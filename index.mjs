@@ -71,7 +71,9 @@ async function chat(messages) {
     },
     body: JSON.stringify({ model: 'gpt-4o', messages, tools }),
   }).then(r => r.json());
-  return r.choices[0].message;
+  const msg = r.choices?.[0]?.message;
+  if (!msg) throw new Error(JSON.stringify(r));
+  return msg;
 }
 
 async function run(messages) {
