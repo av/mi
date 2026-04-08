@@ -53,6 +53,8 @@ const toolDefs = [
   },
 ];
 
+const dim = s => `\x1b[90m${s}\x1b[0m`;
+
 async function chat(messages) {
   const r = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -75,9 +77,9 @@ async function run(messages) {
     for (const tc of msg.tool_calls) {
       const { name } = tc.function;
       const args = JSON.parse(tc.function.arguments);
-      console.log(`> ${name}(${JSON.stringify(args)})`);
+      console.log(dim(`> ${name}(${JSON.stringify(args)})`));
       const result = String(tools[name](args));
-      console.log(result);
+      console.log(dim(result));
       messages.push({ role: 'tool', tool_call_id: tc.id, content: result });
     }
   }
