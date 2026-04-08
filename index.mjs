@@ -55,9 +55,10 @@ const toolDefs = [
 
 const dim = s => `\x1b[90m${s}\x1b[0m`;
 const model = process.env.MODEL || 'gpt-4o';
+const baseUrl = (process.env.OPENAI_BASE_URL || 'https://api.openai.com').replace(/\/+$/, '');
 
 async function chat(messages) {
-  const r = await fetch('https://api.openai.com/v1/chat/completions', {
+  const r = await fetch(`${baseUrl}/v1/chat/completions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
