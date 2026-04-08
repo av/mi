@@ -11,46 +11,18 @@ const tools = {
   write: ({ path, content }) => { writeFileSync(path, content); return 'ok'; },
 };
 
+function mkParams(...keys) {
+  return {
+    type: 'object',
+    properties: Object.fromEntries(keys.map(k => [k, { type: 'string' }])),
+    required: keys,
+  };
+}
+
 const toolDefs = [
-  {
-    type: 'function',
-    function: {
-      name: 'bash',
-      description: 'run a bash command',
-      parameters: {
-        type: 'object',
-        properties: { cmd: { type: 'string' } },
-        required: ['cmd'],
-      },
-    },
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'read',
-      description: 'read a file',
-      parameters: {
-        type: 'object',
-        properties: { path: { type: 'string' } },
-        required: ['path'],
-      },
-    },
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'write',
-      description: 'write a file',
-      parameters: {
-        type: 'object',
-        properties: {
-          path: { type: 'string' },
-          content: { type: 'string' },
-        },
-        required: ['path', 'content'],
-      },
-    },
-  },
+  { type: 'function', function: { name: 'bash', description: 'run bash cmd', parameters: mkParams('cmd') } },
+  { type: 'function', function: { name: 'read', description: 'read a file', parameters: mkParams('path') } },
+  { type: 'function', function: { name: 'write', description: 'write a file', parameters: mkParams('path', 'content') } },
 ];
 
 const dim = s => `\x1b[90m${s}\x1b[0m`;
