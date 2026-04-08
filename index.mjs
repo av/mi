@@ -78,9 +78,9 @@ async function run(messages) {
       const { name } = tc.function;
       const args = JSON.parse(tc.function.arguments);
       console.log(dim(`> ${name}(${JSON.stringify(args)})`));
-      const result = String(tools[name](args));
-      console.log(dim(result));
-      messages.push({ role: 'tool', tool_call_id: tc.id, content: result });
+      const out = String(tools[name](args));
+      console.log(dim(out.length > 200 ? out.slice(0, 200) + '…' : out));
+      messages.push({ role: 'tool', tool_call_id: tc.id, content: out });
     }
   }
 }
