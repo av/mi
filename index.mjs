@@ -11,62 +11,55 @@ const tools = {
   write: ({ path, content }) => { writeFileSync(path, content); return 'ok'; },
 };
 
-function mkParams(...keys) {
-  return {
-    type: 'object',
-    properties: Object.fromEntries(keys.map(k => [k, { type: 'string' }])),
-    required: keys,
-  };
-}
+const mkp = (...keys) => ({
+  type: 'object',
+  properties: Object.fromEntries(keys.map(k => [k, { type: 'string' }])),
+  required: keys,
+});
 
-const toolDefs = [
-  { type: 'function', function: { name: 'bash', description: 'run bash cmd', parameters: mkParams('cmd') } },
-  { type: 'function', function: { name: 'read', description: 'read a file', parameters: mkParams('path') } },
-  { type: 'function', function: { name: 'write', description: 'write a file', parameters: mkParams('path', 'content') } },
-];
+const defs = [
+  { name: 'bash', description: 'run bash cmd', parameters: mkp('cmd') },
+  { name: 'read', description: 'read a file', parameters: mkp('path') },
+  { name: 'write', description: 'write a file', parameters: mkp('path', 'content') },
+].map(f => ({ type: 'function', function: f }));
 
 const dim = s => `\x1b[90m${s}\x1b[0m`;
 const model = process.env.MODEL || 'gpt-4o';
 const baseUrl = (process.env.OPENAI_BASE_URL || 'https://api.openai.com').replace(/\/+$/, '');
 
-async function chat(messages) {
-  const r = await fetch(`${baseUrl}/v1/chat/completions`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-    },
-    body: JSON.stringify({ model, messages, tools: toolDefs }),
-  }).then(r => r.json());
-  const msg = r.choices?.[0]?.message;
-  if (!msg) throw new Error(JSON.stringify(r));
-  return msg;
-}
-
-async function run(messages) {
+async function run(msgs) {
   while (true) {
-    const msg = await chat(messages);
-    messages.push(msg);
+    const r = await fetch(`${baseUrl}/v1/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({ model, messages: msgs, tools: defs }),
+    }).then(r => r.json());
+    const msg = r.choices?.[0]?.message;
+    if (!msg) throw new Error(JSON.stringify(r));
+    msgs.push(msg);
     if (!msg.tool_calls) return msg.content;
-    for (const tc of msg.tool_calls) {
-      const { name } = tc.function;
-      const args = JSON.parse(tc.function.arguments);
+    for (const t of msg.tool_calls) {
+      const { name } = t.function;
+      const args = JSON.parse(t.function.arguments);
       console.log(dim(`> ${name}(${JSON.stringify(args)})`));
       const out = String(tools[name](args));
       console.log(dim(out.length > 200 ? out.slice(0, 200) + '…' : out));
-      messages.push({ role: 'tool', tool_call_id: tc.id, content: out });
+      msgs.push({ role: 'tool', tool_call_id: t.id, content: out });
     }
   }
 }
 
 const rl = createInterface({ input: process.stdin, output: process.stdout });
 const ask = q => new Promise(r => rl.question(q, r));
-const history = [];
+const hist = [];
 
 while (true) {
-  const input = await ask('\n> ');
-  if (input.trim()) {
-    history.push({ role: 'user', content: input });
-    console.log(await run(history));
+  const i = await ask('\n> ');
+  if (i.trim()) {
+    hist.push({ role: 'user', content: i });
+    console.log(await run(hist));
   }
 }
