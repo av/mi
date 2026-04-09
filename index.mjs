@@ -45,7 +45,7 @@ async function run(msgs) {
     for (const t of msg.tool_calls) {
       const { name } = t.function;
       const args = JSON.parse(t.function.arguments);
-      console.log(dim(`> ${name}(${JSON.stringify(args)})`));
+      console.log(dim(`⟡ ${name}(${JSON.stringify(args)})`));
       const out = String(tools[name](args));
       console.log(dim(out.length > 200 ? out.slice(0, 200) + '…' : out));
       msgs.push({ role: 'tool', tool_call_id: t.id, content: out });
