@@ -9,11 +9,7 @@ const tools = {
   write: ({ path, content }) => (writeFileSync(path, content), 'ok'),
 };
 
-const mkp = (...keys) => ({
-  type: 'object',
-  properties: Object.fromEntries(keys.map(k => [k, { type: 'string' }])),
-  required: keys,
-});
+const mkp = (...keys) => ({ type: 'object', properties: Object.fromEntries(keys.map(k => [k, { type: 'string' }])), required: keys });
 
 const defs = [
   { name: 'bash', description: 'run bash cmd', parameters: mkp('cmd') },
