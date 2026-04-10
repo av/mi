@@ -8,23 +8,16 @@ const tools = {
   read:  ({ path })         => readFileSync(path, 'utf8'),
   write: ({ path, content }) => (writeFileSync(path, content), 'ok'),
 };
-
 const mkp = (...keys) => ({ type: 'object', properties: Object.fromEntries(keys.map(k => [k, { type: 'string' }])), required: keys });
-
-const defs = [
-  { name: 'bash', description: 'run bash cmd', parameters: mkp('cmd') },
-  { name: 'read', description: 'read a file', parameters: mkp('path') },
-  { name: 'write', description: 'write a file', parameters: mkp('path', 'content') },
-].map(f => ({ type: 'function', function: f }));
+const defs = [{ name: 'bash', description: 'run bash cmd', parameters: mkp('cmd') }, { name: 'read', description: 'read a file', parameters: mkp('path') },
+  { name: 'write', description: 'write a file', parameters: mkp('path', 'content') }].map(f => ({ type: 'function', function: f }));
 
 async function run(msgs) {
   while (true) {
     const base = (process.env.OPENAI_BASE_URL || 'https://api.openai.com').replace(/\/+$/, '');
-    const r = await fetch(`${base}/v1/chat/completions`, {
-      method: 'POST',
+    const r = await fetch(`${base}/v1/chat/completions`, { method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
-      body: JSON.stringify({ model: process.env.MODEL || 'gpt-4o', messages: msgs, tools: defs }),
-    }).then(r => r.json());
+      body: JSON.stringify({ model: process.env.MODEL || 'gpt-4o', messages: msgs, tools: defs }) }).then(r => r.json());
     const msg = r.choices?.[0]?.message;
     if (!msg) throw new Error(JSON.stringify(r));
     msgs.push(msg);
