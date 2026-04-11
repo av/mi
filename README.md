@@ -1,6 +1,6 @@
 # mi
 
-Minimal agentic REPL. Bash + file tools. OpenAI-compatible.
+30 lines. Agentic REPL. Bash + file tools. OpenAI-compatible.
 
 ## Usage
 
