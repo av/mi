@@ -40,3 +40,124 @@ MODEL=qwen3.5:4b OPENAI_BASE_URL=http://localhost:33821 mi
 | `OPENAI_BASE_URL` | `https://api.openai.com` | api base url (ollama, lmstudio, litellm, etc) |
 | `MODEL` | `gpt-5.4` | model name |
 | `SYSTEM_PROMPT` | built-in agent prompt | override the system prompt entirely |
+
+## deep dive
+
+an agentic harness is surprisingly simple. it's a loop that calls an llm, checks if it wants to use tools, executes them, feeds results back, and repeats. here's how each part works.
+
+### tools
+
+the agent needs to affect the outside world. tools are just functions that take structured args and return a string. three tools is enough for a general-purpose coding agent:
+
+```js
+const tools = {
+  bash: ({ command }) => execShell(command),    // run any shell command
+  read:  ({ path }) => readFileSync(path, 'utf8'),  // read a file
+  write: ({ path, content }) => (writeFileSync(path, content), 'ok'), // write a file
+};
+```
+
+`bash` gives the agent access to the entire system — git, curl, compilers, package managers. `read` and `write` handle files. every tool returns a string because that's what goes back into the conversation.
+
+### tool definitions
+
+the llm doesn't see your functions. it sees json schemas that describe what tools are available and what arguments they accept:
+
+```js
+const defs = [
+  { name: 'bash',  description: 'run bash cmd', parameters: mkp('command') },
+  { name: 'read',  description: 'read a file',  parameters: mkp('path') },
+  { name: 'write', description: 'write a file', parameters: mkp('path', 'content') },
+].map(f => ({ type: 'function', function: f }));
+```
+
+`mkp` is a helper that builds a json schema object from a list of key names — each key becomes a required string property. the `defs` array is sent along with every api call so the model knows what it can do.
+
+### messages
+
+the conversation is a flat array of message objects. each message has a `role` — `system`, `user`, `assistant`, or `tool` — and `content`. this array is the agent's entire memory:
+
+```js
+const hist = [{ role: 'system', content: SYSTEM }];
+
+// user says something
+hist.push({ role: 'user', content: 'fix the bug in server.js' });
+
+// assistant replies (pushed inside the loop)
+// tool results get pushed too (role: 'tool')
+```
+
+the system message sets the agent's personality and context (working directory, date). every user message, assistant response, and tool result gets appended. the model sees the full history on each call, which is how it maintains context across multiple tool uses.
+
+### the api call
+
+each iteration makes a single call to the chat completions endpoint. the model receives the full message history and the tool definitions:
+
+```js
+const r = await fetch(`${base}/v1/chat/completions`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+  body: JSON.stringify({ model, messages: msgs, tools: defs }),
+}).then(r => r.json());
+const msg = r.choices[0].message;
+```
+
+the response message either has `content` (a text reply to the user) or `tool_calls` (the model wants to use tools). this is the decision point that drives the whole loop.
+
+### the agentic loop
+
+this is the core of the harness. it's a `while (true)` that keeps calling the llm until it responds with text instead of tool calls:
+
+```js
+async function run(msgs) {
+  while (true) {
+    const msg = await callLLM(msgs);  // make the api call
+    msgs.push(msg);                   // add assistant response to history
+    if (!msg.tool_calls) return msg.content;  // no tools? we're done
+    // otherwise, execute tools and continue...
+  }
+}
+```
+
+the loop exits only when the model decides it has enough information to respond directly. the model might call tools once or twenty times — it drives its own execution. this is what makes it *agentic*: the llm decides when it's done, not the code.
+
+### tool execution
+
+when the model returns `tool_calls`, the harness executes each one and pushes the result back into the message history as a `tool` message:
+
+```js
+for (const t of msg.tool_calls) {
+  const { name } = t.function;
+  const args = JSON.parse(t.function.arguments);
+  const result = String(await tools[name](args));
+  msgs.push({ role: 'tool', tool_call_id: t.id, content: result });
+}
+```
+
+each tool result is tagged with the `tool_call_id` so the model knows which call it corresponds to. after all tool results are pushed, the loop goes back to the top and calls the llm again — now with the tool outputs in context.
+
+### the repl
+
+the outer shell is a simple read-eval-print loop. it reads user input, pushes it as a user message, calls `run()`, and prints the result:
+
+```js
+while (true) {
+  const input = await ask('\n> ');
+  if (input.trim()) {
+    hist.push({ role: 'user', content: input });
+    console.log(await run(hist));
+  }
+}
+```
+
+there's also a one-shot mode (`-p 'prompt'`) that skips the repl and exits after a single run. both modes use the same `run()` function — the agentic loop doesn't care where the prompt came from.
+
+### putting it together
+
+the full flow looks like this:
+
+```
+user prompt → [system, user] → llm → tool_calls? → execute tools → [tool results] → llm → ... → text response
+```
+
+more sophisticated agents add things like memory, retries, parallel tool calls, or multi-agent delegation, but the core is always: **loop, call, check for tools, execute, repeat**.
