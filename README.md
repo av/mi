@@ -1,5 +1,7 @@
 ![Splash image](./assets/splash.png)
 
+https://github.com/user-attachments/assets/9289d105-5a40-442d-b1b5-773723c95c13
+
 agentic coding in 30 loc. a loop, three tools, and an llm.
 
 ## features
