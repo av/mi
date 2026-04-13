@@ -8,17 +8,28 @@ agentic coding in 30 loc. a loop, three tools, and an llm.
 - chat REPL by default
 - non-interactive mode with `-p 'prompt'` arg
 
+## install
+
+```sh
+# run directly
+npx @avcodes/mi
+
+# or install globally
+npm i -g @avcodes/mi
+mi
+```
+
 ## usage
 
 ```sh
 # interactive repl
-OPENAI_API_KEY=sk-... node index.mjs
+OPENAI_API_KEY=sk-... mi
 
 # one-shot (run once, exit)
-node index.mjs -p 'refactor auth.js to use bcrypt'
+mi -p 'refactor auth.js to use bcrypt'
 
 # local models via any openai-compatible api
-MODEL=qwen3.5:4b OPENAI_BASE_URL=http://localhost:33821 node index.mjs
+MODEL=qwen3.5:4b OPENAI_BASE_URL=http://localhost:33821 mi
 ```
 
 ## env
