@@ -2,12 +2,17 @@
 
 https://github.com/user-attachments/assets/9289d105-5a40-442d-b1b5-773723c95c13
 
-agentic coding in 30 loc. a loop, three tools, and an llm.
+agentic coding in 30 loc. a loop, four tools, and an llm.
 
 ## features
 
-- `bash`, `read` and `write` tools
-- chat REPL by default
+- `bash`, `read`, `write`, and `skill` tools
+- `skill` tool loads agent skills from `~/.agents/skills/`
+- accepts stdin via pipes (e.g. `echo "do this" | mi`)
+- file context ingestion via `-f <file>` argument
+- automatic ingestion of `AGENTS.md` if it exists in current directory
+- chat REPL by default with interactive `/reset` command to clear history
+- graceful `SIGINT` (Ctrl+C) handling for bash child processes
 - non-interactive mode with `-p 'prompt'` arg
 
 ## install
@@ -49,7 +54,7 @@ an agentic harness is surprisingly simple. it's a loop that calls an llm, checks
 
 ### tools
 
-the agent needs to affect the outside world. tools are just functions that take structured args and return a string. three tools is enough for a general-purpose coding agent:
+the agent needs to affect the outside world. tools are just functions that take structured args and return a string. four tools is enough for a general-purpose coding agent:
 
 ```js
 const tools = {
