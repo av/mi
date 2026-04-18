@@ -21,6 +21,10 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
           scope: '@avcodes'
           
+      - name: Update npm to support OIDC tokenless publishing
+        run: npm install -g npm@latest
+          
       - run: npm install
       
-      - run: npm publish --access public --provenance
+      - name: Publish tokenlessly
+        run: npm publish --access public --provenance
