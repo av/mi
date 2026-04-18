@@ -18,6 +18,10 @@
     "cli",
     "openai"
   ],
+  "scripts": {
+    "test": "node --test tests/test.js",
+    "lines": "node scripts/count-lines.mjs index.mjs"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",

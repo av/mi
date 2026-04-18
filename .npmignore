@@ -1,0 +1,13 @@
+# dev utilities
+scripts/
+
+# tests
+tests/
+
+# assets & docs
+assets/
+README.md
+AGENTS.md
+
+# ci
+.github/
