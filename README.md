@@ -6,7 +6,7 @@ agentic coding in 30 loc. a loop, four tools, and an llm.
 
 ## features
 
-- `bash`, `read`, `write`, and `skill` tools
+- `bash` (optional `timeout=<ms>` kills after delay, `bg=truthy` detaches and returns pid+log), `read`, `write`, and `skill` tools
 - `skill` tool loads agent skills from `~/.agents/skills/`
 - accepts stdin via pipes (e.g. `echo "do this" | mi`)
 - file context ingestion via `-f <file>` argument
@@ -64,14 +64,14 @@ the agent needs to affect the outside world. tools are just functions that take 
 
 ```js
 const tools = {
-  bash: ({ command }) => execShell(command),    // run any shell command
+  bash: ({ command, timeout, bg }) => execShell(command, timeout, bg), // run any shell command
   read:  ({ path }) => readFileSync(path, 'utf8'),  // read a file
   write: ({ path, content }) => (writeFileSync(path, content), 'ok'), // write a file
   skill: ({ name }) => loadSkillMarkdown(name), // load agent skill from ~/.agents/skills/
 };
 ```
 
-`bash` gives the agent access to the entire system: git, curl, compilers, package managers. `read` and `write` handle files. `skill` gives the agent specialized workflows. every tool returns a string because that's what goes back into the conversation.
+`bash` gives the agent access to the entire system: git, curl, compilers, package managers. optional `timeout=<ms>` kills the process after the given delay and resolves with `[timeout]`. optional `bg=truthy` runs the command detached and returns `pid:X log:/tmp/mi-*.log` immediately. `read` and `write` handle files. `skill` gives the agent specialized workflows. every tool returns a string because that's what goes back into the conversation.
 
 ### tool definitions
 

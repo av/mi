@@ -490,3 +490,78 @@ test('clean ctrl-c and subprocess cleanup', async () => {
   
   assert.strictEqual(pgrepCode, 1, 'The sleep process should have been killed');
 });
+
+test('bash tool timeout', async () => {
+  let callCount = 0;
+  requestHandler = (req, res, body) => {
+    callCount++;
+    if (callCount === 1) {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        choices: [{
+          message: {
+            role: 'assistant',
+            tool_calls: [{
+              id: 'call_timeout',
+              type: 'function',
+              function: {
+                name: 'bash',
+                arguments: JSON.stringify({ command: 'sleep 5', timeout: '300' })
+              }
+            }]
+          }
+        }]
+      }));
+    } else {
+      const lastMsg = body.messages[body.messages.length - 1];
+      assert.strictEqual(lastMsg.role, 'tool');
+      assert.match(lastMsg.content, /\[timeout\]/);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        choices: [{ message: { role: 'assistant', content: 'timeout works' } }]
+      }));
+    }
+  };
+
+  const result = await runMi(['-p', 'run timeout']);
+  assert.strictEqual(result.status, 0);
+  assert.match(result.stdout, /timeout works/);
+});
+
+test('bash tool bg', async () => {
+  let callCount = 0;
+  requestHandler = (req, res, body) => {
+    callCount++;
+    if (callCount === 1) {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        choices: [{
+          message: {
+            role: 'assistant',
+            tool_calls: [{
+              id: 'call_bg',
+              type: 'function',
+              function: {
+                name: 'bash',
+                arguments: JSON.stringify({ command: 'echo bg_test', bg: 'true' })
+              }
+            }]
+          }
+        }]
+      }));
+    } else {
+      const lastMsg = body.messages[body.messages.length - 1];
+      assert.strictEqual(lastMsg.role, 'tool');
+      assert.match(lastMsg.content, /pid:\d+/);
+      assert.match(lastMsg.content, /log:\/tmp\/mi-/);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        choices: [{ message: { role: 'assistant', content: 'bg works' } }]
+      }));
+    }
+  };
+
+  const result = await runMi(['-p', 'run bg']);
+  assert.strictEqual(result.status, 0);
+  assert.match(result.stdout, /bg works/);
+});

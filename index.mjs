@@ -11,16 +11,16 @@ import { createInterface } from 'readline'; import { spawn } from 'child_process
 const tools = {
 
   /* Run a command in a detached bash shell; resolve with combined output. */
-  bash: ({command}) => new Promise(resolve => { const child = spawn('bash', ['-c', command], { stdio: ['ignore', 'pipe', 'pipe'], detached: true });
+  bash: ({command,timeout,bg}) => { if (bg) { const log=`/tmp/mi-${Date.now()}.log`; const c=spawn('bash',['-c',`${command} >${log} 2>&1`],{stdio:'ignore',detached:true}); c.unref(); return `pid:${c.pid} log:${log}`; } return new Promise(resolve => { const child = spawn('bash', ['-c', command], { stdio: ['ignore', 'pipe', 'pipe'], detached: true });
 
     /* Collect stdout and stderr into a single string. */
     let output = ''; child.stdout.on('data', data => output += data); child.stderr.on('data', data => output += data);
 
     /* Kill the process group on SIGINT; remove the listener on exit. */
-    const cleanup = () => { try { process.kill(-child.pid) } catch (err) {} }; process.on('SIGINT', cleanup);
+    const cleanup = () => { try { process.kill(-child.pid) } catch (err) {} }; process.on('SIGINT', cleanup); const timer = timeout ? setTimeout(() => { cleanup(); resolve(output+'\n[timeout]') }, +timeout) : null;
 
     /* Resolve with collected output once the child process exits. */
-    child.on('exit', () => { process.off('SIGINT', cleanup); resolve(output); }); }),
+    child.on('exit', () => { process.off('SIGINT', cleanup); if (timer) clearTimeout(timer); resolve(output); }); }); },
 
   /* Read a file as UTF-8. */
   read:  ({path})         => readFileSync(path, 'utf8'),
@@ -31,10 +31,10 @@ const tools = {
   /* Load a skill's SKILL.md from ~/.agents/skills/<name>/. */
   skill: ({name})         => readFileSync(`${process.env.HOME || homedir()}/.agents/skills/${name}/SKILL.md`, 'utf8')
 
-}; const makeParams = (...keys) => ({ type: 'object', properties: Object.fromEntries(keys.map(key => [key, { type: 'string' }])), required: keys });
+}; const makeParams = (...keys) => ({ type: 'object', properties: Object.fromEntries(keys.map(k => [k.replace('?',''), { type: 'string' }])), required: keys.filter(k => !k.startsWith('?')) });
 
 /* Tool definitions formatted for the OpenAI API. */
-const toolsDef = [{ name: 'bash', description: 'run bash cmd', parameters: makeParams('command') }, { name: 'read', description: 'read a file', parameters: makeParams('path') }, { name: 'write', description: 'write a file', parameters: makeParams('path', 'content') }, { name: 'skill', description: 'load skill', parameters: makeParams('name') }].map(func => ({ type: 'function', function: func }));
+const toolsDef = [{ name: 'bash', description: 'run bash cmd; timeout=ms kills after delay, bg=truthy runs detached returning pid+log', parameters: makeParams('command', '?timeout', '?bg') }, { name: 'read', description: 'read a file', parameters: makeParams('path') }, { name: 'write', description: 'write a file', parameters: makeParams('path', 'content') }, { name: 'skill', description: 'load skill', parameters: makeParams('name') }].map(func => ({ type: 'function', function: func }));
 
 /*
  * Call the chat API in a loop, executing tool calls, until the model
@@ -66,7 +66,7 @@ const SYSTEM = (process.env.SYSTEM_PROMPT || 'You are an autonomous agent. Prefe
 /* History seeded with the system prompt; getArg reads a named CLI flag. */
 const history = [{ role: 'system', content: SYSTEM }], getArg = key => (idx => idx >= 0 && process.argv[idx + 1])(process.argv.indexOf(key));
 
-if (process.argv.includes('-h')) { console.log('usage: mi [-p prompt] [-f file] [-h]\n  pipe: echo "..." | mi    repl: /reset clears history\nenv: OPENAI_API_KEY, MODEL, OPENAI_BASE_URL, SYSTEM_PROMPT'); process.exit(0); }
+if (process.argv.includes('-h')) { console.log('usage: mi [-p prompt] [-f file] [-h]\n  pipe: echo "..." | mi    repl: /reset clears history\nenv: OPENAI_API_KEY, MODEL, OPENAI_BASE_URL, SYSTEM_PROMPT\nbash tool args: timeout=<ms> kills after delay · bg=truthy detaches and returns pid+log'); process.exit(0); }
 
 /* Prepend -f file and AGENTS.md (if present) to the system message. */
 const fileArg = getArg('-f'); if (fileArg) history[0].content += `\n\nFile (${fileArg}):\n` + readFileSync(fileArg, 'utf8'); if (existsSync('AGENTS.md')) history[0].content += '\n' + readFileSync('AGENTS.md', 'utf8');
