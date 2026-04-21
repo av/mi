@@ -5,7 +5,7 @@ description: Spawn an isolated `mi -p '<prompt>'` subprocess via bash for self-c
 
 Use when the work is self-contained and iteration isn't needed: codebase exploration, bulk research across many files, independent subtasks that can run in parallel, one-shot refactors with a clear spec.
 
-Do not use for iterative work needing back-and-forth, or for tasks already mid-flight in the main context. Do not nest — a delegated subprocess must not itself delegate.
+Do not use for iterative work needing back-and-forth, or for tasks already mid-flight in the main context.
 
 The subprocess inherits `OPENAI_API_KEY`, `MODEL`, `OPENAI_BASE_URL` and has no prior history. The prompt must be fully self-contained:
 
@@ -29,6 +29,6 @@ mi -p '<prompt A>'   # with bg=truthy -> pid:A log:/tmp/mi-A.log
 mi -p '<prompt B>'   # with bg=truthy -> pid:B log:/tmp/mi-B.log
 ```
 
-Collect each `pid` and `log`. Wait with `wait <pid>` or poll `kill -0 <pid> 2>/dev/null`. Once done, `cat` each log to read the full transcript. Prefer telling each subprocess to also write a compact result file under `/tmp/mi-*` so you don't have to parse transcript noise.
+Collect each `pid` and `log`. Background children are detached (the harness calls `unref`) so `wait` will not find them — poll with `kill -0 <pid> 2>/dev/null` instead (exit 0 = still running, exit 1 = finished). Once done, `cat` each log to read the full transcript. Prefer telling each subprocess to also write a compact result file under `/tmp/mi-*` so you don't have to parse transcript noise.
 
 Keep prompts short and specific. A vague delegation wastes a whole subprocess.

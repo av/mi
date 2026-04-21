@@ -16,8 +16,8 @@ Do not propose a fix before step 1 completes. A bug you cannot reproduce is a bu
 
 4. **Test the hypothesis.** Change exactly one variable, re-run the repro, record the result. If the hypothesis is wrong, revert the change before trying the next one — do not stack speculative edits.
 
+   If the fix requires new code rather than a surgical change, hand off to the `tdd` skill for red/green/refactor before proceeding to verification.
+
 5. **Verify the fix.** The repro now passes AND nothing else broke. Hand off to the `verify` skill for the broader check (lint, typecheck, full test suite). Keep the repro script or test committed where useful — it's a regression guard.
 
 If you cannot reproduce after a reasonable effort, stop and say so. Request more information (exact command, environment, inputs, version). Do not guess-patch an unreproduced bug.
-
-If the fix is new code rather than a surgical change, hand off to `tdd` for red/green/refactor.

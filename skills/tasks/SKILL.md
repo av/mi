@@ -1,11 +1,13 @@
 ---
 name: tasks
-description: Track execution state for multi-step work as a checkbox list at /tmp/mi-tasks.md. Load when work has more than one step; skip for single-step jobs. State tracking only — use `plan` for strategy.
+description: Track execution state for multi-step work as a checkbox list at /tmp/mi-<slug>/tasks.md. Load when work has more than one step; skip for single-step jobs. State tracking only — use `plan` for strategy.
 ---
 
 Skip entirely for single-step work.
 
-Maintain `/tmp/mi-tasks.md` as a flat checkbox list:
+Use the same `<slug>` as the `plan` skill — both live under `/tmp/mi-<slug>/`. If no plan exists, pick a kebab-case slug and `mkdir -p /tmp/mi-<slug>` first.
+
+Maintain `/tmp/mi-<slug>/tasks.md` as a flat checkbox list:
 
 ```
 - [ ] pending task
@@ -20,6 +22,16 @@ Rules:
 - When scope grows, append new `- [ ]` entries. Do not silently drop work.
 - Never delete tasks. Abandoned work becomes `- [x] <task> (skipped: <one-line reason>)`.
 
-Re-read the file before each state transition so updates are exact. Edit with targeted `sed -i` on the full line, not line numbers (they shift).
+**Always rewrite the entire file with a quoted heredoc.** Do NOT use `sed`, `awk`, or any stream edit — task titles can contain `/`, `&`, quotes, backticks, and regex metacharacters that silently corrupt in-place edits. The quoted `'EOF'` also blocks variable and command expansion in the body:
+
+```
+cat > /tmp/mi-<slug>/tasks.md <<'EOF'
+- [x] read config
+- [~] add retry to fetch
+- [ ] update tests
+EOF
+```
+
+Before every rewrite, `cat /tmp/mi-<slug>/tasks.md` first and reproduce every existing line verbatim so nothing is dropped. Only change the state marker of the single task whose status flipped; leave every other line byte-identical.
 
 Keep titles short and action-oriented ("add retry to fetch", not "I should probably add retry logic to the fetch function"). No priorities, no timestamps, no nesting — if you need structure beyond a flat list, the work belongs in `plan`, not here.

@@ -1,11 +1,13 @@
 ---
 name: plan
-description: Record a short strategy doc at /tmp/mi-plan.md before non-trivial work. Load when a task needs more than one step, spans multiple files, or has unclear direction.
+description: Record a short strategy doc at /tmp/mi-<slug>/plan.md before non-trivial work. Load when a task needs more than one step, spans multiple files, or has unclear direction.
 ---
 
 Skip entirely for trivial one-step work (single edit, single command, single read).
 
-Write `/tmp/mi-plan.md` with three sections, nothing else:
+Pick a short kebab-case `<slug>` for the task (e.g. `auth-refactor`, `fix-retry-bug`) and reuse it for both `plan` and `tasks` — they share `/tmp/mi-<slug>/` so they move together. Create the dir once with `mkdir -p /tmp/mi-<slug>`. If a plan already exists for the task, reuse the same slug rather than starting a new one (`ls -d /tmp/mi-*/ 2>/dev/null` to check).
+
+Write `/tmp/mi-<slug>/plan.md` with three sections, nothing else:
 
 ```
 # Goal
@@ -22,6 +24,6 @@ Write `/tmp/mi-plan.md` with three sections, nothing else:
 
 This is strategy, not a task list. No checkboxes, no status fields — the `tasks` skill owns execution state.
 
-Re-read `/tmp/mi-plan.md` before each major step. If reality diverges from the plan, revise the file before continuing — do not let it rot.
+Re-read `/tmp/mi-<slug>/plan.md` before each major step. If reality diverges from the plan, revise the file before continuing — do not let it rot.
 
 Revise (don't append) when direction changes. The doc should always reflect current intent, not history.

@@ -3,34 +3,20 @@ name: verify
 description: Run the project's lint/typecheck/test/build after code changes; never declare work done on red output.
 ---
 
-Detect the stack, then run its checks cheapest-first so failures surface fast. Run after every non-trivial edit, not just at the end.
+Run after every non-trivial edit, not just at the end. Never invent commands — use only what the project itself declares.
 
-Detection (one pass, quick):
-- `ls package.json pyproject.toml Cargo.toml go.mod Makefile 2>/dev/null`
-- Node: `sed -n '/"scripts"/,/}/p' package.json` — look for `lint`, `typecheck`, `test`, `build`.
-- Make: `grep -E '^[a-zA-Z_-]+:' Makefile` — look for `lint`, `test`, `check`, `ci`.
-- Python: check `pyproject.toml` for `[tool.ruff]`, `[tool.mypy]`, `[tool.pytest]`; also `tox.ini`, `noxfile.py`.
-- Rust: `Cargo.toml` implies `cargo` toolchain.
-- Go: `go.mod` implies `go` toolchain.
+Find the commands the project actually uses, in this order:
 
-Execution order (stop and fix on first red):
-1. Typecheck / lint (seconds)
-2. Unit tests (seconds to a minute)
-3. Full test suite / build (slow)
+1. **Repo instructions first.** `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md`, `README.md`. These usually name the lint/test/build commands verbatim and are authoritative when present.
+2. **Declared build metadata.** Inspect whatever the project's toolchain uses: `package.json` `"scripts"`, `Makefile` targets, `pyproject.toml` / `tox.ini` / `noxfile.py`, `Cargo.toml`, `go.mod`, `build.gradle` / `pom.xml`, `mix.exs`, `stack.yaml` / `*.cabal`, `deno.json`, etc. Only run scripts/targets that actually exist.
+3. **CI config as fallback.** `.github/workflows/*.yml`, `.gitlab-ci.yml`, `.circleci/config.yml`, `azure-pipelines.yml` — these run the real check commands and are a reliable source when docs are thin.
 
-One-liners by stack — pick what the project actually has:
-- npm:   `npm run -s lint && npm run -s typecheck && npm test --silent && npm run -s build`
-- yarn:  `yarn -s lint && yarn -s typecheck && yarn -s test && yarn -s build`
-- pnpm:  `pnpm -s lint && pnpm -s typecheck && pnpm -s test && pnpm -s build`
-- python: `ruff check . && mypy . && pytest -q`
-- rust:  `cargo fmt --check && cargo clippy -- -D warnings && cargo test`
-- go:    `go vet ./... && go test ./... && go build ./...`
-- make:  `make lint && make test` (or `make check` / `make ci` if defined)
+Run checks cheapest-first so failures surface fast: format/lint → typecheck → unit tests → integration/build. Stop at the first red and fix the cause, not the symptom, before continuing.
 
-For long suites, wrap with `timeout=ms` on the bash call; if a command hangs, kill it and investigate rather than retrying blindly.
+For long suites, wrap with `timeout=<ms>` on the bash call; if a command hangs, kill it and investigate rather than retrying blindly.
 
 On red:
-- Do NOT report the task as done. Read the failing output, fix the cause (not the symptom), re-run the same command, then re-run earlier stages to confirm no regression.
+- Do NOT report the task as done. Read the failing output, fix the underlying cause, re-run the same command, then re-run earlier stages to confirm no regression.
 - If a check was pre-existing red on untouched code, say so explicitly; do not silently skip it.
 
-If detection finds no lint/typecheck/test/build commands: tell the user plainly that the project has no verification commands configured. Do not invent one.
+If after checking the three sources above you find no verification commands, tell the user plainly that the project has none configured. Do not scaffold one and do not fall back to guessed defaults.
