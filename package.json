@@ -1,13 +1,14 @@
 {
   "name": "@avcodes/mi",
   "version": "1.0.9",
-  "description": "agentic coding in 30 loc. a loop, four tools, and an llm.",
+  "description": "agentic coding in 27 loc. a loop, two tools, and an llm.",
   "type": "module",
   "bin": {
     "mi": "./index.mjs"
   },
   "files": [
-    "index.mjs"
+    "index.mjs",
+    "skills"
   ],
   "keywords": [
     "ai",

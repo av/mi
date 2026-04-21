@@ -2,12 +2,13 @@
 
 https://github.com/user-attachments/assets/9289d105-5a40-442d-b1b5-773723c95c13
 
-agentic coding in 30 loc. a loop, four tools, and an llm.
+agentic coding in 27 loc. a loop, two tools, and an llm.
 
 ## features
 
-- `bash` (optional `timeout=<ms>` kills after delay, `bg=truthy` detaches and returns pid+log), `read`, `write`, and `skill` tools
-- `skill` tool loads `SKILL.md` playbooks from `~/.agents/skills/` (descriptions auto-advertised in system prompt so the model matches tasks to skills)
+- `bash` (optional `timeout=<ms>` kills after delay, `bg=truthy` detaches and returns pid+log) and `skill` tools — file I/O goes through `bash` (`cat`, `sed -i`, heredocs)
+- `skill` tool loads `SKILL.md` playbooks from bundled `skills/` and `~/.agents/skills/` (descriptions auto-advertised in system prompt so the model matches tasks to skills)
+- bundled skills: `plan`, `tasks`, `delegate`, `verify`, `debug`, `tdd`
 - accepts stdin via pipes (e.g. `echo "do this" | mi`)
 - file context ingestion via `-f <file>` argument
 - automatic ingestion of `AGENTS.md` if it exists in current directory
@@ -60,18 +61,16 @@ an agentic harness is surprisingly simple. it's a loop that calls an llm, checks
 
 ### tools
 
-the agent needs to affect the outside world. tools are just functions that take structured args and return a string. four tools is enough for a general-purpose coding agent:
+the agent needs to affect the outside world. tools are just functions that take structured args and return a string. two tools is enough for a general-purpose coding agent:
 
 ```js
 const tools = {
-  bash: ({ command, timeout, bg }) => execShell(command, timeout, bg), // run any shell command
-  read:  ({ path }) => readFileSync(path, 'utf8'),  // read a file
-  write: ({ path, content }) => (writeFileSync(path, content), 'ok'), // write a file
-  skill: ({ name }) => loadSkillMarkdown(name), // load agent skill from ~/.agents/skills/
+  bash:  ({ command, timeout, bg }) => execShell(command, timeout, bg), // run any shell command
+  skill: ({ name }) => loadSkillMarkdown(name), // load agent skill from bundled skills/ or ~/.agents/skills/
 };
 ```
 
-`bash` gives the agent access to the entire system: git, curl, compilers, package managers. optional `timeout=<ms>` kills the process after the given delay and resolves with `[timeout]`. optional `bg=truthy` runs the command detached and returns `pid:X log:/tmp/mi-*.log` immediately. `read` and `write` handle files. `skill` gives the agent specialized workflows. every tool returns a string because that's what goes back into the conversation.
+`bash` gives the agent access to the entire system: git, curl, compilers, package managers, and file I/O (via `cat`, `sed -n`, `sed -i`, heredocs — the system prompt teaches the patterns). optional `timeout=<ms>` kills the process after the given delay and resolves with `[timeout]`. optional `bg=truthy` runs the command detached and returns `pid:X log:/tmp/mi-*.log` immediately. `skill` gives the agent specialized workflows loaded on demand from markdown playbooks. every tool returns a string because that's what goes back into the conversation.
 
 ### tool definitions
 
@@ -80,8 +79,7 @@ the llm doesn't see your functions. it sees json schemas that describe what tool
 ```js
 const defs = [
   { name: 'bash',  description: 'run bash cmd', parameters: mkp('command') },
-  { name: 'read',  description: 'read a file',  parameters: mkp('path') },
-  { name: 'write', description: 'write a file', parameters: mkp('path', 'content') },
+  { name: 'skill', description: 'load a skill\'s SKILL.md body by name', parameters: mkp('?name') },
 ].map(f => ({ type: 'function', function: f }));
 ```
 

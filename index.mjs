@@ -2,10 +2,10 @@
 
 /*
  * Import readline for interactive CLI input, child_process to spawn commands,
- * fs to read/write files, and os to get the home directory. Exit with an error
+ * fs to read files, and os to get the home directory. Exit with an error
  * if OPENAI_API_KEY is missing and -h was not passed.
  */
-import { createInterface } from 'readline'; import { spawn } from 'child_process'; import { readFileSync, writeFileSync, existsSync, readdirSync } from 'fs'; import { homedir } from 'os'; const DIR = new URL('.', import.meta.url).pathname; if (!process.env.OPENAI_API_KEY && !process.argv.includes('-h')) { console.error('OPENAI_API_KEY required'); process.exit(1); }
+import { createInterface } from 'readline'; import { spawn } from 'child_process'; import { readFileSync, existsSync, readdirSync } from 'fs'; import { homedir } from 'os'; const DIR = new URL('.', import.meta.url).pathname; if (!process.env.OPENAI_API_KEY && !process.argv.includes('-h')) { console.error('OPENAI_API_KEY required'); process.exit(1); }
 
 /* Tools the agent can invoke. */
 const tools = {
@@ -22,12 +22,6 @@ const tools = {
     /* Resolve with collected output once the child process exits. */
     child.on('exit', () => { process.off('SIGINT', cleanup); if (timer) clearTimeout(timer); resolve(output); }); }); },
 
-  /* Read a file as UTF-8. */
-  read:  ({path})         => readFileSync(path, 'utf8'),
-
-  /* Write content to a file; return 'ok'. */
-  write: ({path,content}) => (writeFileSync(path, content), 'ok'),
-
   /* Load a skill's SKILL.md by name, or list available skills as `- name: description` bullets parsed from YAML frontmatter. */
   skill: ({name}) => name ? loadSkill(name) : listSkills().join('\n'),
 
@@ -35,7 +29,7 @@ const tools = {
 const listSkills = () => skillDirs().flatMap(dir => existsSync(dir) ? readdirSync(dir).filter(d => existsSync(dir+d+'/SKILL.md')).map(d => { const {name,description} = meta(readFileSync(dir+d+'/SKILL.md','utf8')); return `- ${name||d}: ${description}`; }) : []), loadSkill = n => { for (const d of skillDirs()) if (existsSync(d+n+'/SKILL.md')) return readFileSync(d+n+'/SKILL.md','utf8'); }, makeParams = (...keys) => ({ type: 'object', properties: Object.fromEntries(keys.map(k => [k.replace('?',''), { type: 'string' }])), required: keys.filter(k => !k.startsWith('?')) });
 
 /* Tool definitions formatted for the OpenAI API. */
-const toolsDef = [{ name: 'bash', description: 'run bash cmd; timeout=ms kills after delay, bg=truthy runs detached returning pid+log', parameters: makeParams('command', '?timeout', '?bg') }, { name: 'read', description: 'read a file', parameters: makeParams('path') }, { name: 'write', description: 'write a file', parameters: makeParams('path', 'content') }, { name: 'skill', description: 'load a skill\'s SKILL.md body by name', parameters: makeParams('?name') }].map(func => ({ type: 'function', function: func }));
+const toolsDef = [{ name: 'bash', description: 'run bash cmd; timeout=ms kills after delay, bg=truthy runs detached returning pid+log', parameters: makeParams('command', '?timeout', '?bg') }, { name: 'skill', description: 'load a skill\'s SKILL.md body by name', parameters: makeParams('?name') }].map(func => ({ type: 'function', function: func }));
 
 /*
  * Call the chat API in a loop, executing tool calls, until the model
@@ -59,7 +53,7 @@ async function run(messages) { while (true) {
   } } }
 
 /* System prompt: built-in instructions plus current directory and date. */
-const SYSTEM = (process.env.SYSTEM_PROMPT || 'You are an autonomous agent. Prefer action over speculation—use tools to answer questions and complete tasks.\nA skill is a SKILL.md file containing a procedure for a particular kind of task, paired with a one-line description of when it applies. The skill tool loads a skill\'s body by name.\nWhen handling a request, compare it against each skill description listed below. If a description covers what the user is asking for, call skill(name) to load that skill and follow its body as your plan.\nbash runs any shell command: curl/wget for HTTP, git, package managers, compilers, anything available on the system.\nread/write operate on local files. Always read before editing; write complete files.\nApproach: explore, plan, act one step at a time, verify. Be concise.') + `\nCWD: ${process.cwd()}\nDate: ${new Date().toISOString()}`;
+const SYSTEM = (process.env.SYSTEM_PROMPT || 'You are an autonomous agent. Prefer action over speculation—use tools to answer questions and complete tasks.\nA skill is a SKILL.md file containing a procedure for a particular kind of task, paired with a one-line description of when it applies. The skill tool loads a skill\'s body by name.\nWhen handling a request, compare it against each skill description listed below. If a description covers what the user is asking for, call skill(name) to load that skill and follow its body as your plan.\nbash runs any shell command: curl/wget for HTTP, git, package managers, compilers, anything available on the system.\nFile I/O goes through bash. Read with cat, sed -n \'10,40p\' file, head, tail, grep -n. Edit surgically with sed -i \'s/old/new/\' file, or rewrite a whole file via a quoted heredoc: cat > file <<\'EOF\' ... EOF. Read before editing; quote the heredoc delimiter to prevent expansion.\nApproach: explore, plan, act one step at a time, verify. Be concise.') + `\nCWD: ${process.cwd()}\nDate: ${new Date().toISOString()}`;
 
 /* History seeded with the system prompt; getArg reads a named CLI flag. */
 const history = [{ role: 'system', content: SYSTEM }], getArg = key => (idx => idx >= 0 && process.argv[idx + 1])(process.argv.indexOf(key));
