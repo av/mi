@@ -7,6 +7,8 @@ Skip entirely for trivial one-step work (single edit, single command, single rea
 
 Pick a short kebab-case `<slug>` for the task (e.g. `auth-refactor`, `fix-retry-bug`) and reuse the same slug for any execution-state list under `/tmp/mi-<slug>/tasks.md` so plan and tasks move together. Create the dir once with `mkdir -p /tmp/mi-<slug>`. If a plan already exists for the task, reuse the same slug rather than starting a new one (`ls -d /tmp/mi-*/ 2>/dev/null` to check).
 
+**Slug collisions:** When multiple concurrent mi sessions may run simultaneously (e.g. parallel subagents each starting their own plan), append a timestamp or random suffix to avoid clobbering each other's files: `auth-refactor-$(date +%s)`. Single-session sequential work does not need this.
+
 Write `/tmp/mi-<slug>/plan.md` with three sections, nothing else:
 
 ```

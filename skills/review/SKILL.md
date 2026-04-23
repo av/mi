@@ -32,4 +32,6 @@ A review without intent is just grep. Always read the commit message / PR body /
 
 6. Aggregate. Dedupe overlapping findings across partitions. Group the output by severity or by file (ask the user if unclear). If every subagent left an axis empty across the whole diff — e.g. nobody flagged missing tests — call that out as a coverage gap, not a clean bill.
 
+   **Handling missing or blocked subagents:** Before consuming a result file, check that it exists and that `STATUS:` is `complete` or `partial`. If the file is missing or `STATUS: blocked`, do NOT silently skip it — insert a line in the aggregate output: `BLOCKED: <subagent-slug> (no output / status: blocked)`. Continue aggregating remaining partitions normally. Surface blocked partitions to the user at the end so they know that slice was not reviewed.
+
 Poll subagents with `kill -0 <pid> 2>/dev/null` (exit 0 = still running, 1 = done); do not `sleep`-poll and do not `wait`. Read each `/tmp/mi-review-<slug>.md` by grepping `^STATUS:` first to confirm completion before consuming findings.
