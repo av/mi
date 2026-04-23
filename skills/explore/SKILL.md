@@ -9,7 +9,7 @@ Question-driven, not map-driven. If the user's request is "describe this repo" r
 
 2. Identify candidate clusters. Breadth first: `ls -la` the repo root, read the package manifest (`package.json` / `pyproject.toml` / `Cargo.toml` / `go.mod` / etc.) for entry points, then run a single keyword grep — `grep -rli '<term>' <top-level dirs>` — to list candidate files without opening them. Pick 2–5 plausible clusters where the answer could live. If it's obvious (single file, single function), skip delegation and read it directly.
 
-3. Spawn one subagent per cluster via `mi -p '<prompt>'` with `bg=truthy` — the harness returns `pid:X log:/tmp/mi-X.log` and detaches the child; do NOT append `&`. Use this prompt template for each subagent:
+3. Spawn one subagent per cluster via `node "$MI_PATH" -p '<prompt>'` with `bg=truthy` — the harness returns `pid:X log:/tmp/mi-X.log` and detaches the child; do NOT append `&`. Use this prompt template for each subagent:
 
    ```
    Question: <the sharpened question, verbatim>

@@ -36,7 +36,7 @@ Write `/tmp/mi-<slug>/plan.md` with three sections, nothing else:
 - <omit section if genuinely none>
 ```
 
-This is strategy, not a task list. No checkboxes, no status fields — execution state belongs in `/tmp/mi-<slug>/tasks.md`, not here.
+This is strategy, not a task list. No checkboxes, no status fields — execution state belongs in `/tmp/mi-<slug>/tasks.md`, not here. To track step-by-step progress alongside this plan, call `skill("tasks")` and follow its body.
 
 Re-read `/tmp/mi-<slug>/plan.md` before each major step. If reality diverges from the plan, revise the file before continuing — do not let it rot.
 

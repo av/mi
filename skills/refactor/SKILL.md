@@ -21,7 +21,7 @@ A refactor that changes behavior is not a refactor — it's a bug risk wearing a
 
 2. **Name the transformation.** One sentence: "rename `foo` → `bar`", "extract `parseDate` from `utils.py` into `date_utils.py`", "split `big_module.py` into `reader.py` and `writer.py` by concern". Write it down; this sentence becomes your commit message subject.
 
-3. **Callsite sweep** (required for any rename / move / signature change). Spawn a subagent via `node /home/everlier/code/mi/index.mjs -p '<prompt>'` with `bg=truthy` — the harness returns `pid:X log:/tmp/mi-X.log` and detaches the child; do NOT append `&`. The prompt must include: the symbol, the repo root, and instruction to list every hit with context.
+3. **Callsite sweep** (required for any rename / move / signature change). Spawn a subagent via `node "$MI_PATH" -p '<prompt>'` with `bg=truthy` — the harness returns `pid:X log:/tmp/mi-X.log` and detaches the child; do NOT append `&`. The prompt must include: the symbol, the repo root, and instruction to list every hit with context.
 
 4. **Summary contract** — the callsite subagent writes `/tmp/mi-refactor-callsites-<symbol>.md` with:
    - `STATUS:` `complete` | `partial` | `blocked`

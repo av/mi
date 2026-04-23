@@ -5,7 +5,7 @@ description: Track execution state for multi-step work as a checkbox list at /tm
 
 Skip entirely for single-step work.
 
-Reuse the `<slug>` from any existing `/tmp/mi-<slug>/plan.md` so plan and tasks share `/tmp/mi-<slug>/`. If none exists, pick a kebab-case slug and `mkdir -p /tmp/mi-<slug>` first.
+Reuse the `<slug>` from any existing `/tmp/mi-<slug>/plan.md` so plan and tasks share `/tmp/mi-<slug>/`. If none exists, pick a kebab-case slug and `mkdir -p /tmp/mi-<slug>` first. If there is no plan yet and the work has unclear direction, call `skill("plan")` first to record strategy before tracking steps.
 
 **Slug collisions:** If multiple concurrent mi sessions may run simultaneously (e.g. parallel subagents each starting fresh work), a plain descriptive slug like `fix-auth` risks collision. Append a short timestamp or random suffix: `fix-auth-$(date +%s)` or `fix-auth-$(head -c4 /dev/urandom | xxd -p)`. Single-agent sequential work does not need this.
 

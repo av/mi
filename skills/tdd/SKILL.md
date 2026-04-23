@@ -32,6 +32,7 @@ For each new behavior, run the loop below exactly once. Do not queue up multiple
 5. **Refactor**
    - Rename, dedupe, extract — structural changes only, no new behavior.
    - Re-run the same subset. Still green, or revert the refactor.
+   - For significant structural changes (rename across many callsites, extract to a new module, split a large class), call `skill("refactor")` and follow its body — it handles callsite sweeps and the green gate properly.
 
 **Common anti-patterns to avoid:**
 - Writing multiple failing tests before any green (defeats the feedback loop).

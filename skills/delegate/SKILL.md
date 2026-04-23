@@ -1,6 +1,6 @@
 ---
 name: delegate
-description: Spawn an isolated `mi -p '<prompt>'` subprocess via bash for self-contained work that would otherwise bloat the main context. Load for exploration/research, independent parallel subtasks, or one-shot transformations that don't need iteration.
+description: Spawn an isolated subprocess via bash (`node "$MI_PATH" -p '<prompt>'`) for self-contained work that would otherwise bloat the main context. Load for exploration/research, independent parallel subtasks, or one-shot transformations that don't need iteration.
 ---
 
 Use when the work is self-contained and iteration isn't needed: codebase exploration, bulk research across many files, independent subtasks that can run in parallel, one-shot refactors with a clear spec.

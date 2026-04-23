@@ -11,7 +11,7 @@ A review without intent is just grep. Always read the commit message / PR body /
 
 3. Partition by concern. Otherwise: split the diff by module / subsystem / changed-file cluster / tests-vs-impl — whichever boundary makes each slice independently reviewable. Save each partition's diff to `/tmp/mi-review-<slug>.diff` so the subagent prompt stays short.
 
-4. Spawn one subagent per partition via `mi -p '<prompt>'` with `bg=truthy` — the harness returns `pid:X log:/tmp/mi-X.log` and detaches the child; do NOT append `&`. Each prompt must include: the intent (one line), the partition's diff path, and exactly these four axes to check: correctness, scope creep, test coverage, convention fit with surrounding code.
+4. Spawn one subagent per partition via `node "$MI_PATH" -p '<prompt>'` with `bg=truthy` — the harness returns `pid:X log:/tmp/mi-X.log` and detaches the child; do NOT append `&`. Each prompt must include: the intent (one line), the partition's diff path, and exactly these four axes to check: correctness, scope creep, test coverage, convention fit with surrounding code.
 
 5. Summary contract — each subagent writes `/tmp/mi-review-<slug>.md` with:
    - `STATUS:` `complete` | `partial` | `blocked`
