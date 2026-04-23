@@ -1,6 +1,6 @@
 ---
 name: verify
-description: Run lint, typecheck, tests, or build to confirm code is green. Use when asked "does it build", "run the tests", "check for lint errors", or after making code changes.
+description: Run lint, typecheck, tests, or build — and fix any failures found. Use when asked "does it build", "run the tests", "check for lint errors", "find and fix lint errors", or after making code changes.
 ---
 
 Run after every non-trivial edit, not just at the end. Never invent commands — use only what the project itself declares.
