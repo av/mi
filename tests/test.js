@@ -120,7 +120,7 @@ test('bash tool', async () => {
     }
   };
 
-  const result = await runMi(['-p', 'run bash']);
+  const result = await runMi(['-p', 'executeAgent bash']);
   assert.strictEqual(result.status, 0);
   assert.match(result.stdout, /bash done/);
 });
@@ -627,7 +627,7 @@ test('clean ctrl-c and subprocess cleanup', async () => {
     }
   };
 
-  const child = spawn('node', [INDEX_PATH, '-p', 'run sleep'], {
+  const child = spawn('node', [INDEX_PATH, '-p', 'executeAgent sleep'], {
     env: {
       ...process.env,
       OPENAI_BASE_URL: serverUrl,
@@ -696,9 +696,48 @@ test('bash tool timeout', async () => {
     }
   };
 
-  const result = await runMi(['-p', 'run timeout']);
+  const result = await runMi(['-p', 'executeAgent timeout']);
   assert.strictEqual(result.status, 0);
   assert.match(result.stdout, /timeout works/);
+});
+
+test('MI_PATH is set in bash tool environment', async () => {
+  let callCount = 0;
+  let bashToolResult = null;
+  requestHandler = (req, res, body) => {
+    callCount++;
+    if (callCount === 1) {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        choices: [{
+          message: {
+            role: 'assistant',
+            tool_calls: [{
+              id: 'call_mi_path',
+              type: 'function',
+              function: {
+                name: 'bash',
+                arguments: JSON.stringify({ command: 'echo "MI_PATH=$MI_PATH"' })
+              }
+            }]
+          }
+        }]
+      }));
+    } else {
+      bashToolResult = body.messages[body.messages.length - 1].content;
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        choices: [{ message: { role: 'assistant', content: 'mi_path checked' } }]
+      }));
+    }
+  };
+
+  const result = await runMi(['-p', 'check']);
+  assert.strictEqual(result.status, 0);
+  assert.match(result.stdout, /mi_path checked/);
+  // MI_PATH must be set in the bash tool's environment and point to index.mjs
+  assert.match(bashToolResult, /MI_PATH=.*index\.mjs/);
+  assert.ok(bashToolResult.includes(INDEX_PATH), `Expected MI_PATH to equal ${INDEX_PATH}, got: ${bashToolResult}`);
 });
 
 test('bash tool bg', async () => {
@@ -734,7 +773,7 @@ test('bash tool bg', async () => {
     }
   };
 
-  const result = await runMi(['-p', 'run bg']);
+  const result = await runMi(['-p', 'executeAgent bg']);
   assert.strictEqual(result.status, 0);
   assert.match(result.stdout, /bg works/);
 });
