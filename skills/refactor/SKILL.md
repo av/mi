@@ -1,6 +1,6 @@
 ---
 name: refactor
-description: Restructure code without changing behavior, with a subagent-run callsite sweep and test gate between every step. Load when renaming, extracting, moving, or splitting code.
+description: Restructure code without changing behavior. Use for renaming, extracting, moving, splitting, or cleaning up code — one transformation at a time with tests kept green.
 ---
 
 A refactor that changes behavior is not a refactor — it's a bug risk wearing a refactor's clothes. Keep structural and behavioral changes in separate commits always.

@@ -1,6 +1,6 @@
 ---
 name: explore
-description: Answer targeted questions about an unfamiliar codebase by fanning plausible code clusters out to subagents with citation-grade summaries. Load when the user asks a specific question about how/where code does something.
+description: Answer "how does X work", "where is X defined", or "trace through Y" questions about a codebase using parallel subagent searches with cited summaries.
 ---
 
 Question-driven, not map-driven. If the user's request is "describe this repo" rather than "where does X happen / how does Y work", push back for a concrete question — a tour without a destination is wasted subagent load.

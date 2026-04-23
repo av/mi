@@ -1,6 +1,6 @@
 ---
 name: review
-description: Produce a pragmatic code review by partitioning a diff across subagents, one per concern, aggregating file-anchored findings. Load when asked to review a PR, branch, or staged diff.
+description: Review code, a PR, branch, or staged diff. Use when asked to "review", "give feedback", "check this PR", or "what's wrong with this diff".
 ---
 
 A review without intent is just grep. Always read the commit message / PR body / user-stated purpose before looking at any diff line.

@@ -1,6 +1,6 @@
 ---
 name: tasks
-description: Track execution state for multi-step work as a checkbox list at /tmp/mi-<slug>/tasks.md. Load when work has more than one step; skip for single-step jobs. State tracking only — use `plan` for strategy.
+description: Maintain a checkbox task list to track progress through multi-step work. Distinct from `plan` (strategy): tasks tracks what's done/pending during execution.
 ---
 
 Skip entirely for single-step work.

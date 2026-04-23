@@ -1,6 +1,6 @@
 ---
 name: tdd
-description: Red/green/refactor loop for adding new behavior. Load when extending code that already has a test harness; one behavior at a time.
+description: Add new behavior test-first (write failing test → make it pass → refactor). Use when asked to "add a test for", "implement X with tests", or extending a codebase that already has a test suite.
 ---
 
 First, confirm a test harness exists (pytest, jest/vitest, `cargo test`, `go test`, rspec, etc.) and that the existing suite runs green. If there is no harness, stop and tell the user — do not scaffold one without being asked.

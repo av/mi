@@ -1,6 +1,6 @@
 ---
 name: plan
-description: Record a short strategy doc at /tmp/mi-<slug>/plan.md before non-trivial work. Load when a task needs more than one step, spans multiple files, or has unclear direction.
+description: Write a strategy doc before starting multi-step, multi-file, or unclear work. Use when asked to "plan out", "figure out the approach", or before any task needing more than one step.
 ---
 
 Skip entirely for trivial one-step work (single edit, single command, single read).

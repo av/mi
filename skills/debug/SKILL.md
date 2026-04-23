@@ -1,6 +1,6 @@
 ---
 name: debug
-description: Structured root-cause investigation for bugs. Load when something is broken and the fix isn't obvious, to avoid patching symptoms.
+description: Fix bugs, crashes, errors, or failing tests. Use when "it's broken", "getting an error", "test is failing", or the cause isn't obvious.
 ---
 
 Do not propose a fix before step 1 completes. A bug you cannot reproduce is a bug you cannot fix.
