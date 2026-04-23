@@ -29,6 +29,14 @@ mi -p '<prompt A>'   # with bg=truthy -> pid:A log:/tmp/mi-A.log
 mi -p '<prompt B>'   # with bg=truthy -> pid:B log:/tmp/mi-B.log
 ```
 
-Collect each `pid` and `log`. Background children are detached (the harness calls `unref`) so `wait` will not find them — poll with `kill -0 <pid> 2>/dev/null` instead (exit 0 = still running, exit 1 = finished). Once done, `cat` each log to read the full transcript. Prefer telling each subprocess to also write a compact result file under `/tmp/mi-*` so you don't have to parse transcript noise.
+Collect each `pid` and `log`. Background children are detached (the harness calls `unref`) so `wait` will not find them — poll with `kill -0 <pid> 2>/dev/null` instead (exit 0 = still running, exit 1 = finished).
+
+Reading long logs: subagent logs grow large. Do NOT `cat` the full log blindly — instead:
+- `tail -n 50 /tmp/mi-A.log` to see the final output and whether the agent concluded
+- `grep -n "RESULT\|ERROR\|DONE\|Traceback" /tmp/mi-A.log` to surface key lines quickly
+- `wc -l /tmp/mi-A.log` to know total size before committing to a full read
+- If the agent wrote a compact result file (e.g. `/tmp/mi-A.out`), read that instead — it's why you ask for one
+
+Always prefer telling each subprocess to write a compact result file under `/tmp/mi-*` so you don't have to parse transcript noise.
 
 Keep prompts short and specific. A vague delegation wastes a whole subprocess.
