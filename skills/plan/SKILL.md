@@ -5,7 +5,7 @@ description: Record a short strategy doc at /tmp/mi-<slug>/plan.md before non-tr
 
 Skip entirely for trivial one-step work (single edit, single command, single read).
 
-Pick a short kebab-case `<slug>` for the task (e.g. `auth-refactor`, `fix-retry-bug`) and reuse it for both `plan` and `tasks` — they share `/tmp/mi-<slug>/` so they move together. Create the dir once with `mkdir -p /tmp/mi-<slug>`. If a plan already exists for the task, reuse the same slug rather than starting a new one (`ls -d /tmp/mi-*/ 2>/dev/null` to check).
+Pick a short kebab-case `<slug>` for the task (e.g. `auth-refactor`, `fix-retry-bug`) and reuse the same slug for any execution-state list under `/tmp/mi-<slug>/tasks.md` so plan and tasks move together. Create the dir once with `mkdir -p /tmp/mi-<slug>`. If a plan already exists for the task, reuse the same slug rather than starting a new one (`ls -d /tmp/mi-*/ 2>/dev/null` to check).
 
 Write `/tmp/mi-<slug>/plan.md` with three sections, nothing else:
 
@@ -22,7 +22,7 @@ Write `/tmp/mi-<slug>/plan.md` with three sections, nothing else:
 - <omit section if genuinely none>
 ```
 
-This is strategy, not a task list. No checkboxes, no status fields — the `tasks` skill owns execution state.
+This is strategy, not a task list. No checkboxes, no status fields — execution state belongs in `/tmp/mi-<slug>/tasks.md`, not here.
 
 Re-read `/tmp/mi-<slug>/plan.md` before each major step. If reality diverges from the plan, revise the file before continuing — do not let it rot.
 

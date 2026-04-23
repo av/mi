@@ -19,7 +19,7 @@ For each new behavior, run the loop below exactly once. Do not queue up multiple
 3. Green — minimum code to pass
    - Hardcode if that is genuinely the simplest thing; generality comes from the next failing test, not speculation.
    - Touch only files required to satisfy this test.
-   - If making it pass turns into spelunking (unexpected errors, stack traces in unrelated code), stop and invoke the `debug` skill. Do not keep flailing.
+   - If making it pass turns into spelunking (unexpected errors, stack traces in unrelated code), stop and call `skill("debug")` and follow its body. Do not keep flailing and do not proceed without loading it.
 
 4. Green — run the relevant subset
    - Run the whole file or module under test, not just the one case. Confirm green.
@@ -29,4 +29,4 @@ For each new behavior, run the loop below exactly once. Do not queue up multiple
    - Rename, dedupe, extract — structural changes only, no new behavior.
    - Re-run the same subset. Still green, or revert the refactor.
 
-Then stop and return to the caller, or start the loop again for the next behavior. Hand off to the `verify` skill before declaring the larger task done.
+Then stop and return to the caller, or start the loop again for the next behavior. Before declaring the larger task done, call `skill("verify")` and follow its body. Do not declare done without loading it.

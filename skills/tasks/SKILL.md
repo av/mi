@@ -5,7 +5,7 @@ description: Track execution state for multi-step work as a checkbox list at /tm
 
 Skip entirely for single-step work.
 
-Use the same `<slug>` as the `plan` skill — both live under `/tmp/mi-<slug>/`. If no plan exists, pick a kebab-case slug and `mkdir -p /tmp/mi-<slug>` first.
+Reuse the `<slug>` from any existing `/tmp/mi-<slug>/plan.md` so plan and tasks share `/tmp/mi-<slug>/`. If none exists, pick a kebab-case slug and `mkdir -p /tmp/mi-<slug>` first.
 
 Maintain `/tmp/mi-<slug>/tasks.md` as a flat checkbox list:
 
@@ -34,4 +34,4 @@ EOF
 
 Before every rewrite, `cat /tmp/mi-<slug>/tasks.md` first and reproduce every existing line verbatim so nothing is dropped. Only change the state marker of the single task whose status flipped; leave every other line byte-identical.
 
-Keep titles short and action-oriented ("add retry to fetch", not "I should probably add retry logic to the fetch function"). No priorities, no timestamps, no nesting — if you need structure beyond a flat list, the work belongs in `plan`, not here.
+Keep titles short and action-oriented ("add retry to fetch", not "I should probably add retry logic to the fetch function"). No priorities, no timestamps, no nesting — if you need structure beyond a flat list, the work belongs in `/tmp/mi-<slug>/plan.md`, not here.
