@@ -1,6 +1,6 @@
 ---
 name: refactor
-description: Restructure code without changing behavior. Use for renaming, extracting, moving, splitting, or cleaning up code — one transformation at a time with tests kept green.
+description: Restructure code without changing behavior. Triggers: "rename X to Y", "move X to Y", "extract X into Y", "clean up / split / deduplicate code" — one transformation at a time, tests kept green.
 ---
 
 A refactor that changes behavior is not a refactor — it's a bug risk wearing a refactor's clothes. Keep structural and behavioral changes in separate commits always.
