@@ -68,6 +68,6 @@ if (getArg('-p')) { history.push({ role: 'user', content: getArg('-p') }); conso
 if (!process.stdin.isTTY) { let inputStr = ''; for await (const chunk of process.stdin) inputStr += chunk; history.push({ role: 'user', content: inputStr.trim() }); console.log(await run(history)); process.exit(0); }
 
 /* Set up the readline interface and enter the interactive REPL. */
-const readLine = createInterface({ input: process.stdin, output: process.stdout }); const promptUser = query => new Promise(resolve => readLine.question(query, resolve));
+const readLine = createInterface({ input: process.stdin, output: process.stdout }); const promptUser = query => new Promise(resolve => readLine.question(query, resolve)); const ver = JSON.parse(readFileSync(DIR+'package.json','utf8')).version; console.log('\x1b[38;5;208m◰ mi\x1b[90m/'+ver+'\x1b[0m');
 
-readLine.on('close', () => process.exit(0)); while (true) { const input = await promptUser('\n> '); if (input === '/reset') { history.splice(1); continue; } if (input.trim()) { history.push({ role: 'user', content: input }); console.log(await run(history)); } }
+readLine.on('close', () => process.exit(0)); while (true) { const input = await promptUser('\n> '); if (input === '/reset') { history.splice(1); continue; } if (input.trim()) { history.push({ role: 'user', content: input }); let f=0,sp='◰◳◲◱',si=setInterval(()=>process.stdout.write('\r\x1b[38;5;208m'+sp[f++%sp.length]+'\x1b[0m'),150); try { const r = await run(history); clearInterval(si); process.stdout.clearLine(0); process.stdout.cursorTo(0); console.log('\x1b[90m─────\x1b[0m\n' + r); } catch(e) { clearInterval(si); process.stdout.clearLine(0); process.stdout.cursorTo(0); console.error('\x1b[31m✗ ' + e.message + '\x1b[0m'); history.pop(); } } }
