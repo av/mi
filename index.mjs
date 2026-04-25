@@ -33,15 +33,17 @@ const toolsDef = [{ name: 'bash', description: 'run bash cmd; timeout=ms kills a
 
 /*
  * Call the chat API in a loop, executing tool calls, until the model
- * returns a plain text reply.
+ * returns a plain text reply. Streams content tokens to stdout as they arrive.
  */
 async function run(messages) { while (true) {
 
-  /* POST to the completions endpoint; parse the JSON response. */
-  const response = await fetch(`${(process.env.OPENAI_BASE_URL || 'https://api.openai.com').replace(/\/+$/, '')}/v1/chat/completions`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.OPENAI_API_KEY}` }, body: JSON.stringify({ model: process.env.MODEL || 'gpt-5.4', messages, tools: toolsDef }) }).then(res => res.json());
+  /* POST with stream:true; throw on non-200 by reading the JSON error body. */
+  const res = await fetch(`${(process.env.OPENAI_BASE_URL || 'https://api.openai.com').replace(/\/+$/, '')}/v1/chat/completions`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.OPENAI_API_KEY}` }, body: JSON.stringify({ model: process.env.MODEL || 'gpt-5.4', messages, tools: toolsDef, stream: true }) }); if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e.error?.message || `HTTP ${res.status}`); }
 
-  /* Throw on API error; push the message, return content once no tool calls remain. */
-  if (response.error) throw new Error(response.error.message || JSON.stringify(response.error)); const message = response.choices?.[0]?.message; if (!message) throw new Error(JSON.stringify(response)); messages.push(message); if (!message.tool_calls) return message.content;
+  /* Iterate SSE deltas: write content tokens to stdout, merge tool_call fragments by index into one assistant message. */
+  const message = { role: 'assistant', content: '' }, dec = new TextDecoder(); let buf = '';
+  for await (const chunk of res.body) { buf += dec.decode(chunk, {stream:true}); let i; while ((i = buf.indexOf('\n\n')) >= 0) { const ev = buf.slice(0, i); buf = buf.slice(i+2); for (const line of ev.split('\n')) { if (!line.startsWith('data: ')) continue; const d = line.slice(6); if (d === '[DONE]') continue; let p; try { p = JSON.parse(d); } catch { continue; } if (p.error) throw new Error(p.error.message || JSON.stringify(p.error)); const delta = p.choices?.[0]?.delta; if (!delta) continue; if (delta.content) { process.stdout.write(delta.content); message.content += delta.content; } if (delta.tool_calls) { message.tool_calls ||= []; for (const tc of delta.tool_calls) { const t = message.tool_calls[tc.index] ||= { id:'', type:'function', function:{name:'',arguments:''} }; if (tc.id) t.id = tc.id; if (tc.type) t.type = tc.type; if (tc.function?.name) t.function.name += tc.function.name; if (tc.function?.arguments) t.function.arguments += tc.function.arguments; } } } } }
+  if (message.content) process.stdout.write('\n'); messages.push(message); if (!message.tool_calls) return;
 
   for (const toolCall of message.tool_calls) {
     const {name} = toolCall.function, args = JSON.parse(toolCall.function.arguments), formatDim = str => `\x1b[90m${str}\x1b[0m`;
@@ -63,11 +65,11 @@ if (process.argv.includes('-h')) { console.log('usage: mi [-p prompt] [-f file] 
 /* Prepend -f file, AGENTS.md, and the skills index (if present) to the system message. */
 const fileArg = getArg('-f'); if (fileArg) history[0].content += `\n\nFile (${fileArg}):\n` + readFileSync(fileArg, 'utf8'); if (existsSync('AGENTS.md')) history[0].content += '\n' + readFileSync('AGENTS.md', 'utf8'); const sl = listSkills(); if (sl.length) history[0].content += '\n\nSkill descriptions:\n' + sl.join('\n');
 
-if (getArg('-p')) { history.push({ role: 'user', content: getArg('-p') }); console.log(await run(history)); process.exit(0); }
+if (getArg('-p')) { history.push({ role: 'user', content: getArg('-p') }); await run(history); process.exit(0); }
 
-if (!process.stdin.isTTY) { let inputStr = ''; for await (const chunk of process.stdin) inputStr += chunk; history.push({ role: 'user', content: inputStr.trim() }); console.log(await run(history)); process.exit(0); }
+if (!process.stdin.isTTY) { let inputStr = ''; for await (const chunk of process.stdin) inputStr += chunk; history.push({ role: 'user', content: inputStr.trim() }); await run(history); process.exit(0); }
 
 /* Set up the readline interface and enter the interactive REPL. */
 const readLine = createInterface({ input: process.stdin, output: process.stdout }); const promptUser = query => new Promise(resolve => readLine.question(query, resolve)); const ver = JSON.parse(readFileSync(DIR+'package.json','utf8')).version; console.log('\x1b[38;5;208m◰ mi\x1b[90m/'+ver+'\x1b[0m');
 
-readLine.on('close', () => process.exit(0)); while (true) { const input = await promptUser('\n> '); if (input === '/reset') { history.splice(1); continue; } if (input.trim()) { history.push({ role: 'user', content: input }); let f=0,sp='◰◳◲◱',si=setInterval(()=>process.stdout.write('\r\x1b[38;5;208m'+sp[f++%sp.length]+'\x1b[0m'),150); try { const r = await run(history); clearInterval(si); process.stdout.clearLine(0); process.stdout.cursorTo(0); console.log('\x1b[90m─────\x1b[0m\n' + r); } catch(e) { clearInterval(si); process.stdout.clearLine(0); process.stdout.cursorTo(0); console.error('\x1b[31m✗ ' + e.message + '\x1b[0m'); history.pop(); } } }
+readLine.on('close', () => process.exit(0)); while (true) { const input = await promptUser('\n> '); if (input === '/reset') { history.splice(1); continue; } if (input.trim()) { history.push({ role: 'user', content: input }); process.stdout.write('\x1b[90m─────\x1b[0m\n'); try { await run(history); } catch(e) { console.error('\x1b[31m✗ ' + e.message + '\x1b[0m'); history.pop(); } } }

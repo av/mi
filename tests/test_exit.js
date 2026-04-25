@@ -1,17 +1,28 @@
 import { spawn } from 'node:child_process';
 import * as http from 'node:http';
 
+function sse(res, message) {
+  res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+  if (message.tool_calls) {
+    for (let i = 0; i < message.tool_calls.length; i++) {
+      const tc = message.tool_calls[i];
+      res.write(`data: ${JSON.stringify({ choices: [{ delta: { tool_calls: [{ index: i, id: tc.id, type: tc.type, function: { name: tc.function.name, arguments: tc.function.arguments } }] } }] })}\n\n`);
+    }
+  }
+  if (message.content) res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: message.content } }] })}\n\n`);
+  res.write('data: [DONE]\n\n');
+  res.end();
+}
+
 const server = http.createServer((req, res) => {
   let body = '';
   req.on('data', chunk => body += chunk);
   req.on('end', () => {
     const b = JSON.parse(body);
     if (!b.messages.some(m => m.role === 'tool')) {
-      res.writeHead(200, {'Content-Type': 'application/json'});
-      res.end(JSON.stringify({choices: [{message: {role: 'assistant', tool_calls: [{id: 'call_1', type: 'function', function: {name: 'bash', arguments: '{"command": "sleep 10"}'}}]}}]}));
+      sse(res, { role: 'assistant', tool_calls: [{ id: 'call_1', type: 'function', function: { name: 'bash', arguments: '{"command": "sleep 10"}' } }] });
     } else {
-      res.writeHead(200, {'Content-Type': 'application/json'});
-      res.end(JSON.stringify({choices: [{message: {role: 'assistant', content: 'done'}}]}));
+      sse(res, { role: 'assistant', content: 'done' });
     }
   });
 });

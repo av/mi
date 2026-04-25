@@ -11,11 +11,26 @@ const INDEX_PATH = join(__dirname, '../index.mjs');
 
 let server;
 let serverUrl;
+
+// Helper: encode an OpenAI-style assistant message as a stream of SSE chunks
+// (tool_calls first if present, then content, then [DONE]).
+function sse(res, message) {
+  res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+  if (message.tool_calls) {
+    for (let i = 0; i < message.tool_calls.length; i++) {
+      const tc = message.tool_calls[i];
+      res.write(`data: ${JSON.stringify({ choices: [{ delta: { tool_calls: [{ index: i, id: tc.id, type: tc.type, function: { name: tc.function.name, arguments: tc.function.arguments } }] } }] })}\n\n`);
+    }
+  }
+  if (message.content) {
+    res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: message.content } }] })}\n\n`);
+  }
+  res.write('data: [DONE]\n\n');
+  res.end();
+}
+
 let requestHandler = (req, res, body) => {
-  res.writeHead(200, { 'Content-Type': 'application/json' });
-  res.end(JSON.stringify({
-    choices: [{ message: { role: 'assistant', content: 'default response' } }]
-  }));
+  sse(res, { role: 'assistant', content: 'default response' });
 };
 
 before(async () => {
@@ -77,10 +92,7 @@ function runMi(args, env = {}, input = '') {
 test('basic text response', async () => {
   requestHandler = (req, res, body) => {
     assert.strictEqual(body.messages[body.messages.length - 1].content, 'hello');
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({
-      choices: [{ message: { role: 'assistant', content: 'hi there' } }]
-    }));
+    sse(res, { role: 'assistant', content: 'hi there' });
   };
 
   const result = await runMi(['-p', 'hello']);
@@ -93,30 +105,19 @@ test('bash tool', async () => {
   requestHandler = (req, res, body) => {
     callCount++;
     if (callCount === 1) {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({
-        choices: [{
-          message: {
-            role: 'assistant',
-            tool_calls: [{
-              id: 'call_1',
-              type: 'function',
-              function: {
-                name: 'bash',
-                arguments: JSON.stringify({ command: 'echo "bash_test_output"' })
-              }
-            }]
-          }
+      sse(res, {
+        role: 'assistant',
+        tool_calls: [{
+          id: 'call_1',
+          type: 'function',
+          function: { name: 'bash', arguments: JSON.stringify({ command: 'echo "bash_test_output"' }) }
         }]
-      }));
+      });
     } else {
       const lastMsg = body.messages[body.messages.length - 1];
       assert.strictEqual(lastMsg.role, 'tool');
       assert.match(lastMsg.content, /bash_test_output/);
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({
-        choices: [{ message: { role: 'assistant', content: 'bash done' } }]
-      }));
+      sse(res, { role: 'assistant', content: 'bash done' });
     }
   };
 
@@ -130,10 +131,7 @@ test('context gathering', async () => {
     const sysMsg = body.messages[0].content;
     assert.match(sysMsg, /CWD: /);
     assert.match(sysMsg, /Date: /);
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({
-      choices: [{ message: { role: 'assistant', content: 'context checked' } }]
-    }));
+    sse(res, { role: 'assistant', content: 'context checked' });
   };
 
   const result = await runMi(['-p', 'check context']);
@@ -147,10 +145,7 @@ test('-f <filepath> flag', async () => {
   requestHandler = (req, res, body) => {
     const sysMsg = body.messages[0].content;
     assert.match(sysMsg, /file_flag_content_xyz/);
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({
-      choices: [{ message: { role: 'assistant', content: 'file flag checked' } }]
-    }));
+    sse(res, { role: 'assistant', content: 'file flag checked' });
   };
 
   const result = await runMi(['-f', testFile, '-p', 'check file flag']);
@@ -164,10 +159,7 @@ test('standard input (stdin)', async () => {
   requestHandler = (req, res, body) => {
     const userMsg = body.messages[1].content;
     assert.strictEqual(userMsg, 'piped_input_data');
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({
-      choices: [{ message: { role: 'assistant', content: 'stdin checked' } }]
-    }));
+    sse(res, { role: 'assistant', content: 'stdin checked' });
   };
 
   const result = await runMi([], {}, 'piped_input_data');
@@ -180,10 +172,7 @@ test('environment variables', async () => {
     assert.strictEqual(body.model, 'custom-model-123');
     const sysMsg = body.messages[0].content;
     assert.match(sysMsg, /^custom-sys-prompt/);
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({
-      choices: [{ message: { role: 'assistant', content: 'env vars checked' } }]
-    }));
+    sse(res, { role: 'assistant', content: 'env vars checked' });
   };
 
   const result = await runMi(['-p', 'check env vars'], {
@@ -202,10 +191,7 @@ test('AGENTS.md context', async () => {
   requestHandler = (req, res, body) => {
     const sysMsg = body.messages[0].content;
     assert.match(sysMsg, /agents_md_content_789/);
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({
-      choices: [{ message: { role: 'assistant', content: 'agents context checked' } }]
-    }));
+    sse(res, { role: 'assistant', content: 'agents context checked' });
   };
 
   const result = await runMi(['-p', 'check agents context']);
@@ -232,30 +218,19 @@ test('skill tool', async () => {
   requestHandler = (req, res, body) => {
     callCount++;
     if (callCount === 1) {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({
-        choices: [{
-          message: {
-            role: 'assistant',
-            tool_calls: [{
-              id: 'call_skill',
-              type: 'function',
-              function: {
-                name: 'skill',
-                arguments: JSON.stringify({ name: 'dummy_skill' })
-              }
-            }]
-          }
+      sse(res, {
+        role: 'assistant',
+        tool_calls: [{
+          id: 'call_skill',
+          type: 'function',
+          function: { name: 'skill', arguments: JSON.stringify({ name: 'dummy_skill' }) }
         }]
-      }));
+      });
     } else {
       const lastMsg = body.messages[body.messages.length - 1];
       assert.strictEqual(lastMsg.role, 'tool');
       assert.strictEqual(lastMsg.content, 'dummy_skill_content_abc');
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({
-        choices: [{ message: { role: 'assistant', content: 'skill checked' } }]
-      }));
+      sse(res, { role: 'assistant', content: 'skill checked' });
     }
   };
 
@@ -284,25 +259,17 @@ test('skill tool: list all skills as - name: description bullets', async () => {
   requestHandler = (req, res, body) => {
     callCount++;
     if (callCount === 1) {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({
-        choices: [{
-          message: {
-            role: 'assistant',
-            tool_calls: [{
-              id: 'call_list',
-              type: 'function',
-              function: { name: 'skill', arguments: JSON.stringify({}) }
-            }]
-          }
+      sse(res, {
+        role: 'assistant',
+        tool_calls: [{
+          id: 'call_list',
+          type: 'function',
+          function: { name: 'skill', arguments: JSON.stringify({}) }
         }]
-      }));
+      });
     } else {
       toolResult = body.messages[body.messages.length - 1].content;
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({
-        choices: [{ message: { role: 'assistant', content: 'list done' } }]
-      }));
+      sse(res, { role: 'assistant', content: 'list done' });
     }
   };
 
@@ -328,27 +295,19 @@ test('skill tool: loads from local ./skills/ directory', async () => {
   requestHandler = (req, res, body) => {
     callCount++;
     if (callCount === 1) {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({
-        choices: [{
-          message: {
-            role: 'assistant',
-            tool_calls: [{
-              id: 'call_local',
-              type: 'function',
-              function: { name: 'skill', arguments: JSON.stringify({ name: 'local_only' }) }
-            }]
-          }
+      sse(res, {
+        role: 'assistant',
+        tool_calls: [{
+          id: 'call_local',
+          type: 'function',
+          function: { name: 'skill', arguments: JSON.stringify({ name: 'local_only' }) }
         }]
-      }));
+      });
     } else {
       const lastMsg = body.messages[body.messages.length - 1];
       assert.strictEqual(lastMsg.role, 'tool');
       assert.strictEqual(lastMsg.content, 'local_skill_body_789');
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({
-        choices: [{ message: { role: 'assistant', content: 'local skill loaded' } }]
-      }));
+      sse(res, { role: 'assistant', content: 'local skill loaded' });
     }
   };
 
@@ -375,27 +334,19 @@ test('skill tool: local skill takes precedence over global', async () => {
   requestHandler = (req, res, body) => {
     callCount++;
     if (callCount === 1) {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({
-        choices: [{
-          message: {
-            role: 'assistant',
-            tool_calls: [{
-              id: 'call_pref',
-              type: 'function',
-              function: { name: 'skill', arguments: JSON.stringify({ name: 'shared' }) }
-            }]
-          }
+      sse(res, {
+        role: 'assistant',
+        tool_calls: [{
+          id: 'call_pref',
+          type: 'function',
+          function: { name: 'skill', arguments: JSON.stringify({ name: 'shared' }) }
         }]
-      }));
+      });
     } else {
       const lastMsg = body.messages[body.messages.length - 1];
       assert.strictEqual(lastMsg.role, 'tool');
       assert.strictEqual(lastMsg.content, 'LOCAL_VERSION');
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({
-        choices: [{ message: { role: 'assistant', content: 'precedence ok' } }]
-      }));
+      sse(res, { role: 'assistant', content: 'precedence ok' });
     }
   };
 
@@ -422,25 +373,17 @@ test('skill tool: frontmatter parsing with directory-name fallback', async () =>
   requestHandler = (req, res, body) => {
     callCount++;
     if (callCount === 1) {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({
-        choices: [{
-          message: {
-            role: 'assistant',
-            tool_calls: [{
-              id: 'call_fm',
-              type: 'function',
-              function: { name: 'skill', arguments: JSON.stringify({}) }
-            }]
-          }
+      sse(res, {
+        role: 'assistant',
+        tool_calls: [{
+          id: 'call_fm',
+          type: 'function',
+          function: { name: 'skill', arguments: JSON.stringify({}) }
         }]
-      }));
+      });
     } else {
       toolResult = body.messages[body.messages.length - 1].content;
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({
-        choices: [{ message: { role: 'assistant', content: 'fm ok' } }]
-      }));
+      sse(res, { role: 'assistant', content: 'fm ok' });
     }
   };
 
@@ -467,25 +410,17 @@ test('skill tool: listing filters out dirs without SKILL.md', async () => {
   requestHandler = (req, res, body) => {
     callCount++;
     if (callCount === 1) {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({
-        choices: [{
-          message: {
-            role: 'assistant',
-            tool_calls: [{
-              id: 'call_filter',
-              type: 'function',
-              function: { name: 'skill', arguments: JSON.stringify({}) }
-            }]
-          }
+      sse(res, {
+        role: 'assistant',
+        tool_calls: [{
+          id: 'call_filter',
+          type: 'function',
+          function: { name: 'skill', arguments: JSON.stringify({}) }
         }]
-      }));
+      });
     } else {
       toolResult = body.messages[body.messages.length - 1].content;
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({
-        choices: [{ message: { role: 'assistant', content: 'filter ok' } }]
-      }));
+      sse(res, { role: 'assistant', content: 'filter ok' });
     }
   };
 
@@ -513,10 +448,7 @@ test('skill tool: skills advertised in system prompt at startup', async () => {
     const sysMsg = body.messages[0].content;
     assert.match(sysMsg, /Skill descriptions:/);
     assert.match(sysMsg, /- advertised: should appear in system prompt/);
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({
-      choices: [{ message: { role: 'assistant', content: 'advertised ok' } }]
-    }));
+    sse(res, { role: 'assistant', content: 'advertised ok' });
   };
 
   try {
@@ -534,10 +466,7 @@ test('REPL mode and /reset', async () => {
   requestHandler = (req, res, body) => {
     requestCount++;
     lastBody = body;
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({
-      choices: [{ message: { role: 'assistant', content: `repl response ${requestCount}` } }]
-    }));
+    sse(res, { role: 'assistant', content: `repl response ${requestCount}` });
   };
 
   const result = await new Promise((resolve) => {
@@ -603,27 +532,16 @@ test('clean ctrl-c and subprocess cleanup', async () => {
   requestHandler = (req, res, body) => {
     callCount++;
     if (callCount === 1) {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({
-        choices: [{
-          message: {
-            role: 'assistant',
-            tool_calls: [{
-              id: 'call_sleep',
-              type: 'function',
-              function: {
-                name: 'bash',
-                arguments: JSON.stringify({ command: uniqueSleepCmd })
-              }
-            }]
-          }
+      sse(res, {
+        role: 'assistant',
+        tool_calls: [{
+          id: 'call_sleep',
+          type: 'function',
+          function: { name: 'bash', arguments: JSON.stringify({ command: uniqueSleepCmd }) }
         }]
-      }));
+      });
     } else {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({
-        choices: [{ message: { role: 'assistant', content: 'done' } }]
-      }));
+      sse(res, { role: 'assistant', content: 'done' });
     }
   };
 
@@ -669,30 +587,19 @@ test('bash tool timeout', async () => {
   requestHandler = (req, res, body) => {
     callCount++;
     if (callCount === 1) {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({
-        choices: [{
-          message: {
-            role: 'assistant',
-            tool_calls: [{
-              id: 'call_timeout',
-              type: 'function',
-              function: {
-                name: 'bash',
-                arguments: JSON.stringify({ command: 'sleep 5', timeout: '300' })
-              }
-            }]
-          }
+      sse(res, {
+        role: 'assistant',
+        tool_calls: [{
+          id: 'call_timeout',
+          type: 'function',
+          function: { name: 'bash', arguments: JSON.stringify({ command: 'sleep 5', timeout: '300' }) }
         }]
-      }));
+      });
     } else {
       const lastMsg = body.messages[body.messages.length - 1];
       assert.strictEqual(lastMsg.role, 'tool');
       assert.match(lastMsg.content, /\[timeout\]/);
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({
-        choices: [{ message: { role: 'assistant', content: 'timeout works' } }]
-      }));
+      sse(res, { role: 'assistant', content: 'timeout works' });
     }
   };
 
@@ -707,28 +614,17 @@ test('MI_PATH is set in bash tool environment', async () => {
   requestHandler = (req, res, body) => {
     callCount++;
     if (callCount === 1) {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({
-        choices: [{
-          message: {
-            role: 'assistant',
-            tool_calls: [{
-              id: 'call_mi_path',
-              type: 'function',
-              function: {
-                name: 'bash',
-                arguments: JSON.stringify({ command: 'echo "MI_PATH=$MI_PATH"' })
-              }
-            }]
-          }
+      sse(res, {
+        role: 'assistant',
+        tool_calls: [{
+          id: 'call_mi_path',
+          type: 'function',
+          function: { name: 'bash', arguments: JSON.stringify({ command: 'echo "MI_PATH=$MI_PATH"' }) }
         }]
-      }));
+      });
     } else {
       bashToolResult = body.messages[body.messages.length - 1].content;
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({
-        choices: [{ message: { role: 'assistant', content: 'mi_path checked' } }]
-      }));
+      sse(res, { role: 'assistant', content: 'mi_path checked' });
     }
   };
 
@@ -745,31 +641,20 @@ test('bash tool bg', async () => {
   requestHandler = (req, res, body) => {
     callCount++;
     if (callCount === 1) {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({
-        choices: [{
-          message: {
-            role: 'assistant',
-            tool_calls: [{
-              id: 'call_bg',
-              type: 'function',
-              function: {
-                name: 'bash',
-                arguments: JSON.stringify({ command: 'echo bg_test', bg: 'true' })
-              }
-            }]
-          }
+      sse(res, {
+        role: 'assistant',
+        tool_calls: [{
+          id: 'call_bg',
+          type: 'function',
+          function: { name: 'bash', arguments: JSON.stringify({ command: 'echo bg_test', bg: 'true' }) }
         }]
-      }));
+      });
     } else {
       const lastMsg = body.messages[body.messages.length - 1];
       assert.strictEqual(lastMsg.role, 'tool');
       assert.match(lastMsg.content, /pid:\d+/);
       assert.match(lastMsg.content, /log:\/tmp\/mi-/);
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({
-        choices: [{ message: { role: 'assistant', content: 'bg works' } }]
-      }));
+      sse(res, { role: 'assistant', content: 'bg works' });
     }
   };
 
