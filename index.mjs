@@ -38,7 +38,7 @@ const toolsDef = [{ name: 'bash', description: 'run bash cmd; timeout=ms kills a
 async function run(messages) { while (true) {
 
   /* POST with stream:true; throw on non-200 by reading the JSON error body. */
-  const response = await fetch(`${(process.env.OPENAI_BASE_URL || 'https://api.openai.com').replace(/\/+$/, '')}/v1/chat/completions`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.OPENAI_API_KEY}` }, body: JSON.stringify({ model: process.env.MODEL || 'gpt-5.4', messages, tools: toolsDef, stream: true }) }); if (!response.ok) { const e = await response.json().catch(()=>({})); throw new Error(e.error?.message || `HTTP ${response.status}`); }
+  const response = await fetch(`${(process.env.OPENAI_BASE_URL || 'https://api.openai.com').replace(/\/+$/, '')}/v1/chat/completions`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.OPENAI_API_KEY}` }, body: JSON.stringify({ model: process.env.MODEL || 'gpt-5.4', messages, tools: toolsDef, stream: true }) }); if (!response.ok) { const error = await response.json().catch(()=>({})); throw new Error(error.error?.message || `HTTP ${response.status}`); }
 
   /* Iterate SSE deltas: write content tokens to stdout, merge tool_call fragments by index into one assistant message. */
   const message = { role: 'assistant', content: '' }, dec = new TextDecoder(); let buf = '';
@@ -72,4 +72,4 @@ if (!process.stdin.isTTY) { let inputStr = ''; for await (const chunk of process
 /* Set up the readline interface and enter the interactive REPL. */
 const readLine = createInterface({ input: process.stdin, output: process.stdout }); const promptUser = query => new Promise(resolve => readLine.question(query, resolve)); const ver = JSON.parse(readFileSync(DIR+'package.json','utf8')).version; console.log('\x1b[38;5;208m◰ mi\x1b[90m/'+ver+'\x1b[0m');
 
-readLine.on('close', () => process.exit(0)); while (true) { const input = await promptUser('\n> '); if (input === '/reset') { history.splice(1); console.log(dim('✓ reset')); continue; } if (input.trim()) { history.push({ role: 'user', content: input }); process.stdout.write(dim('─────')+'\n'); try { await run(history); } catch(e) { console.error('\x1b[31m✗ ' + e.message + '\x1b[0m'); history.pop(); } } }
+readLine.on('close', () => process.exit(0)); while (true) { const input = await promptUser('\n> '); if (input === '/reset') { history.splice(1); console.log(dim('✓ reset')); continue; } if (input.trim()) { history.push({ role: 'user', content: input }); process.stdout.write(dim('─────')+'\n'); try { await run(history); } catch(error) { console.error('\x1b[31m✗ ' + error.message + '\x1b[0m'); history.pop(); } } }
