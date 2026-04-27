@@ -6,16 +6,18 @@ agentic coding in 30 loc. a loop, two tools, and an llm.
 
 ## features
 
-- streaming: assistant tokens stream to stdout as they arrive (SSE), no waiting for the full reply
-- `bash` (optional `timeout=<ms>` kills after delay, `bg=truthy` detaches and returns pid+log) and `skill` tools; file I/O goes through `bash` (`cat`, `sed -i`, heredocs)
-- `skill` tool loads `SKILL.md` playbooks from bundled `skills/` and `~/.agents/skills/` (descriptions auto-advertised in system prompt so the model matches tasks to skills)
+- works with any OpenAI-compatible API: OpenAI, ollama, lmstudio, litellm, vllm, local models
+- `bash` tool gives full system access: git, curl, compilers, file I/O (`cat`, `sed -i`, heredocs); optional `timeout=<ms>` and `bg=truthy` for background tasks
+- `skill` tool loads markdown playbooks from `skills/` and `~/.agents/skills/` (auto-advertised in system prompt)
 - bundled skills: `plan`, `tasks`, `delegate`, `explore`, `refactor`, `review`, `verify`, `debug`, `tdd`, `new-skill`, `self`
-- accepts stdin via pipes (e.g. `echo "do this" | mi`)
-- file context ingestion via `-f <file>` argument
-- automatic ingestion of `AGENTS.md` if it exists in current directory
-- chat REPL by default with version banner, interactive `/reset` command, and error recovery (failed requests pop the user message instead of crashing)
-- graceful `SIGINT` (Ctrl+C) handling for bash child processes
-- non-interactive mode with `-p 'prompt'` arg
+- modular tools: add new tools by dropping `.mjs` files in `tools/` (auto-discovered at startup)
+- automatic `AGENTS.md` ingestion from current directory for repo-specific context
+- non-interactive mode with `-p 'prompt'` for scripting and CI
+- stdin pipes: `echo "do this" | mi` or `cat file | mi`
+- file context via `-f <file>` argument
+- chat REPL with `/reset` command and error recovery
+- streaming output (SSE) — tokens appear as they arrive
+- graceful `SIGINT` handling for bash child processes
 
 ## install
 
