@@ -1466,3 +1466,34 @@ test('skill tool: whitespace-only SKILL.md file loads as whitespace', async () =
     cleanup();
   }
 });
+
+test('very long input in one-shot mode (10KB+)', async () => {
+  // Test that very long prompt text (10KB+) is handled correctly without buffer/memory issues
+  // This exercises the full path: argument parsing -> message construction -> fetch body serialization
+  // 10KB of text = ~10240 characters
+  const prefix = 'START_LONG_';
+  const suffix = '_END_LONG';
+  const middleText = 'ABCDEFGHIJ'.repeat(1020);  // 10200 characters
+  const longPrompt = prefix + middleText + suffix;  // ~10220 characters total, well over 10KB
+
+  assert.ok(longPrompt.length > 10000, `Test setup: prompt should be >10KB, got ${longPrompt.length} chars`);
+
+  let receivedPrompt = null;
+  requestHandler = (req, res, body) => {
+    // Capture the full user message to verify it was sent intact
+    const userMsg = body.messages.find(m => m.role === 'user');
+    receivedPrompt = userMsg?.content;
+    sse(res, { role: 'assistant', content: 'long input received' });
+  };
+
+  const result = await runMi(['-p', longPrompt]);
+  assert.strictEqual(result.status, 0, 'Should handle 10KB+ prompt without errors');
+  assert.match(result.stdout, /long input received/);
+
+  // Verify the full prompt was sent to the API without truncation
+  assert.strictEqual(receivedPrompt?.length, longPrompt.length,
+    `Full prompt length should be preserved: expected ${longPrompt.length}, got ${receivedPrompt?.length}`);
+  assert.ok(receivedPrompt?.startsWith(prefix), 'Prompt should start with prefix marker');
+  assert.ok(receivedPrompt?.endsWith(suffix), 'Prompt should end with suffix marker');
+  assert.strictEqual(receivedPrompt, longPrompt, 'Full prompt should match exactly');
+});
