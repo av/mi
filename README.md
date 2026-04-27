@@ -2,7 +2,7 @@
 
 https://github.com/user-attachments/assets/9289d105-5a40-442d-b1b5-773723c95c13
 
-agentic coding in 29 loc. a loop, two tools, and an llm.
+agentic coding in 30 loc. a loop, two tools, and an llm.
 
 ## features
 
@@ -62,29 +62,37 @@ an agentic harness is surprisingly simple. it's a loop that calls an llm, checks
 
 ### tools
 
-the agent needs to affect the outside world. tools are just functions that take structured args and return a string. two tools is enough for a general-purpose coding agent:
+the agent needs to affect the outside world. tools are just functions that take structured args and return a string. each tool lives in `tools/<name>.mjs` and exports `name`, `description`, `parameters`, and `handler`:
 
 ```js
-const tools = {
-  bash:  ({ command, timeout, bg }) => execShell(command, timeout, bg), // run any shell command
-  skill: ({ name }) => loadSkillMarkdown(name), // load agent skill from bundled skills/ or ~/.agents/skills/
-};
+// tools/bash.mjs
+export default { name: 'bash', description: '...', parameters: {...}, handler: ({command, timeout, bg}) => {
+  // run shell command, return output
+}};
 ```
 
-`bash` gives the agent access to the entire system: git, curl, compilers, package managers, and file I/O (via `cat`, `sed -n`, `sed -i`, heredocs; the system prompt teaches the patterns). optional `timeout=<ms>` kills the process after the given delay and resolves with `[timeout]`. optional `bg=truthy` runs the command detached and returns `pid:X log:/tmp/mi-*.log` immediately. `skill` gives the agent specialized workflows loaded on demand from markdown playbooks. every tool returns a string because that's what goes back into the conversation.
+the harness auto-discovers tools at startup by scanning `tools/*.mjs`. two tools ship by default:
+
+- `bash` gives the agent access to the entire system: git, curl, compilers, package managers, and file I/O (via `cat`, `sed -n`, `sed -i`, heredocs; the system prompt teaches the patterns). optional `timeout=<ms>` kills the process after the given delay and resolves with `[timeout]`. optional `bg=truthy` runs the command detached and returns `pid:X log:/tmp/mi-*.log` immediately.
+- `skill` gives the agent specialized workflows loaded on demand from markdown playbooks in bundled `skills/` or `~/.agents/skills/`.
+
+every tool returns a string because that's what goes back into the conversation.
 
 ### tool definitions
 
-the llm doesn't see your functions. it sees json schemas that describe what tools are available and what arguments they accept:
+the llm doesn't see your functions. it sees json schemas that describe what tools are available and what arguments they accept. each tool module exports these directly:
 
 ```js
-const defs = [
-  { name: 'bash',  description: 'run bash cmd', parameters: mkp('command') },
-  { name: 'skill', description: 'load a skill\'s SKILL.md body by name', parameters: mkp('?name') },
-].map(f => ({ type: 'function', function: f }));
+// tools/bash.mjs
+export default {
+  name: 'bash',
+  description: 'run bash cmd',
+  parameters: { type: 'object', properties: { command: { type: 'string' } }, required: ['command'] },
+  handler: ...
+};
 ```
 
-`mkp` is a helper that builds a json schema object from a list of key names. each key becomes a required string property. the `defs` array is sent along with every api call so the model knows what it can do.
+the harness builds the `tools` array from all discovered modules and sends it with every api call so the model knows what it can do.
 
 ### messages
 
