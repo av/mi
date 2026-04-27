@@ -1187,3 +1187,110 @@ test('REPL empty input skips API call', async () => {
   const separatorCount = (result.stdout.match(/─────/g) || []).length;
   assert.strictEqual(separatorCount, 1, 'Should only show 1 separator line (for the real message)');
 });
+
+test('tool output truncation boundary: exactly 200 chars NOT truncated', async () => {
+  // The condition is `out.length > 200`, so 200 chars should NOT be truncated
+  // 200 is not > 200, so it passes through unchanged
+  const exactly200 = 'X'.repeat(200);
+
+  let callCount = 0;
+  requestHandler = (req, res, body) => {
+    callCount++;
+    if (callCount === 1) {
+      sse(res, {
+        role: 'assistant',
+        tool_calls: [{
+          id: 'call_200',
+          type: 'function',
+          function: { name: 'bash', arguments: JSON.stringify({ command: `printf '%s' '${exactly200}'` }) }
+        }]
+      });
+    } else {
+      sse(res, { role: 'assistant', content: 'boundary 200 done' });
+    }
+  };
+
+  const result = await runMi(['-p', 'test 200 boundary']);
+  assert.strictEqual(result.status, 0);
+  assert.match(result.stdout, /boundary 200 done/);
+  // Should NOT contain ellipsis since 200 chars is not > 200
+  const ellipsisCount = (result.stdout.match(/…/g) || []).length;
+  assert.strictEqual(ellipsisCount, 0, 'Exactly 200 chars should NOT be truncated (no ellipsis)');
+  // The full 200 X's should appear in output
+  assert.ok(result.stdout.includes(exactly200), 'Full 200 chars should appear in log output');
+});
+
+test('tool output truncation boundary: exactly 201 chars IS truncated', async () => {
+  // The condition is `out.length > 200`, so 201 chars should BE truncated
+  // 201 > 200, so it gets sliced to 200 + ellipsis
+  // Use a unique start marker 'S' and end marker 'E' to verify truncation behavior
+  const content = 'S' + 'Y'.repeat(199) + 'E';  // Total 201 chars: S + 199 Y's + E
+  assert.strictEqual(content.length, 201, 'Test setup: content should be exactly 201 chars');
+
+  let callCount = 0;
+  requestHandler = (req, res, body) => {
+    callCount++;
+    if (callCount === 1) {
+      sse(res, {
+        role: 'assistant',
+        tool_calls: [{
+          id: 'call_201',
+          type: 'function',
+          function: { name: 'bash', arguments: JSON.stringify({ command: `printf '%s' '${content}'` }) }
+        }]
+      });
+    } else {
+      sse(res, { role: 'assistant', content: 'boundary 201 done' });
+    }
+  };
+
+  const result = await runMi(['-p', 'test 201 boundary']);
+  assert.strictEqual(result.status, 0);
+  assert.match(result.stdout, /boundary 201 done/);
+  // Should contain ellipsis since 201 chars IS > 200
+  const ellipsisCount = (result.stdout.match(/…/g) || []).length;
+  assert.strictEqual(ellipsisCount, 1, 'Exactly 201 chars should be truncated (has ellipsis)');
+  // The truncated result line should have: S + 199 Y's (first 200 chars) + ellipsis
+  // The 'E' at position 201 should NOT appear with ellipsis (it gets cut off)
+  // Note: 'E' appears in the command log line, but not in the result line with ellipsis
+  // Look for the truncated pattern: 200 chars followed by ellipsis (the result line)
+  assert.ok(result.stdout.includes(content.slice(0, 200) + '…'),
+    'Truncated result should have first 200 chars followed by ellipsis');
+});
+
+test('loadSkill returns undefined for nonexistent skill', async () => {
+  // Test that calling skill tool with a name that doesn't exist returns undefined
+  // which gets stringified to "undefined" when sent back as tool result
+  let callCount = 0;
+  let toolResult = null;
+  requestHandler = (req, res, body) => {
+    callCount++;
+    if (callCount === 1) {
+      sse(res, {
+        role: 'assistant',
+        tool_calls: [{
+          id: 'call_missing',
+          type: 'function',
+          function: { name: 'skill', arguments: JSON.stringify({ name: 'nonexistent_skill_xyz123' }) }
+        }]
+      });
+    } else {
+      toolResult = body.messages[body.messages.length - 1].content;
+      sse(res, { role: 'assistant', content: 'missing skill done' });
+    }
+  };
+
+  // Use a mock HOME with empty .agents/skills to ensure the skill truly doesn't exist
+  const mockHome = join(__dirname, 'mock_home_missing');
+  mkdirSync(join(mockHome, '.agents', 'skills'), { recursive: true });
+
+  try {
+    const result = await runMi(['-p', 'load missing skill'], { HOME: mockHome });
+    assert.strictEqual(result.status, 0);
+    assert.match(result.stdout, /missing skill done/);
+    // loadSkill returns undefined for missing skill, String(undefined) = "undefined"
+    assert.strictEqual(toolResult, 'undefined', 'Missing skill should return "undefined" string');
+  } finally {
+    rmSync(mockHome, { recursive: true, force: true });
+  }
+});
