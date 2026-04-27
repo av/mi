@@ -806,3 +806,85 @@ test('tool call output truncation', async () => {
   const suffixMatches = result.stdout.match(/_END_MARKER/g);
   assert.strictEqual(suffixMatches?.length || 0, 1, 'Suffix should appear only once (in command), not in truncated result');
 });
+
+test('REPL error recovery removes failed user message from history', async () => {
+  let requestCount = 0;
+  let lastBody = null;
+  requestHandler = (req, res, body) => {
+    requestCount++;
+    lastBody = body;
+    if (requestCount === 1) {
+      // First request: return an error in the SSE stream to trigger the catch block
+      res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+      res.write(`data: ${JSON.stringify({ error: { message: 'Simulated API error' } })}\n\n`);
+      res.end();
+    } else {
+      // Second request: should succeed and history should only have system + this new user message
+      sse(res, { role: 'assistant', content: 'recovered successfully' });
+    }
+  };
+
+  const result = await new Promise((resolve) => {
+    const child = spawn('node', ['-e', `process.stdin.isTTY = true; import(${JSON.stringify(INDEX_PATH)})`], {
+      env: {
+        ...process.env,
+        OPENAI_BASE_URL: serverUrl,
+        OPENAI_API_KEY: 'test-key',
+        http_proxy: '',
+        https_proxy: '',
+        HTTP_PROXY: '',
+        HTTPS_PROXY: ''
+      }
+    });
+
+    let stdout = '';
+    let stderr = '';
+    let step = 0;
+
+    child.stdout.on('data', d => {
+      const out = d.toString();
+      stdout += out;
+
+      if (out.includes('> ')) {
+        if (step === 0) {
+          step++;
+          // Send a message that will fail
+          child.stdin.write("failing_message\n");
+        } else if (step === 1 && stderr.includes('Simulated API error')) {
+          step++;
+          // After error is shown, send another message
+          child.stdin.write("recovery_message\n");
+        }
+      }
+
+      if (stdout.includes('recovered successfully')) {
+        child.stdin.end();
+      }
+    });
+    child.stderr.on('data', d => {
+      stderr += d.toString();
+      // Check if we're ready for next step after error appears
+      if (step === 1 && stderr.includes('Simulated API error') && stdout.includes('> ')) {
+        step++;
+        child.stdin.write("recovery_message\n");
+      }
+    });
+
+    child.on('close', code => {
+      resolve({ status: code, stdout, stderr });
+    });
+  });
+
+  assert.strictEqual(result.status, 0);
+  // Verify error was displayed in stderr with the red X format
+  assert.match(result.stderr, /Simulated API error/);
+  // Verify recovery worked
+  assert.match(result.stdout, /recovered successfully/);
+
+  // Verify history was cleaned: second request should only have system + "recovery_message"
+  // (not system + "failing_message" + "recovery_message")
+  assert.strictEqual(lastBody.messages.length, 2, 'History should only have system + recovery message after error');
+  assert.strictEqual(lastBody.messages[0].role, 'system');
+  assert.strictEqual(lastBody.messages[1].role, 'user');
+  assert.strictEqual(lastBody.messages[1].content, 'recovery_message');
+});
