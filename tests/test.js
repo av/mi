@@ -702,3 +702,53 @@ test('HTTP error handling', async () => {
   assert.notStrictEqual(result.status, 0);
   assert.match(result.stderr, /Invalid API key provided/);
 });
+
+test('tool call output truncation', async () => {
+  // Generate output longer than 200 chars to trigger truncation
+  // Use a unique marker at the start and end to verify truncation
+  const prefix = 'START_MARKER_';
+  const suffix = '_END_MARKER';
+  const middlePadding = 'X'.repeat(250);
+  const fullOutput = prefix + middlePadding + suffix;
+
+  let callCount = 0;
+  requestHandler = (req, res, body) => {
+    callCount++;
+    if (callCount === 1) {
+      sse(res, {
+        role: 'assistant',
+        tool_calls: [{
+          id: 'call_trunc',
+          type: 'function',
+          function: { name: 'bash', arguments: JSON.stringify({ command: `printf '%s' '${fullOutput}'` }) }
+        }]
+      });
+    } else {
+      // Verify the full output is sent to the API (not truncated in tool result)
+      const lastMsg = body.messages[body.messages.length - 1];
+      assert.strictEqual(lastMsg.role, 'tool');
+      assert.ok(lastMsg.content.includes(fullOutput), 'Full output should be in tool result');
+      sse(res, { role: 'assistant', content: 'truncation done' });
+    }
+  };
+
+  const result = await runMi(['-p', 'test truncation']);
+  assert.strictEqual(result.status, 0);
+  assert.match(result.stdout, /truncation done/);
+
+  // The logged output should be truncated to 200 chars + ellipsis
+  // The prefix should appear (it's within first 200 chars)
+  assert.ok(result.stdout.includes(prefix), 'Prefix should appear in truncated output');
+
+  // The suffix should NOT appear in stdout (it's beyond 200 chars, so it gets truncated)
+  // But the tool call log line shows it. We need to check the result line specifically.
+  // The output line format is: dim("result text...")
+  // We verify the ellipsis is present which indicates truncation happened
+  assert.match(result.stdout, /…/, 'Ellipsis should appear after truncation');
+
+  // Count occurrences of the suffix - it should appear in the bash command echo but NOT in the truncated result
+  // Actually, checking the truncated result line: it should show 200 chars + ellipsis
+  // The key test: the suffix _END_MARKER should only appear once (in the command), not twice (not in result)
+  const suffixMatches = result.stdout.match(/_END_MARKER/g);
+  assert.strictEqual(suffixMatches?.length || 0, 1, 'Suffix should appear only once (in command), not in truncated result');
+});
