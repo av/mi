@@ -997,3 +997,42 @@ test('HTTP error with non-JSON response body', async () => {
   // Should fall back to HTTP status code since JSON parsing fails
   assert.match(result.stderr, /HTTP 503/);
 });
+
+test('streaming tool call argument fragments', async () => {
+  // Test incremental argument building across multiple SSE chunks
+  // This exercises line 45: merged.function.arguments += toolDelta.function.arguments
+  // Real OpenAI streams often split JSON arguments into small pieces
+  let callCount = 0;
+  let receivedArgs = null;
+  requestHandler = (req, res, body) => {
+    callCount++;
+    if (callCount === 1) {
+      res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+      // Send tool call with arguments fragmented across 5 separate SSE chunks
+      // Fragment 1: id and function name
+      res.write(`data: ${JSON.stringify({ choices: [{ delta: { tool_calls: [{ index: 0, id: 'call_frag', type: 'function', function: { name: 'bash', arguments: '' } }] } }] })}\n\n`);
+      // Fragment 2: opening brace and key start
+      res.write(`data: ${JSON.stringify({ choices: [{ delta: { tool_calls: [{ index: 0, function: { arguments: '{"comm' } }] } }] })}\n\n`);
+      // Fragment 3: rest of key and colon
+      res.write(`data: ${JSON.stringify({ choices: [{ delta: { tool_calls: [{ index: 0, function: { arguments: 'and":"e' } }] } }] })}\n\n`);
+      // Fragment 4: value content
+      res.write(`data: ${JSON.stringify({ choices: [{ delta: { tool_calls: [{ index: 0, function: { arguments: 'cho fragmented_arg_test' } }] } }] })}\n\n`);
+      // Fragment 5: closing quote and brace
+      res.write(`data: ${JSON.stringify({ choices: [{ delta: { tool_calls: [{ index: 0, function: { arguments: '"}' } }] } }] })}\n\n`);
+      res.write('data: [DONE]\n\n');
+      res.end();
+    } else {
+      // Capture what arguments were actually received after reassembly
+      const toolMsg = body.messages.find(m => m.role === 'tool');
+      receivedArgs = toolMsg?.content;
+      sse(res, { role: 'assistant', content: 'fragments merged' });
+    }
+  };
+
+  const result = await runMi(['-p', 'test fragmented args']);
+  assert.strictEqual(result.status, 0);
+  assert.match(result.stdout, /fragments merged/);
+  // Verify the fragmented arguments were correctly reassembled and executed
+  assert.ok(receivedArgs?.includes('fragmented_arg_test'),
+    `Tool should have received reassembled args with output containing "fragmented_arg_test", got: ${receivedArgs}`);
+});
