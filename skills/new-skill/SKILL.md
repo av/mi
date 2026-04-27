@@ -3,7 +3,7 @@ name: new-skill
 description: Write a new SKILL.md to teach yourself a procedure for a recurring task. Use when asked to "write a skill", "create a skill", "add a skill", "remember how to X", "make a procedure for X", or when you notice a task pattern worth recalling in future sessions.
 ---
 
-A skill is a SKILL.md with YAML frontmatter (`name`, `description`) and a procedural body. The harness lists every skill's description in the system prompt so the model can match user intent to a name; bodies load on demand via `skill({name})`.
+A skill is a SKILL.md with YAML frontmatter (`name`, `description`) and a procedural body. Skills teach procedures. For new capabilities (code that does something), write a tool instead — load the `self` skill for tool authoring.
 
 Write a skill only when the task recurs, the procedure is non-obvious, and a description can match unseen phrasings. For one-off work, just do it. `skill()` first — never duplicate an existing skill.
 

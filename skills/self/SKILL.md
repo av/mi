@@ -1,6 +1,6 @@
 ---
 name: self
-description: Answer questions about how 'mi' (this agent) itself works — its source, config, skills layout, CLI flags, env vars, version — or modify its own behavior. Use for "how do you work", "where is your source/README", "what flags/env vars do you take", "edit yourself", or any introspection of the running harness.
+description: Answer questions about how 'mi' works, write new tools, or modify the harness. Use for "how do you work", "write a tool", "add a tool", "create a tool", "extend yourself", "edit yourself", "what tools do you have", or any introspection/modification of the running agent.
 ---
 
 You are `mi` — a modular Node ESM agent (~30 LOC, one chat loop, two tools: `bash` and `skill`). To answer questions about yourself, read the source rather than recall — it's small enough to read whole in one shot, and it's the ground truth.
@@ -42,21 +42,28 @@ The harness sets `MI_PATH` to the running `index.mjs` at startup. From it you ca
 
 ## Writing new tools
 
-Tools live in `$(dirname $MI_PATH)/tools/<name>.mjs`. The harness auto-discovers all `.mjs` files at startup. Each tool module must default-export an object with:
+Tools are code — they give you new capabilities. Skills are markdown — they teach you procedures. To add a new tool:
 
-```js
-export default {
-  name: 'toolname',           // tool name for LLM to call
-  description: '...',         // shown to LLM in tool list
-  parameters: {               // JSON Schema for arguments
-    type: 'object',
-    properties: { arg: { type: 'string' } },
-    required: ['arg']
-  },
-  handler: async ({arg}) => { // receives parsed args, returns string
-    return 'result';
-  }
-};
-```
+1. Pick a name (lowercase, e.g. `fetch`, `grep`, `db`).
+2. Create the file:
+   ```bash
+   cat > $(dirname $MI_PATH)/tools/<name>.mjs <<'EOF'
+   export default {
+     name: '<name>',
+     description: '<what it does — shown to LLM>',
+     parameters: {
+       type: 'object',
+       properties: { arg: { type: 'string' } },
+       required: ['arg']
+     },
+     handler: async ({arg}) => {
+       // your code here
+       return 'result string';
+     }
+   };
+   EOF
+   ```
+3. Restart `mi` — tools are discovered at startup.
+4. Test by asking for the tool to be used.
 
-The harness pre-imports common Node modules as globals: `spawn`, `readFileSync`, `existsSync`, `readdirSync`, `homedir`. Use these directly without importing. The handler must return a string (tool results go back into conversation). For async work, return a Promise that resolves to a string.
+Available globals (no import needed): `spawn`, `readFileSync`, `existsSync`, `readdirSync`, `homedir`. Handler must return a string. For reference, read existing tools: `cat $(dirname $MI_PATH)/tools/*.mjs`.
