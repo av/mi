@@ -11,6 +11,8 @@ agentic coding in 30 loc. a loop, two tools, and an llm.
 - `skill` tool loads markdown playbooks from `skills/` and `~/.agents/skills/` (auto-advertised in system prompt)
 - bundled skills: `plan`, `tasks`, `delegate`, `explore`, `refactor`, `review`, `verify`, `debug`, `tdd`, `new-skill`, `self`
 - modular tools: add new tools by dropping `.mjs` files in `tools/` (auto-discovered at startup)
+- self-extending: agent can write its own tools via the `self` skill
+- recursive agents: tools can spawn sub-agents by calling `mi` as a child process
 - automatic `AGENTS.md` ingestion from current directory for repo-specific context
 - non-interactive mode with `-p 'prompt'` for scripting and CI
 - stdin pipes: `echo "do this" | mi` or `cat file | mi`
