@@ -807,6 +807,23 @@ test('tool call output truncation', async () => {
   assert.strictEqual(suffixMatches?.length || 0, 1, 'Suffix should appear only once (in command), not in truncated result');
 });
 
+test('SSE stream handles malformed JSON gracefully', async () => {
+  // Test the try/catch around JSON.parse on line 45 - malformed JSON should be skipped, not crash
+  requestHandler = (req, res, body) => {
+    res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+    // Send malformed JSON first (this should be caught and skipped via continue)
+    res.write(`data: {malformed json without closing brace\n\n`);
+    // Then send valid content - this should still be processed
+    res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: 'survived malformed json' } }] })}\n\n`);
+    res.write('data: [DONE]\n\n');
+    res.end();
+  };
+
+  const result = await runMi(['-p', 'test malformed json']);
+  assert.strictEqual(result.status, 0, 'Should complete successfully despite malformed JSON');
+  assert.match(result.stdout, /survived malformed json/, 'Valid content after malformed JSON should be processed');
+});
+
 test('REPL error recovery removes failed user message from history', async () => {
   let requestCount = 0;
   let lastBody = null;
