@@ -945,3 +945,55 @@ test('REPL readline close exits cleanly', async () => {
   // Verify we were in REPL mode (saw the version banner)
   assert.match(result.stdout, /◰ mi/, 'Should have shown REPL banner before exit');
 });
+
+test('multiple tool calls in single response', async () => {
+  // Test the tool call merging loop - multiple tool calls indexed 0, 1, 2 in one response
+  // Exercises line 45: message.tool_calls[toolDelta.index] ||= {...}
+  let callCount = 0;
+  let toolResults = [];
+  requestHandler = (req, res, body) => {
+    callCount++;
+    if (callCount === 1) {
+      // Send response with three tool calls at once
+      res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+      // First tool call at index 0
+      res.write(`data: ${JSON.stringify({ choices: [{ delta: { tool_calls: [{ index: 0, id: 'call_0', type: 'function', function: { name: 'bash', arguments: '{"command":"echo first"}' } }] } }] })}\n\n`);
+      // Second tool call at index 1
+      res.write(`data: ${JSON.stringify({ choices: [{ delta: { tool_calls: [{ index: 1, id: 'call_1', type: 'function', function: { name: 'bash', arguments: '{"command":"echo second"}' } }] } }] })}\n\n`);
+      // Third tool call at index 2
+      res.write(`data: ${JSON.stringify({ choices: [{ delta: { tool_calls: [{ index: 2, id: 'call_2', type: 'function', function: { name: 'bash', arguments: '{"command":"echo third"}' } }] } }] })}\n\n`);
+      res.write('data: [DONE]\n\n');
+      res.end();
+    } else {
+      // Second request: verify all 3 tool results were captured
+      const toolMsgs = body.messages.filter(m => m.role === 'tool');
+      toolResults = toolMsgs.map(m => m.content.trim());
+      sse(res, { role: 'assistant', content: 'multi tools done' });
+    }
+  };
+
+  const result = await runMi(['-p', 'execute multiple tools']);
+  assert.strictEqual(result.status, 0);
+  assert.match(result.stdout, /multi tools done/);
+
+  // Verify all three tool calls were executed and results captured
+  assert.strictEqual(toolResults.length, 3, 'Should have 3 tool results');
+  assert.ok(toolResults.some(r => r === 'first'), 'First tool output should be captured');
+  assert.ok(toolResults.some(r => r === 'second'), 'Second tool output should be captured');
+  assert.ok(toolResults.some(r => r === 'third'), 'Third tool output should be captured');
+});
+
+test('HTTP error with non-JSON response body', async () => {
+  // Test the .catch(()=>({})) fallback on line 41 when error response is not valid JSON
+  // This handles cases where server returns plain text error or HTML
+  requestHandler = (req, res, body) => {
+    res.writeHead(503, { 'Content-Type': 'text/plain' });
+    res.end('Service Unavailable - Maintenance Mode');  // Not JSON
+  };
+
+  const result = await runMi(['-p', 'trigger non-json error']);
+  // Process should fail but not crash - should show HTTP status as fallback
+  assert.notStrictEqual(result.status, 0);
+  // Should fall back to HTTP status code since JSON parsing fails
+  assert.match(result.stderr, /HTTP 503/);
+});
