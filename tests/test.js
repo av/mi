@@ -1387,3 +1387,124 @@ test('AGENTS.md edge case: missing file does not crash', async () => {
     // If it didn't exist before, leave it deleted
   }
 });
+
+test('skill tool: empty SKILL.md file loads as empty string', async () => {
+  // Test that a skill with an empty SKILL.md file (0 bytes) is handled gracefully
+  // loadSkill returns readFileSync content, which is '' for empty file
+  // listSkills uses meta() which handles empty string: name=undefined (falls back to dirName), description=''
+  const mockHome = join(__dirname, 'mock_home_empty_skill');
+  const skillDir = join(mockHome, '.agents', 'skills', 'empty_skill');
+  mkdirSync(skillDir, { recursive: true });
+  writeFileSync(join(skillDir, 'SKILL.md'), '');  // Empty file
+
+  // First test: listSkills should include empty skill with directory name as fallback
+  let listCallCount = 0;
+  let listToolResult = null;
+  requestHandler = (req, res, body) => {
+    listCallCount++;
+    if (listCallCount === 1) {
+      sse(res, {
+        role: 'assistant',
+        tool_calls: [{
+          id: 'call_list_empty',
+          type: 'function',
+          function: { name: 'skill', arguments: JSON.stringify({}) }
+        }]
+      });
+    } else {
+      listToolResult = body.messages[body.messages.length - 1].content;
+      sse(res, { role: 'assistant', content: 'list empty skill ok' });
+    }
+  };
+
+  try {
+    const listResult = await runMi(['-p', 'list skills with empty'], { HOME: mockHome });
+    assert.strictEqual(listResult.status, 0, 'Should not crash when listing skills with empty SKILL.md');
+    assert.match(listResult.stdout, /list empty skill ok/);
+    // Empty SKILL.md: name regex returns undefined -> falls back to dirName "empty_skill"
+    // description regex returns undefined -> falls back to ''
+    assert.match(listToolResult, /^- empty_skill: $/m, 'Empty skill should use directory name and empty description');
+
+    // Second test: loadSkill should return empty string for empty SKILL.md
+    let loadCallCount = 0;
+    let loadToolResult = null;
+    requestHandler = (req, res, body) => {
+      loadCallCount++;
+      if (loadCallCount === 1) {
+        sse(res, {
+          role: 'assistant',
+          tool_calls: [{
+            id: 'call_load_empty',
+            type: 'function',
+            function: { name: 'skill', arguments: JSON.stringify({ name: 'empty_skill' }) }
+          }]
+        });
+      } else {
+        loadToolResult = body.messages[body.messages.length - 1].content;
+        sse(res, { role: 'assistant', content: 'load empty skill ok' });
+      }
+    };
+
+    const loadResult = await runMi(['-p', 'load empty skill'], { HOME: mockHome });
+    assert.strictEqual(loadResult.status, 0, 'Should not crash when loading empty SKILL.md');
+    assert.match(loadResult.stdout, /load empty skill ok/);
+    // readFileSync returns '' for empty file, String('') = ''
+    assert.strictEqual(loadToolResult, '', 'Loading empty SKILL.md should return empty string');
+  } finally {
+    rmSync(mockHome, { recursive: true, force: true });
+  }
+});
+
+test('skill tool: malformed SKILL.md with broken frontmatter', async () => {
+  // Test that a SKILL.md with malformed/incomplete YAML frontmatter is handled gracefully
+  // The meta() function uses regex to extract name/description, which won't crash on malformed content
+  // Cases tested:
+  // 1. Unclosed frontmatter (--- at start, no closing ---)
+  // 2. Invalid YAML syntax (missing colon)
+  const mockHome = join(__dirname, 'mock_home_malformed_skill');
+  const skillsRoot = join(mockHome, '.agents', 'skills');
+
+  // Create two different malformed SKILL.md files
+  mkdirSync(join(skillsRoot, 'unclosed_frontmatter'), { recursive: true });
+  writeFileSync(join(skillsRoot, 'unclosed_frontmatter', 'SKILL.md'), '---\nname: malformed_test_name\ndescription: unclosed_desc\nbody without closing delimiter');
+
+  mkdirSync(join(skillsRoot, 'invalid_yaml_xyz'), { recursive: true });
+  writeFileSync(join(skillsRoot, 'invalid_yaml_xyz', 'SKILL.md'), '---\nname test\ndescription no colon\n---\nbody');
+
+  let callCount = 0;
+  let toolResult = null;
+  requestHandler = (req, res, body) => {
+    callCount++;
+    if (callCount === 1) {
+      sse(res, {
+        role: 'assistant',
+        tool_calls: [{
+          id: 'call_malformed',
+          type: 'function',
+          function: { name: 'skill', arguments: JSON.stringify({}) }
+        }]
+      });
+    } else {
+      toolResult = body.messages[body.messages.length - 1].content;
+      sse(res, { role: 'assistant', content: 'malformed skill list ok' });
+    }
+  };
+
+  try {
+    const result = await runMi(['-p', 'list malformed skills'], { HOME: mockHome });
+    assert.strictEqual(result.status, 0, 'Should not crash when listing malformed SKILL.md files');
+    assert.match(result.stdout, /malformed skill list ok/);
+
+    // unclosed_frontmatter: has valid name and description lines despite no closing ---
+    // Regex still matches because it's not YAML parsing, just line-by-line regex
+    assert.ok(toolResult.includes('- malformed_test_name: unclosed_desc'),
+      `Should extract name/description from unclosed frontmatter, got: ${toolResult}`);
+
+    // invalid_yaml_xyz: name and description lines don't have colons, regex won't match
+    // Falls back to directory name with empty description
+    assert.ok(toolResult.includes('- invalid_yaml_xyz:'),
+      `Should fall back to dirName for invalid YAML syntax, got: ${toolResult}`);
+  } finally {
+    rmSync(mockHome, { recursive: true, force: true });
+  }
+});
