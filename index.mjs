@@ -2,7 +2,7 @@
 // mi — minimal autonomous agent CLI. Streams OpenAI chat completions, executes tool calls in a loop.
 
 // ── Imports & environment ────────────────────────────────────────────
-// Node builtins only — no npm deps. These four cover REPL, filesystem, subprocesses, and path resolution.
+// Node builtins only — no npm deps. These four cover REPL, filesystem, subprocesses, and home directory.
 import { createInterface } from 'readline'; import { readFileSync, existsSync, readdirSync } from 'fs'; import { spawn } from 'child_process'; import { homedir } from 'os';
 // Globals: tools run in a separate module scope but need fs/spawn — expose via global rather than re-importing.
 // DIR = package root (for tool/skill discovery); MI_DIR/MI_PATH = env vars so tools can locate project assets.
@@ -10,7 +10,7 @@ Object.assign(global, { spawn, readFileSync, existsSync, readdirSync, homedir })
 
 // ── Tool discovery ───────────────────────────────────────────────────
 // Load tool modules; each exports {name, description, parameters, handler}.
-// ANSI helpers: 90 = gray (dim), 31 = red (error), 38;5;208 = orange (brand)
+// ANSI helpers: 90 = bright black (gray), 31 = red (error), 38;5;208 = orange (brand)
 const toolMods = await Promise.all(readdirSync(`${DIR}tools`).filter(file => file.endsWith('.mjs')).map(file => import(`${DIR}tools/${file}`))), defs = toolMods.map(mod => mod.default), gray = s => `\x1b[90m${s}\x1b[0m`, red = s => `\x1b[31m${s}\x1b[0m`, { listSkills } = toolMods.find(mod => mod.listSkills);
 const tools = Object.fromEntries(defs.map(def => [def.name, def.handler])), toolSchemas = defs.map(def => ({ type: 'function', function: { name: def.name, description: def.description, parameters: def.parameters } }));
 
@@ -60,7 +60,7 @@ const sysMsg = history[0], fileArg = getArg('-f'); if (fileArg) sysMsg.content +
 // ── One-shot modes: -p flag and stdin pipe ───────────────────────────
 const prompt = getArg('-p'); if (prompt) { history.push({ role: 'user', content: prompt }); await run(history); process.exit(0); }
 
-if (!process.stdin.isTTY) { let input = ''; for await (const chunk of process.stdin) input += chunk; history.push({ role: 'user', content: input.trim() }); await run(history); process.exit(0); }
+if (!process.stdin.isTTY) { let input = ''; for await (const chunk of process.stdin) input += chunk; /* Buffer auto-coerces to string via += */ history.push({ role: 'user', content: input.trim() }); await run(history); process.exit(0); }
 
 // ── Interactive REPL ─────────────────────────────────────────────────
 // readline setup, version banner, then an infinite prompt loop
