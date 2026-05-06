@@ -11,5 +11,5 @@ export default { name: 'bash', description: 'Runs in a detached process group. R
   // killGroup uses try/catch because the process group may already be dead.
   // SIGINT wired so Ctrl-C in the terminal kills the child group, not just mi.
   // On exit: detach SIGINT handler to avoid leaking listeners, cancel timer.
-  return new Promise(resolve => { const child = spawn('bash', ['-c', command], { stdio: ['ignore', 'pipe', 'pipe'], detached: true }); let output = ''; for (const stream of [child.stdout, child.stderr]) stream.on('data', chunk => output += chunk); /* Buffer auto-coerces to string via += */ const killGroup = () => { try { process.kill(-child.pid); } catch {} }; process.on('SIGINT', killGroup); const timer = timeout ? setTimeout(() => { killGroup(); resolve(`${output}\n[timeout]`) }, +timeout) : null; child.on('exit', () => { process.off('SIGINT', killGroup); if (timer) clearTimeout(timer); resolve(output); }); });
-}};
+  return new Promise(resolve => { const child = spawn('bash', ['-c', command], { stdio: ['ignore', 'pipe', 'pipe'], detached: true }); let output = ''; for (const stream of [child.stdout, child.stderr]) stream.on('data', chunk => output += chunk); /* Buffer auto-coerces to string via += */
+    const killGroup = () => { try { process.kill(-child.pid); } catch {} }; process.on('SIGINT', killGroup); const timer = timeout ? setTimeout(() => { killGroup(); resolve(`${output}\n[timeout]`) }, +timeout) : null; child.on('exit', () => { process.off('SIGINT', killGroup); if (timer) clearTimeout(timer); resolve(output); }); }); }};
