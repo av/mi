@@ -20,8 +20,8 @@
 
 # architecture
 - core logic lives in index.mjs — every non-shebang line is intentionally dense
-- label: tools hot-load from tools/*.mjs via dynamic import before each model call
-  command: grep -q 'await loadTools(); const response' index.mjs
+- label: tools hot-load from bundled tools/*.mjs and user ~/.agents/tools/*.mjs before each model call
+  command: grep -q 'agents/tools' index.mjs && grep -q 'await loadTools(); const response' index.mjs
 - tool modules default-export { name, description, parameters, handler }
 - label: skills are markdown playbooks in skills/<name>/SKILL.md with YAML frontmatter
   command: test -f skills/debug/SKILL.md && head -1 skills/debug/SKILL.md | grep -q '^---'
@@ -50,6 +50,8 @@
 - label: tool output logged truncated to 200 chars; full result sent to model
   command: grep -q '200' index.mjs
 - unknown tool calls return error listing available tools instead of crashing
+- label: invalid or colliding user tools are skipped instead of replacing bundled tools
+  command: grep -q "skipped user tool" index.mjs && grep -q "defs.some" index.mjs
 
 # cli
 - four CLI modes: interactive REPL, one-shot (-p), stdin pipe, and file context (-f)

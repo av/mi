@@ -4,7 +4,7 @@ import { spawn } from 'node:child_process';
 import * as http from 'node:http';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { readFileSync, writeFileSync, unlinkSync, existsSync, symlinkSync } from 'node:fs';
+import { readFileSync, writeFileSync, unlinkSync, existsSync, symlinkSync, mkdirSync, rmSync } from 'node:fs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const INDEX_PATH = join(__dirname, '../index.mjs');
@@ -87,6 +87,19 @@ function runMi(args, env = {}, input = '') {
       resolve({ status: code, stdout, stderr });
     });
   });
+}
+
+
+function createMockToolHome(suffix) {
+  const mockHome = join(__dirname, `mock_tool_home_${suffix}`);
+  const toolsRoot = join(mockHome, '.agents', 'tools');
+  mkdirSync(toolsRoot, { recursive: true });
+  return {
+    mockHome,
+    toolsRoot,
+    createTool: (file, source) => writeFileSync(join(toolsRoot, file), source),
+    cleanup: () => rmSync(mockHome, { recursive: true, force: true })
+  };
 }
 
 // Helper: create a mock HOME directory with skill structure
@@ -176,6 +189,155 @@ test('bash tool', async () => {
   const result = await runMi(['-p', 'executeAgent bash']);
   assert.strictEqual(result.status, 0);
   assert.match(result.stdout, /bash done/);
+});
+
+
+test('user tools load from ~/.agents/tools and execute', async () => {
+  const home = createMockToolHome('basic');
+  home.createTool('user_echo.mjs', "export default { name: 'user_echo', description: 'echo a value', parameters: { type: 'object', properties: { value: { type: 'string' } }, required: ['value'] }, handler: ({value}) => `user:${value}` };\n");
+
+  let callCount = 0;
+  requestHandler = (req, res, body) => {
+    callCount++;
+    if (callCount === 1) {
+      assert.ok(body.tools.some(t => t.function.name === 'user_echo'));
+      sse(res, { role: 'assistant', tool_calls: [{ id: 'call_user_echo', type: 'function', function: { name: 'user_echo', arguments: JSON.stringify({ value: 'abc' }) } }] });
+    } else {
+      assert.strictEqual(body.messages.at(-1).role, 'tool');
+      assert.strictEqual(body.messages.at(-1).content, 'user:abc');
+      sse(res, { role: 'assistant', content: 'user tool done' });
+    }
+  };
+
+  try {
+    const result = await runMi(['-p', 'use user tool'], { HOME: home.mockHome });
+    assert.strictEqual(result.status, 0, result.stderr);
+    assert.match(result.stdout, /user tool done/);
+  } finally {
+    home.cleanup();
+  }
+});
+
+
+test('user tools hot-load before the next model call', async () => {
+  const home = createMockToolHome('hot');
+  let callCount = 0;
+  requestHandler = (req, res, body) => {
+    callCount++;
+    if (callCount === 1) {
+      assert.ok(!body.tools.some(t => t.function.name === 'user_hot'));
+      sse(res, { role: 'assistant', tool_calls: [{ id: 'call_write_user_tool', type: 'function', function: { name: 'bash', arguments: JSON.stringify({ command: `cat > ${home.toolsRoot}/user_hot.mjs <<'EOF'\nexport default { name: 'user_hot', description: 'hot user tool', parameters: { type: 'object', properties: { value: { type: 'string' } }, required: ['value'] }, handler: ({value}) => 'hot:' + value };\nEOF` }) } }] });
+    } else if (callCount === 2) {
+      assert.ok(body.tools.some(t => t.function.name === 'user_hot'));
+      sse(res, { role: 'assistant', tool_calls: [{ id: 'call_user_hot', type: 'function', function: { name: 'user_hot', arguments: JSON.stringify({ value: 'xyz' }) } }] });
+    } else {
+      assert.strictEqual(body.messages.at(-1).content, 'hot:xyz');
+      sse(res, { role: 'assistant', content: 'user hot done' });
+    }
+  };
+
+  try {
+    const result = await runMi(['-p', 'create and use user tool'], { HOME: home.mockHome });
+    assert.strictEqual(result.status, 0, result.stderr);
+    assert.match(result.stdout, /user hot done/);
+  } finally {
+    home.cleanup();
+  }
+});
+
+test('user tools cannot override bundled tools', async () => {
+  const home = createMockToolHome('override');
+  home.createTool('bash.mjs', "export default { name: 'bash', description: 'fake bash', parameters: { type: 'object', properties: { command: { type: 'string' } }, required: ['command'] }, handler: () => 'fake bash' };\n");
+  let callCount = 0;
+  requestHandler = (req, res, body) => {
+    callCount++;
+    if (callCount === 1) sse(res, { role: 'assistant', tool_calls: [{ id: 'call_bash', type: 'function', function: { name: 'bash', arguments: JSON.stringify({ command: 'echo real_bash' }) } }] });
+    else { assert.match(body.messages.at(-1).content, /real_bash/); assert.doesNotMatch(body.messages.at(-1).content, /fake bash/); sse(res, { role: 'assistant', content: 'override blocked' }); }
+  };
+  try {
+    const result = await runMi(['-p', 'check bash override'], { HOME: home.mockHome });
+    assert.strictEqual(result.status, 0, result.stderr);
+    assert.match(result.stdout, /override blocked/);
+    assert.match(result.stderr, /skipped user tool/);
+  } finally {
+    home.cleanup();
+  }
+});
+
+test('broken and malformed user tools are skipped', async () => {
+  const home = createMockToolHome('broken');
+  home.createTool('broken.mjs', "throw new Error('boom from user tool');\n");
+  home.createTool('malformed.mjs', "export default { name: 'bad_tool', description: 'bad' };\n");
+  requestHandler = (req, res, body) => {
+    assert.ok(!body.tools.some(t => t.function.name === 'bad_tool'));
+    assert.ok(body.tools.some(t => t.function.name === 'bash'));
+    sse(res, { role: 'assistant', content: 'broken skipped' });
+  };
+  try {
+    const result = await runMi(['-p', 'check broken user tools'], { HOME: home.mockHome });
+    assert.strictEqual(result.status, 0, result.stderr);
+    assert.match(result.stdout, /broken skipped/);
+    assert.match(result.stderr, /skipped user tool/);
+  } finally {
+    home.cleanup();
+  }
+});
+
+test('duplicate user tool names are deterministic', async () => {
+  const home = createMockToolHome('duplicate');
+  home.createTool('a.mjs', "export default { name: 'dupe_user', description: 'first duplicate', parameters: { type: 'object', properties: {} }, handler: () => 'first' };\n");
+  home.createTool('b.mjs', "export default { name: 'dupe_user', description: 'second duplicate', parameters: { type: 'object', properties: {} }, handler: () => 'second' };\n");
+  let callCount = 0;
+  requestHandler = (req, res, body) => {
+    callCount++;
+    if (callCount === 1) sse(res, { role: 'assistant', tool_calls: [{ id: 'call_dupe', type: 'function', function: { name: 'dupe_user', arguments: '{}' } }] });
+    else { assert.strictEqual(body.messages.at(-1).content, 'first'); sse(res, { role: 'assistant', content: 'dupe done' }); }
+  };
+  try {
+    const result = await runMi(['-p', 'check duplicate user tools'], { HOME: home.mockHome });
+    assert.strictEqual(result.status, 0, result.stderr);
+    assert.match(result.stdout, /dupe done/);
+  } finally {
+    home.cleanup();
+  }
+});
+
+test('user tools load when HOME contains url-special characters', async () => {
+  const home = createMockToolHome('hash?#space');
+  home.createTool('special_home.mjs', "export default { name: 'special_home', description: 'special home tool', parameters: { type: 'object', properties: {} }, handler: () => 'special-ok' };\n");
+  let callCount = 0;
+  requestHandler = (req, res, body) => {
+    callCount++;
+    if (callCount === 1) sse(res, { role: 'assistant', tool_calls: [{ id: 'call_special_home', type: 'function', function: { name: 'special_home', arguments: '{}' } }] });
+    else { assert.strictEqual(body.messages.at(-1).content, 'special-ok'); sse(res, { role: 'assistant', content: 'special done' }); }
+  };
+  try {
+    const result = await runMi(['-p', 'check special home'], { HOME: home.mockHome });
+    assert.strictEqual(result.status, 0, result.stderr);
+    assert.match(result.stdout, /special done/);
+  } finally {
+    home.cleanup();
+  }
+});
+
+
+
+test('missing user tools directory is harmless', async () => {
+  const mockHome = join(__dirname, 'mock_tool_home_missing');
+  rmSync(mockHome, { recursive: true, force: true });
+  mkdirSync(mockHome, { recursive: true });
+  requestHandler = (req, res, body) => {
+    assert.ok(body.tools.some(t => t.function.name === 'bash'));
+    assert.ok(body.tools.some(t => t.function.name === 'skill'));
+    sse(res, { role: 'assistant', content: 'missing tools ok' });
+  };
+  try {
+    const result = await runMi(['-p', 'check missing user tools'], { HOME: mockHome });
+    assert.strictEqual(result.status, 0, result.stderr);
+    assert.match(result.stdout, /missing tools ok/);
+  } finally {
+    rmSync(mockHome, { recursive: true, force: true });
+  }
 });
 
 test('context gathering', async () => {
@@ -326,8 +488,6 @@ test('AGENTS.md context', async () => {
     unlinkSync(agentsFile);
   }
 });
-
-import { mkdirSync, rmdirSync, rmSync } from 'node:fs';
 
 test('skill tool', async () => {
   const { mockHome, createSkill, cleanup } = createMockSkillHome('basic');

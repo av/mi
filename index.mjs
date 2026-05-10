@@ -3,7 +3,7 @@
 
 // ── Imports & environment ────────────────────────────────────────────
 // Node builtins only — no npm deps. These four cover REPL, filesystem, subprocesses, and home directory.
-import { createInterface } from 'readline'; import { readFileSync, existsSync, readdirSync } from 'fs'; import { spawn } from 'child_process'; import { homedir } from 'os';
+import { createInterface } from 'readline'; import { readFileSync, existsSync, readdirSync } from 'fs'; import { spawn } from 'child_process'; import { homedir } from 'os'; import { pathToFileURL } from 'url';
 // Globals: tools run in a separate module scope but need fs/spawn — expose via global rather than re-importing.
 // DIR = package root (for tool/skill discovery); MI_DIR/MI_PATH = env vars so tools can locate project assets.
 Object.assign(global, { spawn, readFileSync, existsSync, readdirSync, homedir }); const DIR = new URL('.', import.meta.url).pathname; Object.assign(process.env, { MI_DIR: DIR, MI_PATH: new URL(import.meta.url).pathname }); if (!process.env.OPENAI_API_KEY && !process.argv.includes('-h')) { console.error('OPENAI_API_KEY required'); process.exit(1); }
@@ -12,7 +12,7 @@ Object.assign(global, { spawn, readFileSync, existsSync, readdirSync, homedir })
 // Load tool modules; each exports {name, description, parameters, handler}.
 // ANSI helpers: 90 = bright black (gray), 31 = red (error), 38;5;208 = orange (brand)
 const gray = s => `\x1b[90m${s}\x1b[0m`, red = s => `\x1b[31m${s}\x1b[0m`, orange = s => `\x1b[38;5;208m${s}\x1b[0m`;
-let tools, toolSchemas, listSkills, loadId = 0; async function loadTools() { const toolMods = await Promise.all(readdirSync(`${DIR}tools`).filter(file => file.endsWith('.mjs')).map(file => import(`${DIR}tools/${file}?v=${++loadId}`))), defs = toolMods.map(mod => mod.default); tools = Object.fromEntries(defs.map(def => [def.name, def.handler])); toolSchemas = defs.map(def => ({ type: 'function', function: { name: def.name, description: def.description, parameters: def.parameters } })); listSkills = toolMods.find(mod => mod.listSkills)?.listSkills; } await loadTools();
+let tools, toolSchemas, listSkills, loadId = 0; async function loadTools() { const specs = [`${DIR}tools`, `${process.env.HOME || homedir()}/.agents/tools`].flatMap((dir, i) => existsSync(dir) ? readdirSync(dir).filter(file => file.endsWith('.mjs')).sort().map(file => [`${dir}/${file}`, i]) : []), mods = await Promise.all(specs.map(([path, user]) => import(`${pathToFileURL(path).href}?v=${++loadId}`).then(mod => ({ mod, def: mod.default, path, user }), error => ({ error, path, user })))); const defs = []; for (const x of mods) { const bad = x.error || !x.def?.name || !x.def?.description || !x.def?.parameters || typeof x.def?.handler !== 'function' || defs.some(def => def.name === x.def.name); if (bad) { if (x.user) { console.error(gray(`⚠ skipped user tool ${x.path}`)); continue; } throw x.error || new Error(`invalid bundled tool ${x.path}`); } defs.push(x.def); } tools = Object.fromEntries(defs.map(def => [def.name, def.handler])); toolSchemas = defs.map(def => ({ type: 'function', function: { name: def.name, description: def.description, parameters: def.parameters } })); listSkills = mods.find(x => x.mod?.listSkills)?.mod.listSkills; } await loadTools();
 
 // ── Agent loop: chat → stream → execute tools → repeat ──────────────
 // Streams the API response, executes any tool calls, and loops until the

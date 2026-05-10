@@ -8,7 +8,7 @@ agentic coding in 30 loc. a loop, two tools, and an llm.
 - `bash` tool gives full system access: git, curl, compilers, file I/O (`cat`, `sed -i`, heredocs); optional `timeout=<ms>` and `bg=truthy` for background tasks
 - `skill` tool loads markdown playbooks from `skills/` and `~/.agents/skills/` (auto-advertised in system prompt)
 - bundled skills: `plan`, `tasks`, `delegate`, `explore`, `refactor`, `review`, `verify`, `debug`, `tdd`, `new-skill`, `self`
-- modular tools: add new tools by dropping `.mjs` files in `tools/` (hot-loaded before each model call)
+- modular tools: add bundled tools in `tools/` or user tools in `~/.agents/tools/` (hot-loaded before each model call)
 - self-extending: agent can write its own tools via the `self` skill
 - recursive agents: tools can spawn sub-agents by calling `mi` as a child process
 - automatic `AGENTS.md` ingestion from current directory for repo-specific context
@@ -74,7 +74,7 @@ export default { name: 'bash', description: '...', parameters: {...}, handler: (
 }};
 ```
 
-the harness hot-loads tools before each model call by scanning `tools/*.mjs`. two tools ship by default:
+the harness hot-loads tools before each model call by scanning bundled `tools/*.mjs` and user `~/.agents/tools/*.mjs`. user tools use the same export contract, but cannot override bundled tool names. two tools ship by default:
 
 - `bash` gives the agent access to the entire system: git, curl, compilers, package managers, and file I/O (via `cat`, `sed -n`, `sed -i`, heredocs; the system prompt teaches the patterns). optional `timeout=<ms>` kills the process after the given delay and resolves with `[timeout]`. optional `bg=truthy` runs the command detached and returns `pid:X log:/tmp/mi-*.log` immediately.
 - `skill` gives the agent specialized workflows loaded on demand from markdown playbooks in bundled `skills/` or `~/.agents/skills/`.

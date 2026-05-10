@@ -5,7 +5,7 @@
 ESM CLI: core logic in `index.mjs`, tools in `tools/*.mjs`, skills in `skills/<name>/SKILL.md`.
 No build step, no transpilation, no lint config.
 
-Tool modules hot-load from `tools/*.mjs` before each model call and must default-export `{ name, description, parameters, handler }`.
+Tool modules hot-load from bundled `tools/*.mjs` and user `~/.agents/tools/*.mjs` before each model call and must default-export `{ name, description, parameters, handler }`. User tools cannot override bundled tool names.
 Bundled skills and user skills are loaded through the `skill` tool from `skills/` and `~/.agents/skills/`.
 
 `scripts/count-lines.mjs` is a dev utility — not part of the published package (`files` in `package.json` is `index.mjs`, `tools/`, and `skills/`).
