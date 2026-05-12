@@ -6,11 +6,13 @@ agentic coding in 30 loc. a loop, two tools, and an llm.
 
 - works with any OpenAI-compatible API: OpenAI, ollama, lmstudio, litellm, vllm, local models
 - `bash` tool gives full system access: git, curl, compilers, file I/O (`cat`, `sed -i`, heredocs); optional `timeout=<ms>` and `bg=truthy` for background tasks
+- `delegate` tool spawns a mi subagent with a prompt — runs in the same directory, same API, streams output in real-time; optional `timeout=<ms>`
+- `goal` tool pursues a high-level goal by iterating subagents until a bash check command exits 0 — uses a progress file so iterations build on prior work (up to 128 by default)
 - `skill` tool loads markdown playbooks from `skills/` and `~/.agents/skills/` (auto-advertised in system prompt)
 - bundled skills: `plan`, `tasks`, `delegate`, `explore`, `refactor`, `review`, `verify`, `debug`, `tdd`, `new-skill`, `self`
 - modular tools: add new tools by dropping `.mjs` files in `tools/` (hot-loaded before each model call)
 - self-extending: agent can write its own tools via the `self` skill
-- recursive agents: tools can spawn sub-agents by calling `mi` as a child process
+- recursive agents: `delegate` and `goal` tools spawn sub-agents natively; any tool can also call `mi` as a child process
 - automatic `AGENTS.md` ingestion from current directory for repo-specific context
 - non-interactive mode with `-p 'prompt'` for scripting and CI
 - stdin pipes: `echo "do this" | mi` or `cat file | mi`
@@ -199,6 +201,42 @@ the full flow looks like this:
 
 ```
 user prompt → [system, user] → llm → tool_calls? → execute tools → [tool results] → llm → ... → text response
+```
+
+### delegation and goals
+
+two built-in tools extend the single-agent loop into multi-agent workflows.
+
+**`delegate`** spawns a fresh mi subagent with a prompt. the child runs in the same directory against the same API. its output streams to the terminal in real-time (the parent REPL is blocked during tool execution, so there's no interleaving). when the child exits, the full output goes back to the parent model as the tool result.
+
+```
+⟡ delegate({"prompt":"fix the failing test in auth.js"})
+  [subagent output streams here — tool calls, content, everything]
+  ⟡ bash({"command":"npm test"})
+  all tests pass.
+done.
+```
+
+optional `timeout` (ms) kills the subagent if it runs too long. ctrl-c kills the child process group.
+
+**`goal`** wraps delegate in a retry loop. it takes a `goal` (what to achieve), a `check` (bash command that exits 0 on success), and an optional `max` (iteration limit, default 128). before starting, it runs the check — if it already passes, it returns immediately. otherwise it loops:
+
+1. create a progress file (`/tmp/mi-goal-<ts>.md`) with the goal, check command, and pre-check output
+2. spawn a subagent with instructions to read the progress file, do the work, and append notes
+3. run the check command (30s timeout)
+4. if the check passes, done. if not, append the check output to the progress file and iterate
+
+the progress file is key: it prevents subagents from re-inventing the world. each iteration reads what was tried before and what the check output was, then picks up where the last one left off.
+
+```
+⟡ goal({"goal":"make all tests pass","check":"npm test"})
+── goal 1/128 ──
+  [subagent 1 streams here]
+── ✗ ──
+── goal 2/128 ──
+  [subagent 2 reads progress file, continues from where 1 left off]
+── ✓ ──
+goal achieved in 2 iterations.
 ```
 
 more sophisticated agents add things like memory, retries, parallel tool calls, or multi-agent delegation, but the core is always: **loop, call, check for tools, execute, repeat**.
