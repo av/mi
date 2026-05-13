@@ -6,6 +6,9 @@ RUN apk add --no-cache \
     tar gzip unzip zip \
     grep gawk sed findutils coreutils diffutils \
     make file bc less \
+    procps util-linux bind-tools iputils tree rsync \
+    tzdata ca-certificates openssl wget vim \
+ && ln -sf /usr/bin/gawk /usr/local/bin/awk \
  && find /bin /sbin /usr -perm /6000 -type f -exec chmod a-s {} + \
  && rm -rf /root/.cache /tmp/*
 

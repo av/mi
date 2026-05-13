@@ -1,6 +1,6 @@
 {
   "name": "@avcodes/mi",
-  "version": "1.7.7",
+  "version": "1.7.8",
   "description": "agentic coding in 30 loc. a loop, two tools, and an llm.",
   "type": "module",
   "bin": {
