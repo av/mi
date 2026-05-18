@@ -42,24 +42,22 @@ shopt -s nullglob
 for res in /tmp/mi-30-eval-*/{mi,terminus}/20*/result.json; do
   if [[ -f "$res" ]]; then
     echo "$res"
-    python3 -c '
-import json, sys, os
+    python3 -c "
+import json,sys
 try:
-    with open(sys.argv[1]) as f:
-        d = json.load(f)
-    s = d.get("stats", {})
-    total = d.get("n_total_trials", "?")
-    comp = s.get("n_completed_trials", 0)
-    runn = s.get("n_running_trials", 0)
-    fin = d.get("finished_at")
-    print(f"  trials: {comp}/{total} completed, {runn} running, finished={fin is not None}")
-    if "evals" in s and s["evals"]:
-        print(f"  evals keys: {list(s[\"evals\"].keys())[:5]}")
-except Exception as e:
-    print(f"  parse error: {e}")
-' "$res" 2>/dev/null || echo "  (parse failed)"
+ d=json.load(open(sys.argv[1]))
+ s=d.get('stats',{})
+ tot=d.get('n_total_trials','?')
+ c=s.get('n_completed_trials',0)
+ r=s.get('n_running_trials',0)
+ fin=d.get('finished_at')
+ print('  trials: {}/{} completed, {} running, finished={}'.format(c,tot,r,fin is not None))
+ if s.get('evals'):
+  print('  evals keys:', list(s['evals'].keys())[:5])
+except Exception as e: print('  parse error:',e)
+" "$res" 2>/dev/null || echo "  (parse failed)"
   fi
-done | head -30
+done
 echo
 
 echo "=== Docker containers for active T-Bench tasks ==="
