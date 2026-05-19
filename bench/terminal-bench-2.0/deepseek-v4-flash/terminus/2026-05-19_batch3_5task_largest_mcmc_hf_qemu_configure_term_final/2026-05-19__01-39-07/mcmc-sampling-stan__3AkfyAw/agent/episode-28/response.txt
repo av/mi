@@ -1,0 +1,13 @@
+```json
+{
+  "analysis": "The MCMC sampling is running - chain 1 is at 40% warmup. This will take a long time. Let me wait further.",
+  "plan": "Continue waiting for the sampling to complete.",
+  "commands": [
+    {
+      "keystrokes": "",
+      "duration": 60.0
+    }
+  ],
+  "task_complete": false
+}
+```

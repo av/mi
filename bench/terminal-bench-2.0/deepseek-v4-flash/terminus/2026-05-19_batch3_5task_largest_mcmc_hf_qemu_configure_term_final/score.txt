@@ -1,0 +1,27 @@
+# FINAL RESULT - 2026-05-19 batch3 5-task (largest-eigenval, mcmc-sampling-stan, hf-model-inference, qemu-startup, configure-git-webserver) - terminus-2
+
+Harness: terminus-2 (official Terminal-Bench reference)
+Model: deepseek/deepseek-v4-flash (OpenRouter)
+Benchmark: terminal-bench@2.0 (batch 3 of 30-task stratified for mi vs terminus-2 comparison)
+
+=== SCORE (final, 5/5 trials done ~02:20 after cycles) ===
+Pass rate: 3 / 5  (60%)
+Mean reward: 0.6
+
+Passed (verified by reward.txt=1):
+- configure-git-webserver
+- mcmc-sampling-stan
+- qemu-startup
+
+Failed (2):
+- largest-eigenval (0)
+- hf-model-inference (0)
+
+Duration at completion: ~41 minutes (launched ~01:39, mcmc last? but finished by 02:20 per result.json)
+Job dir: 2026-05-19__01-39-07
+n_total: 5
+Finished: True
+
+Key highlight: terminus-2 achieved 3 passes on this batch, succeeding on qemu (where mi had NonZeroAgentExitCodeError) and mcmc (which mi also passed), plus the common configure-git-webserver. Missed the math (largest-eigenval) and ML inference (hf) that mi passed. n-conc=2 allowed solid throughput.
+
+This final snapshot updates the earlier partial (which had only 1 pass recorded at 3/5). Complements the paired mi batch3 final (4/4 on non-errored: largest+configure+hf+mcmc).

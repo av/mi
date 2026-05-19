@@ -1,0 +1,7 @@
+Previous response had warnings:
+WARNINGS: - AUTO-CORRECTED: Extracted JSON from mixed content - please fix this in future responses
+
+New Terminal Output:
+
+root@e0dc3a2d2af7:/app# mkdir -p /app/model_cache/sentiment_model
+root@e0dc3a2d2af7:/app#

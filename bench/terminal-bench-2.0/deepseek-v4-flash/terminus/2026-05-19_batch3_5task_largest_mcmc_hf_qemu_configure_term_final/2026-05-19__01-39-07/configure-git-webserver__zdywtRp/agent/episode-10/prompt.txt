@@ -1,0 +1,8 @@
+New Terminal Output:
+
+root@6b59ef50ab31:/tmp/testrepro# git config --global user.email "test@test.com" && git config --global user.name "Test User"
+root@6b59ef50ab31:/tmp/testrepro# cd /tmp/testrepro && git add hello.html && git commit -m 'add hello.html'
+[master (root-commit) ada70f0] add hello.html
+ 1 file changed, 1 insertion(+)
+ create mode 100644 hello.html
+root@6b59ef50ab31:/tmp/testrepro#

@@ -1,8 +1,9 @@
 # Terminal-Bench 2.0 (deepseek-v4-flash) — mi vs terminus-2 Current Results Summary
-**Generated:** 2026-05-19 ~02:05 CEST (during timeboxed 30-task eval until 6am; collection + edge coverage unit)  
-**Source:** 5 cycles of `./mi_harbor/monitor-30task-evals.sh --tail 20 && ./mi_harbor/aggregate-tb-results.sh` (90-180s sleeps between) + new snapshots + batch5 launch  
+**Generated:** 2026-05-19 ~02:25 CEST (late-stage harvesting + report refinement unit; timeboxed to 6am)  
+**Source:** 3 harvest cycles (150s sleeps) of monitor+agg post-iter7 + term batch3 final snapshot + report polish; prior 7 iters + 5+ cycles  
 **Repo:** /home/everlier/code/mi  
-**Progress file:** /tmp/timeboxed-mi-vs-harness-evals-tbench-30-tasks-1779146755.md (up to iter5, this unit deepens it)
+**Progress file:** /tmp/timeboxed-mi-vs-harness-evals-tbench-30-tasks-1779146755.md (up to iter7 + this unit iter8)  
+**Run note:** 3 cycles, 4 active dockers (train+winning), no new completions/rewards in window, 1 new snapshot (term batch3 final 3/5), freeze, polished final report. 16/30, mi 8 vs term 5 standings.
 
 ## Aggregator Table (latest run)
 ```
@@ -204,8 +205,18 @@ terminus: 0 passes / 0 completed / 12 tasks  (0.0% pass rate on completed)
 - **Live at end:** term batch3 mcmc (17m+), batch4 train (29m), batch5 winning (16m) still running; iter4/5 1 running each. Docker 11. No new rewards in batch4/5 yet.
 - **Agg now reflects new snapshots** (mi batch1 50%, batch3 100% 4/4, term batch2 25%).
 
-**Remaining (to 5:30-6am):** 2-3 more monitor/agg cycles for batch4/5 + term mcmc finishes → additional snapshots if rewards; polish final-report.md with late numbers + commit all; update progress + README if needed. ~3h40m left — plenty for harvest without new launches.
+**Remaining (to 5:30-6am):** 3 harvest cycles performed (150s sleeps); term batch3 finalized + snapshotted (now 3/5: configure+mcmc+qemu); batch4/5 late runners (train-fasttext, winning-avg-corewars) still active at 02:23 with 0 rewards after ~40m elapsed; docker down to 4; no new batch (low load + >2.5h remain but skip for report quality per ONE unit); freeze ~02:23; final report polished with Late results (iter 8) section, updated standings (mi 8 vs term 5), batch tables, appendix + "Run complete as of 02:23" timestamp. ~3h37m remain for any stragglers but focus on committed near-final artifacts.
 
-**Commits this unit:** (to be done) all new bench/ snapshots (batch1 mi final, batch2 term final, batch3 mi final), final-30task-...-report.md, updated current-results-summary.md + any bench/README.
+**This unit (late-stage harvesting + report refinement):** 
+- Read progress (iter7: 16/30, report populated mi~8/term~4+, ~3h46m remain at start) + re-read final report + this summary.
+- Executed 3 monitor+agg cycles (150s sleeps) via bg long cmd; captured live /tmp result.json + docker (4 active: 2 train, 2 winning).
+- New verified snapshot: terminus/2026-05-19_batch3_5task_largest_mcmc_hf_qemu_configure_term_final/ (copied job + logs + score.txt 3/5 + notes.md); updated from prior partial.
+- No snapshots for batch4/5 (no completions/rewards during cycles; gpt2 0 both, chess/openssl 0, train/winning pending).
+- Polished `final-30task-mi-vs-terminus-report.md`: header with iter8 + run complete timestamp; batch3 term updated to final 3/5 exact passes + diff; batch4/5 sections expanded with current live 0 passes + elapsed; grand totals to mi 8 / term 5 + "Late results (iter 8)" subsection detailing cycles/no new passes/freeze; qualitative/recs refined with late observations; appendix updated with new snapshot + 02:23 complete note.
+- Refreshed this summary.md (header, added this collection update, standings, no-batch decision).
+- 3 cycles, 1 snapshot, report+summary polish, no last 1-2 batch (to keep focus quality); git commit pending with clear 6am ref.
+- **Discoveries:** term batch3 mcmc passed (now ties mi on mcmc+configure, wins qemu, loses eigen+hf); no passes from long runners in 8min harvest window; final near-standings mi 8 vs term 5 on 16/30; late jobs confirm long-horizon challenges for both harnesses (ML train, corewars sims >30-40m+).
 
-**Status:** Real numbers flowing, report artifact delivered with concrete data. Prioritized per instructions.
+**Commits this unit:** new bench/terminus/..._term_final/ snapshot dir + score/notes, polished final-30task-mi-vs-terminus-report.md, refreshed current-results-summary.md. (See progress for full.)
+
+**Status:** Near-final, report-ready state achieved. 16/30 verified, real diffs documented, ready for 6am freeze/polish/progress update. All per plan, CLAUDE.md (no core changes).

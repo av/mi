@@ -1,0 +1,8 @@
+New Terminal Output:
+
+root@c13b8dc816d1:/app# echo '' | timeout 3 telnet 127.0.0.1 6665 2>&1 || true
+Trying 127.0.0.1...
+Connected to 127.0.0.1.
+Escape character is '^]'.
+Connection closed by foreign host.
+root@c13b8dc816d1:/app#

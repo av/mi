@@ -1,0 +1,47 @@
+Previous response had warnings:
+WARNINGS: - Extra text detected before JSON object
+- Extra text detected after JSON object
+
+New Terminal Output:
+
+root@e91006c5764b:/app# cat > /app/analysis.R << 'EOF'
+> # Load the rstan library
+> library(rstan)
+>
+> # Read the dataset
+> data <- read.csv('/app/data.csv')
+> y <- data$y
+> n <- data$n
+> N <- length(y)
+>
+> # Prepare data list for Stan
+> stan_data <- list(N = N, y = y, n = n)
+>
+> # Compile the Stan model
+> model <- stan_model(file = '/app/hierarchical_model.stan')
+>
+> # Sampling
+> fit <- sampling(
+>   object = model,
+>   data = stan_data,
+>   chains = 4,
+>   iter = 100000,
+>   seed = 1,
+>   verbose = FALSE
+> )
+>
+> # Extract posterior samples for alpha and beta
+> posterior <- extract(fit, pars = c('alpha', 'beta'))
+>
+> # Compute posterior means
+> posterior_alpha_mean <- mean(posterior$alpha)
+> posterior_beta_mean <- mean(posterior$beta)
+>
+> # Save results to text files
+> cat(posterior_alpha_mean, file = '/app/posterior_alpha_mean.txt')
+> cat(posterior_beta_mean, file = '/app/posterior_beta_mean.txt')
+>
+> cat('Posterior mean of alpha:', posterior_alpha_mean, '\n')
+> cat('Posterior mean of beta:', posterior_beta_mean, '\n')
+> EOF
+root@e91006c5764b:/app#

@@ -1,0 +1,4 @@
+Previous response had parsing errors:
+ERROR: Invalid JSON: Expecting ',' delimiter: line 6 column 33 (char 260) | Content preview: '{\n  "analysis": "Commit successful. Now push to the bare repo, which should trigger post-update hook'...
+
+Please fix these issues and provide a proper JSON response.

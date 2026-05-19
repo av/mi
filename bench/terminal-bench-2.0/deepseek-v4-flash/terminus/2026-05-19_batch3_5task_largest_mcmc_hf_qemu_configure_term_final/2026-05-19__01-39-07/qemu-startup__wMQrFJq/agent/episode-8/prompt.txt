@@ -1,0 +1,4 @@
+Previous response had parsing errors:
+ERROR: Invalid JSON: Expecting ',' delimiter: line 2 column 56 (char 57) | Content preview: '{\n  "analysis": "The QEMU process seems to have exited ("Done") shortly after starting. The "Port 66'...
+
+Please fix these issues and provide a proper JSON response.

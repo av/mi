@@ -1,0 +1,34 @@
+Previous response had warnings:
+WARNINGS: - Extra text detected before JSON object
+- Extra text detected after JSON object
+
+New Terminal Output:
+
+ls /usr/local/lib/R/site-library/ | grep -i rstan
+** testing if installed package keeps a record of temporary installation path
+* DONE (rstan)
+
+The downloaded source packages are in
+        ‘/tmp/RtmpOKXSOb/downloaded_packages’
+>
+>
+root@e91006c5764b:/app# ls /usr/local/lib/R/site-library/ | grep stan
+rstan
+root@e91006c5764b:/app# ps aux | grep -i R | grep -v grep
+USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+root           1  0.0  0.0   2808  1840 ?        Ss   May18   0:00 sh -c sleep infinity
+root           7  0.0  0.0   2704  1592 ?        S    May18   0:00 sleep infinity
+root         295  0.2  0.0  20388 14976 ?        Ss   May18   0:01 tmux new-session -x 160 -y 40 -d -s terminus-2 bash --login ; pipe-pane -t terminus-2 cat > /
+logs/agent/terminus_2.pane
+root         296  0.0  0.0   4596  4048 pts/0    Ss   May18   0:00 bash --login
+root         298  0.0  0.0   2808  1876 ?        S    May18   0:00 sh -c cat > /logs/agent/terminus_2.pane
+root         300  0.0  0.0   2848  1480 ?        S    May18   0:00 cat
+root         315  0.1  0.0 103336 23572 pts/0    Sl+  May18   0:00 /usr/bin/python3 /usr/bin/asciinema rec --stdin /logs/agent/recording.cast
+root         316  0.0  0.0  29572 15776 pts/0    S+   May18   0:00 /usr/bin/python3 /usr/bin/asciinema rec --stdin /logs/agent/recording.cast
+root         317  0.0  0.0  30124 16924 pts/0    S+   May18   0:00 /usr/bin/python3 /usr/bin/asciinema rec --stdin /logs/agent/recording.cast
+root         318  0.0  0.0   2808  1796 pts/1    Ss   May18   0:00 sh -c /bin/bash
+root         319  0.0  0.0   4980  4212 pts/1    S    May18   0:00 /bin/bash
+root        7004  0.0  0.0   8280  4292 pts/1    R+   00:05   0:00 ps aux
+root@e91006c5764b:/app# ls /usr/local/lib/R/site-library/ | grep -i rstan
+rstan
+root@e91006c5764b:/app#

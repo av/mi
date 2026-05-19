@@ -1,0 +1,65 @@
+Previous response had warnings:
+WARNINGS: - Extra text detected before JSON object
+- Extra text detected after JSON object
+
+New Terminal Output:
+
+** testing if installed package can be loaded from temporary location
+** testing if installed package can be loaded from final location
+** testing if installed package keeps a record of temporary installation path
+* DONE (posterior)
+* installing *source* package ‘loo’ ...
+** package ‘loo’ successfully unpacked and MD5 sums checked
+** using staged installation
+** R
+** data
+*** moving datasets to lazyload DB
+** inst
+** byte-compile and prepare package for lazy loading
+** help
+*** installing help indices
+*** copying figures
+** building package indices
+** installing vignettes
+** testing if installed package can be loaded from temporary location
+** testing if installed package can be loaded from final location
+** testing if installed package keeps a record of temporary installation path
+* DONE (loo)
+ERROR: dependencies ‘StanHeaders’, ‘RcppEigen’ are not available for package ‘rstan’
+* removing ‘/usr/local/lib/R/site-library/rstan’
+
+The downloaded source packages are in
+        ‘/tmp/RtmpVI2lkv/downloaded_packages’
+Warning messages:
+1: In install.packages("rstan", repos = "https://cloud.r-project.org/") :
+  installation of package ‘RcppEigen’ had non-zero exit status
+2: In install.packages("rstan", repos = "https://cloud.r-project.org/") :
+  installation of package ‘StanHeaders’ had non-zero exit status
+3: In install.packages("rstan", repos = "https://cloud.r-project.org/") :
+  installation of package ‘rstan’ had non-zero exit status
+>
+>
+root@e91006c5764b:/app# R -e "library(rstan); cat('rstan version:', as.character(packageVersion('rstan')), '\n')" 2>&1
+
+R version 4.3.3 (2024-02-29) -- "Angel Food Cake"
+Copyright (C) 2024 The R Foundation for Statistical Computing
+Platform: x86_64-pc-linux-gnu (64-bit)
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+> library(rstan); cat('rstan version:', as.character(packageVersion('rstan')), '\n')
+Error in library(rstan) : there is no package called ‘rstan’
+Execution halted
+root@e91006c5764b:/app# ls /usr/local/lib/R/site-library/ | grep -i rstan
+root@e91006c5764b:/app# ls /usr/local/lib/R/site-library/ | grep -i stan
+root@e91006c5764b:/app#

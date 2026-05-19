@@ -1,0 +1,11 @@
+{
+  "analysis": "Cloned empty repo. Now I'll add hello.html, commit, and push.",
+  "plan": "Add hello.html, commit, push, then test with curl.",
+  "commands": [
+    {
+      "keystrokes": "cd /tmp/testrepro && echo 'hello world' > hello.html && git add hello.html && git commit -m 'add hello.html'\n",
+      "duration": 0.3
+    }
+  ],
+  "task_complete": false
+}

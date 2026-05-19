@@ -1,0 +1,13 @@
+```json
+{
+  "analysis": "Baseline timings: ~6-19 microseconds per call for sizes 2-10. The reference uses np.linalg.eig which calls LAPACK. I need to find a faster approach.\n\nKey observations:\n- eigvals is slightly faster than eig (15.4 us vs 19.2 us for 10x10)\n- For 2x2, we can compute analytically very fast\n- Power iteration might work but needs to handle complex eigenvalues\n- Maybe using a lighter-weight solver like numpy's inner functions or scipy.sparse.linalg.eigs\n\nLet me explore several strategies: 1) scipy.linalg.eigs (Arnoldi) for sparse eigenvalue, 2) power iteration + Rayleigh quotient, 3) analytical formulas for small sizes, 4) using numpy's lower-level functions to reduce overhead.",
+  "plan": "Install scipy and benchmark various approaches to find the fastest.",
+  "commands": [
+    {
+      "keystrokes": "pip install scipy 2>&1 | tail -5\n",
+      "duration": 5.0
+    }
+  ],
+  "task_complete": false
+}
+```

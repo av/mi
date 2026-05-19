@@ -1,0 +1,15 @@
+{
+  "analysis": "Now procps is installed. I can check QEMU process, check if port 6665 is open, and try to telnet to it.",
+  "plan": "1. Check QEMU process status with ps\n2. Check if port 6665 is open using /dev/tcp or nc\n3. Try to telnet connection to see if we get a login prompt\n4. If needed, restart QEMU with proper options",
+  "commands": [
+    {
+      "keystrokes": "ps aux | grep qemu\n",
+      "duration": 0.1
+    },
+    {
+      "keystrokes": "nc -z 127.0.0.1 6665 && echo \"Port 6665 is open\" || echo \"Port 6665 not open\"\n",
+      "duration": 0.1
+    }
+  ],
+  "task_complete": false
+}

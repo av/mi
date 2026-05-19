@@ -1,0 +1,6 @@
+Previous response had parsing errors:
+ERROR: Invalid JSON: Invalid \escape: line 6 column 22 (char 233) | Content preview: '{\n  "analysis": "The terminal is stuck in a heredoc. I need to properly cancel it and reset.",\n  "pl'...
+WARNINGS: - Extra text detected before JSON object
+- Extra text detected after JSON object
+
+Please fix these issues and provide a proper JSON response.

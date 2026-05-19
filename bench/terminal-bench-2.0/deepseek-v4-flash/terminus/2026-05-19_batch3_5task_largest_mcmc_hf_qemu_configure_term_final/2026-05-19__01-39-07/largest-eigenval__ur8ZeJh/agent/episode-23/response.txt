@@ -1,0 +1,19 @@
+```json
+{
+  "analysis: The heredoc has issues with the script content. Let me clean up and write a proper benchmark script using Python to write the file. Also, I realize I should test scipy.sparse.linalg.eigs which might be fast for finding just the largest eigenvalue.
+
+plan: Write a clean benchmark script via Python that tests: np.linalg.eig, scipy.linalg.eig, scipy.sparse.linalg.eigs, and power iteration.
+commands:
+  - keystrokes: "python3 -c \"\nimport numpy as np\n\ncode = '''\nimport numpy as np\nimport time\n\n# Reference method\ndef method_eig(A):\n    evals, evecs = np.linalg.eig(A)\n    idx = np.abs(evals).argmax()\n    return evals[idx], evecs[:, idx]\n\n# Power iteration\ndef method_power(A, max_iter=200):\n    n = A.shape[0]\n    v = np.ones(n)\n    v /= np.linalg.norm(v)\n    for _ in range(max_iter):\n        v_new = A @ v\n        norm = np.linalg.norm(v_new)\n        if norm == 0:\n            break\n        v = v_new / norm\n    lam = (v @ A @ v) / (v @ v)\n    return lam, v\n\nprint('Benchmarking...')\nfor size in [2,4,6,8,10]:\n    A = np.random.normal(size=(size,size)).astype(np.float64)\n    print(f'--- {size}x{size} ---')\n    \n    t0 = time.perf_counter()\n    for _ in range(200):\n        method_eig(A)\n    t1 = time.perf_counter()\n    print(f'np.eig: {(t1-t0)/200*1e6:.3f} us')\n    \n    t0 = time.perf_counter()\n    for _ in range(200):\n        method_power(A)\n    t1 = time.perf_counter()\n    print(f'power: {(t1-t0)/200*1e6:.3f} us')\n'''\n\nwith open('/app/bench3.py', 'w) as f:\n    f.write(code)\nprint('Written')\n\"\n",
+  duration: 0.2
+},
+  {
+    keystrokes: "ls -la bench*.py\n",
+    duration: 0.1
+  },
+  {
+    keystrokes: "python3 bench.py\n",
+    duration: 2.0
+  },
+  task_complete: false
+```

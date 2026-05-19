@@ -1,0 +1,17 @@
+New Terminal Output:
+
+root@c13b8dc816d1:/app# apt-get install -y netcat-openbsd 2>/dev/null || true
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+netcat-openbsd is already the newest version (1.217-3).
+netcat-openbsd set to manually installed.
+0 upgraded, 0 newly installed, 0 to remove and 0 not upgraded.
+root@c13b8dc816d1:/app# which nc nc.traditional 2>/dev/null
+/bin/nc
+root@c13b8dc816d1:/app#
+
+
+
+
+

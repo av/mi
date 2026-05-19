@@ -1,0 +1,5 @@
+New Terminal Output:
+
+root@e0dc3a2d2af7:/app# cd /app && nohup python3 app.py > flask_output.log 2>&1 &
+[1] 829
+root@e0dc3a2d2af7:/app#

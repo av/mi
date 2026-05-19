@@ -1,0 +1,15 @@
+{
+  "analysis": "Commit successful. Now push to the bare repo, which should trigger post-update hook to update /var/www/html.",
+  "plan": "Push to origin master, then curl to see if hello.html is served.",
+  "commands": [
+    {
+      "keystrokes": "keystrokes": "cd /tmp/testrepro && git push origin master\n",
+      "duration": 0.3
+    },
+    {
+      "keystrokes": "",
+      "duration": 0.5
+    }
+  ],
+  "task_complete": false
+}

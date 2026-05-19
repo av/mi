@@ -1,0 +1,49 @@
+Previous response had warnings:
+WARNINGS: - Extra text detected before JSON object
+
+New Terminal Output:
+
+root@c13b8dc816d1:/app# cat /tmp/wait_for_login.py
+import socket
+import sys
+import re
+import time
+
+def wait_for_login(host, port, timeout=120):
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.settimeout(timeout)
+    try:
+        sock.connect((host, port))
+        # Give it a moment to start
+        time.sleep(1)
+        # Send a newline in case it's waiting at boot prompt
+        sock.send(b'\n')
+        # Wait for login prompt
+        data = b''
+        end_time = time.time() + timeout
+        while time.time() < end_time:
+            try:
+                chunk = sock.recv(4096)
+                if not chunk:
+                    break
+                data += chunk
+                # Print received data for debugging
+                sys.stdout.write(chunk.decode('utf-8', errors='replace'))
+                sys.stdout.flush()
+                # Check for login prompt
+                if b'login:' in data or b'login' in data:
+                    print("\n[Login prompt detected!]")
+                    return True
+            except socket.timeout:
+                continue
+        print("\n[Timed out waiting for login prompt]")
+        return False
+    finally:
+        sock.close()
+
+if __name__ == '__main__':
+    if wait_for_login('127.0.0.1', 6665):
+        sys.exit(0)
+    else:
+        sys.exit(1)
+root@c13b8dc816d1:/app#

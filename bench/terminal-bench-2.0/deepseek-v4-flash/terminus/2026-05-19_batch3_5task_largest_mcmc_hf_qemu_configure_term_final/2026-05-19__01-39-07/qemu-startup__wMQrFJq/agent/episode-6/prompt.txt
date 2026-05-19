@@ -1,0 +1,8 @@
+New Terminal Output:
+
+root@c13b8dc816d1:/app# setsid qemu-system-x86_64 -cdrom /app/alpine.iso -hda /app/alpine-disk.qcow2 -serial telnet:0.0.0.0:6665,server,nowait -nographic -m 256
+M -boot d </dev/null &>/tmp/qemu.log &
+[2] 210
+root@c13b8dc816d1:/app# echo "QEMU PID: $!"
+QEMU PID: 210
+root@c13b8dc816d1:/app#

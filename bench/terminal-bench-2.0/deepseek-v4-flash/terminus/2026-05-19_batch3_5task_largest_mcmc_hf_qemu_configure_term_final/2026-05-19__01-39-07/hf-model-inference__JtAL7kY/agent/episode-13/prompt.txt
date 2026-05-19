@@ -1,0 +1,6 @@
+New Terminal Output:
+
+root@e0dc3a2d2af7:/app# cat /app/app.py 2>/dev/null; echo "==="; ls -la /app/app.py 2>/dev/null || echo "File does not exist"
+===
+File does not exist
+root@e0dc3a2d2af7:/app#

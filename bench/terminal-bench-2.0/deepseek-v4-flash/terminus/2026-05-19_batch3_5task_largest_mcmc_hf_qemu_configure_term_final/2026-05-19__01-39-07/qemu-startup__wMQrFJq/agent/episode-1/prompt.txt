@@ -1,0 +1,42 @@
+New Terminal Output:
+
+root@c13b8dc816d1:/app# ls -la /app/
+total 980164
+drwxr-xr-x. 1 root root         34 Oct 22  2025 .
+drwxr-xr-x. 1 root root         34 May 18 23:51 ..
+-rw-r--r--. 1 root root     197120 Oct 22  2025 alpine-disk.qcow2
+-rw-r--r--. 1 root root 1003487232 Dec  7  2023 alpine.iso
+root@c13b8dc816d1:/app# which qemu-system-x86_64 || which qemu || apt-get update && apt-get install -y qemu-system-x86 2>/dev/null
+/usr/bin/qemu-system-x86_64
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+qemu-system-x86 is already the newest version (1:5.2+dfsg-11+deb11u5).
+0 upgraded, 0 newly installed, 0 to remove and 0 not upgraded.
+root@c13b8dc816d1:/app#
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

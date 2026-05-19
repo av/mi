@@ -1,0 +1,8 @@
+New Terminal Output:
+
+root@c13b8dc816d1:/app# ps aux | grep qemu | grep -v grep
+root         211 14.2  1.0 1804556 1325780 ?     Ssl  23:52   0:42 qemu-system-x86_64 -cdrom /app/alpine.iso -hda /app/alpine-disk.qcow2 -serial telnet:0.0.0.0:
+6665,server,nowait -nographic -m 256M -boot d
+root@c13b8dc816d1:/app# nc -z 127.0.0.1 6665 && echo "Port open" || echo "Port closed"
+Port open
+root@c13b8dc816d1:/app#

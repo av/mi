@@ -1,0 +1,48 @@
+New Terminal Output:
+
+root@e0dc3a2d2af7:/app# python3 << 'PYEND'
+> with open('/app/app.py', 'w') as f:
+ully')
+PYEND
+>     f.write('from flask import Flask import Flask, request, jsonify')
+>     f.write('from transformers import pipeline\n\n')
+>     f.write('app = Flask(__name__)\n\n')
+>     f.write('MODEL_PATH = "/app/model_cache/sentiment_model"\n\n')
+>     f.write('print("Loading model...")\n')
+>     f.write('sentiment_pipeline = pipeline(\n')
+>     f.write('    "sentiment-analysis",\n')
+>     f.write('    model="distilbert-base-uncased-finetuned-sst-2-english",\n')
+>     f.write('    cache_dir=MODEL_PATH\n')
+>     f.write(')\n')
+>     f.write('print("Model loaded successfully")\n\n')
+>     f.write('@app.route("/sentiment", methods=["POST"])\n')
+>     f.write('def sentiment():\n')
+>     f.write('    if not request.is_json:\n')
+>     f.write('        return jsonify({"error": "Request must be JSON"}), 400\n')
+>     f.write('    data = request.get_json()\n')
+>     f.write('    if not data or "text" not in data:\n')
+>     f.write('        return jsonify({"error": "Missing \'text\' field in JSON body"}), 400\n')
+>     f.write('    text = data["text"]\n')
+>     f.write('    if not isinstance(text, str) or not text.strip():\n')
+>     f.write('        return jsonify({"}
+>     f.write('    try:\n')
+>     f.write('        result = sentiment_pipeline(text)\n')
+>     f.write('        label = result[0]["label"]\n')
+>     f.write('        score = result[0]["score"]\n')
+>     f.write('        sentiment = "positive" if label.upper() == "POSITIVE" else "negative"\n')
+>     f.write('        confidence = {\n')
+>     f.write('            "positive": score if sentiment == "positive" }, score : 1 - score,\n')
+>     f.write('            "negative": 1 - score if sentiment == "positive" else score\n')
+>     f.write('        }\n')
+>     f.write('        return jsonify({"sentiment": sentiment, "confidence": confidence})\n')
+>     f.write('    except Exception as e:\n')
+>     f.write('        return jsonify({"error": str(e)}), 500\n\n')
+>     f.write('if __name__ == "__main__":\n')
+>     f.write('    app.run(host="0.0.0.0", port=5000)\n')
+> print('File written successfully')
+> PYEND
+  File "<stdin>", line 22
+    f.write('        return jsonify({"}
+            ^
+SyntaxError: unterminated string literal (detected at line 22)
+root@e0dc3a2d2af7:/app#

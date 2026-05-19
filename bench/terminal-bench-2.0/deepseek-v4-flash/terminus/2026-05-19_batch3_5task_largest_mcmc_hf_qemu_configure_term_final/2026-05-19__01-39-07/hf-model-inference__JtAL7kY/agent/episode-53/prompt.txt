@@ -1,0 +1,10 @@
+New Terminal Output:
+
+root@e0dc3a2d2af7:/app# which fuser lsof netstat ss netstat 2>/dev/null; echo "---"; ss -tlnp 2>/dev/null | grep 5000 || netstat -tlnp 2>/dev/null | grep 5000 |
+| (apt-get install -y net-tools 2>&1 | tail -3 && netstat -tlnp | grep 5000)
+---
+Preparing to unpack .../net-tools_2.10-0.1+deb12u2_amd64.deb ...
+Unpacking net-tools (2.10-0.1+deb12u2) ...
+Setting up net-tools (2.10-0.1+deb12u2) ...
+tcp        0      0 0.0.0.0:5000            0.0.0.0:*               LISTEN      830/python3
+root@e0dc3a2d2af7:/app#

@@ -1,0 +1,128 @@
+{
+    "id": "879db4d8-80e2-431f-941d-63c96a3685fe",
+    "task_name": "configure-git-webserver",
+    "trial_name": "configure-git-webserver__zdywtRp",
+    "trial_uri": "file:///tmp/mi-30-eval-iter3/terminus/2026-05-19__01-39-07/configure-git-webserver__zdywtRp",
+    "task_id": {
+        "git_url": "https://github.com/laude-institute/terminal-bench-2.git",
+        "git_commit_id": "69671fbaac6d67a7ef0dfec016cc38a64ef7a77c",
+        "path": "configure-git-webserver"
+    },
+    "source": "terminal-bench",
+    "task_checksum": "3ebefab7ff093813f99af237de90b1ed73363a4eb42ea8a17096939922a16bcf",
+    "config": {
+        "task": {
+            "path": "configure-git-webserver",
+            "git_url": "https://github.com/laude-institute/terminal-bench-2.git",
+            "git_commit_id": "69671fbaac6d67a7ef0dfec016cc38a64ef7a77c",
+            "name": null,
+            "ref": null,
+            "overwrite": false,
+            "download_dir": null,
+            "source": "terminal-bench"
+        },
+        "trial_name": "configure-git-webserver__zdywtRp",
+        "trials_dir": "/tmp/mi-30-eval-iter3/terminus/2026-05-19__01-39-07",
+        "timeout_multiplier": 1.0,
+        "agent_timeout_multiplier": null,
+        "verifier_timeout_multiplier": null,
+        "agent_setup_timeout_multiplier": null,
+        "environment_build_timeout_multiplier": null,
+        "agent": {
+            "name": "terminus-2",
+            "import_path": null,
+            "model_name": "openai/deepseek/deepseek-v4-flash",
+            "skills": [],
+            "override_timeout_sec": null,
+            "override_setup_timeout_sec": null,
+            "max_timeout_sec": null,
+            "kwargs": {},
+            "env": {},
+            "mcp_servers": []
+        },
+        "environment": {
+            "type": "docker",
+            "import_path": null,
+            "force_build": false,
+            "delete": true,
+            "override_cpus": null,
+            "override_memory_mb": null,
+            "override_storage_mb": null,
+            "override_gpus": null,
+            "suppress_override_warnings": false,
+            "mounts": null,
+            "extra_docker_compose": [],
+            "env": {},
+            "kwargs": {}
+        },
+        "verifier": {
+            "override_timeout_sec": null,
+            "max_timeout_sec": null,
+            "env": {},
+            "disable": false
+        },
+        "artifacts": [],
+        "extra_instruction_paths": [],
+        "job_id": "1741899c-2783-41a9-adb4-f0c3a9cbf86e"
+    },
+    "agent_info": {
+        "name": "terminus-2",
+        "version": "2.0.0",
+        "model_info": {
+            "name": "deepseek/deepseek-v4-flash",
+            "provider": "openai"
+        }
+    },
+    "agent_result": {
+        "n_input_tokens": 97034,
+        "n_cache_tokens": 81920,
+        "n_output_tokens": 5469,
+        "cost_usd": null,
+        "rollout_details": [],
+        "metadata": {
+            "n_episodes": 14,
+            "api_request_times_msec": [
+                6801.09429359436,
+                4039.8714542388916,
+                1468.2574272155762,
+                4783.224105834961,
+                1825.8545398712158,
+                3813.6861324310303,
+                4078.5770416259766,
+                6882.431745529175,
+                2037.111520767212,
+                2790.4810905456543,
+                3344.1989421844482,
+                2020.4503536224365,
+                8196.012258529663,
+                3741.150379180908
+            ],
+            "summarization_count": 0
+        }
+    },
+    "verifier_result": {
+        "rewards": {
+            "reward": 1.0
+        }
+    },
+    "exception_info": null,
+    "started_at": "2026-05-18T23:39:09.793068Z",
+    "finished_at": "2026-05-18T23:41:00.076825Z",
+    "environment_setup": {
+        "started_at": "2026-05-18T23:39:09.825058Z",
+        "finished_at": "2026-05-18T23:39:13.823669Z"
+    },
+    "agent_setup": {
+        "started_at": "2026-05-18T23:39:13.823710Z",
+        "finished_at": "2026-05-18T23:39:21.847771Z"
+    },
+    "agent_execution": {
+        "started_at": "2026-05-18T23:39:21.847871Z",
+        "finished_at": "2026-05-18T23:40:39.236251Z"
+    },
+    "verifier": {
+        "started_at": "2026-05-18T23:40:39.417540Z",
+        "finished_at": "2026-05-18T23:40:48.670794Z"
+    },
+    "step_results": null
+}

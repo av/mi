@@ -1,0 +1,5 @@
+New Terminal Output:
+
+root@e0dc3a2d2af7:/app# rm -f /app/app.py && python3 <<< 'import sys; sys.stdout.write("test")' && echo "Python works"
+testPython works
+root@e0dc3a2d2af7:/app#

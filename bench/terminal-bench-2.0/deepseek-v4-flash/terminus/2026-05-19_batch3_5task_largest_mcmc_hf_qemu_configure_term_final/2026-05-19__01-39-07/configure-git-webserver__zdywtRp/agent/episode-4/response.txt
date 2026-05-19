@@ -1,0 +1,11 @@
+{
+  "analysis": "The clone command had too many arguments. I need to clone the bare repo into /var/www/html as the working directory for the web server.",
+  "plan": "Remove the mistaken argument and correctly clone /git/server into /var/www/html.",
+  "commands": [
+    {
+      "keystrokes": "cd /var/www && git clone /git/server html\n",
+      "duration": 0.3
+    }
+  ],
+  "task_complete": false
+}

@@ -1,0 +1,45 @@
+Previous response had warnings:
+WARNINGS: - Extra text detected before JSON object
+- Extra text detected after JSON object
+
+Current Terminal Screen:
+BOOST_PHOENIX_NO_VARIADIC_EXPRESSION -DBOOST_NO_AUTO_PTR -D_REENTRANT -DSTAN_THREADS -DSTRICT_R_HEADERS -DUSE_PTHREAD -I'/usr/local/lib/R/site-library/RcppEigen
+/include' -I'/usr/local/lib/R/site-library/RcppParallel/include'     -fpic  -g -O2 -fno-omit-frame-pointer -mno-omit-leaf-frame-pointer -ffile-prefix-map=/build
+/r-base-FPSnzf/r-base-4.3.3=. -fstack-protector-strong -fstack-clash-protection -Wformat -Werror=format-security -fcf-protection -fdebug-prefix-map=/build/r-bas
+e-FPSnzf/r-base-4.3.3=/usr/src/r-base-4.3.3-2build2 -Wdate-time -D_FORTIFY_SOURCE=3  -c nvector/serial/nvector_serial.c -o nvector/serial/nvector_serial.o
+ar -rs ../lib/libStanHeaders.a cvodes/cvodea.o cvodes/cvodea_io.o cvodes/cvodes.o cvodes/cvodes_bandpre.o cvodes/cvodes_bbdpre.o cvodes/cvodes_diag.o cvodes/cvo
+des_direct.o cvodes/cvodes_io.o cvodes/cvodes_ls.o cvodes/cvodes_nls.o cvodes/cvodes_nls_sim.o cvodes/cvodes_nls_stg.o cvodes/cvodes_nls_stg1.o cvodes/cvodes_sp
+ils.o sundials/sundials_band.o sundials/sundials_context.o sundials/sundials_dense.o sundials/sundials_direct.o sundials/sundials_futils.o sundials/sundials_ite
+rative.o sundials/sundials_linearsolver.o sundials/sundials_math.o sundials/sundials_matrix.o sundials/sundials_memory.o sundials/sundials_nonlinearsolver.o sun
+dials/sundials_nvector.o sundials/sundials_nvector_senswrapper.o sundials/sundials_profiler.o sundials/sundials_version.o sunmatrix/band/sunmatrix_band.o sunmat
+rix/dense/sunmatrix_dense.o sunlinsol/band/sunlinsol_band.o sunlinsol/dense/sunlinsol_dense.o sunnonlinsol/newton/sunnonlinsol_newton.o sunnonlinsol/fixedpoint/
+sunnonlinsol_fixedpoint.o idas/idaa.o idas/idaa_io.o idas/idas.o idas/idas_bbdpre.o idas/idas_direct.o idas/idas_ic.o idas/idas_io.o idas/idas_ls.o idas/idas_nl
+s.o idas/idas_nls_sim.o idas/idas_nls_stg.o idas/idas_spils.o sundials/sundials_band.o sundials/sundials_context.o sundials/sundials_dense.o sundials/sundials_d
+irect.o sundials/sundials_futils.o sundials/sundials_iterative.o sundials/sundials_linearsolver.o sundials/sundials_math.o sundials/sundials_matrix.o sundials/s
+undials_memory.o sundials/sundials_nonlinearsolver.o sundials/sundials_nvector.o sundials/sundials_nvector_senswrapper.o sundials/sundials_profiler.o sundials/s
+undials_version.o sunmatrix/band/sunmatrix_band.o sunmatrix/dense/sunmatrix_dense.o sunlinsol/band/sunlinsol_band.o sunlinsol/dense/sunlinsol_dense.o sunnonlins
+ol/newton/sunnonlinsol_newton.o sunnonlinsol/fixedpoint/sunnonlinsol_fixedpoint.o kinsol/kinsol.o kinsol/kinsol_bbdpre.o kinsol/kinsol_direct.o kinsol/kinsol_io
+.o kinsol/kinsol_ls.o kinsol/kinsol_spils.o sundials/sundials_band.o sundials/sundials_context.o sundials/sundials_dense.o sundials/sundials_direct.o sundials/s
+undials_futils.o sundials/sundials_iterative.o sundials/sundials_linearsolver.o sundials/sundials_math.o sundials/sundials_matrix.o sundials/sundials_memory.o s
+undials/sundials_nonlinearsolver.o sundials/sundials_nvector.o sundials/sundials_nvector_senswrapper.o sundials/sundials_profiler.o sundials/sundials_version.o
+sunmatrix/band/sunmatrix_band.o sunmatrix/dense/sunmatrix_dense.o sunlinsol/band/sunlinsol_band.o sunlinsol/dense/sunlinsol_dense.o sunnonlinsol/newton/sunnonli
+nsol_newton.o sunnonlinsol/fixedpoint/sunnonlinsol_fixedpoint.o nvector/serial/nvector_serial.o sundials/sundials_math.o
+ar: creating ../lib/libStanHeaders.a
+installing via 'install.libs.R' to /usr/local/lib/R/site-library/00LOCK-StanHeaders/00new/StanHeaders
+** R
+** inst
+** byte-compile and prepare package for lazy loading
+** help
+*** installing help indices
+** building package indices
+** installing vignettes
+** testing if installed package can be loaded from temporary location
+** testing if installed package can be loaded from final location
+** testing if installed package keeps a record of temporary installation path
+* DONE (StanHeaders)
+
+The downloaded source packages are in
+        ‘/tmp/RtmpoyzCti/downloaded_packages’
+>
+>
+root@e91006c5764b:/app#

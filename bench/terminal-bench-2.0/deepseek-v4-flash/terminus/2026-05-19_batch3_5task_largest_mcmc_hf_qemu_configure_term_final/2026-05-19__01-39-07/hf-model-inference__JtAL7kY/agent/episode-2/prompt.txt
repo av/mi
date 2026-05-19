@@ -1,0 +1,10 @@
+New Terminal Output:
+
+root@e0dc3a2d2af7:/app# pip3 list | grep -i torch
+torch                    2.7.1
+root@e0dc3a2d2af7:/app#
+
+
+
+
+

@@ -1,0 +1,164 @@
+New Terminal Output:
+
+> "
+Traceback (most recent call last):
+  File "<string>", line 2, in <module>
+    from scipy.linalg.linalg.lapack import get_lapack_funcs
+ModuleNotFoundError: No module named 'scipy.linalg.linalg'
+root@1cf7d2c19296:/app# cat > /app/test_numba.py << 'ENDFILE'
+ge(n):
+        v_dot_Av += v[i] * Av[i]
+
+    lam = v_dot_Av / v_dot_v
+    return lam, v
+
+print("Bench...")
+for size in [2,4,6,8,10]:
+    np.random.seed(42+size)
+    A = np.random.normal(size=(size,size)).astype(np.float64)
+    print(f'\n--- {size}x{size} ---')
+
+    # Warm up numba
+    lam, v = power_iter_numba(A)
+
+    # Time np.eig
+    t0 = time.perf_counter()
+    for _ in range(500):
+        method_eig(A)
+    t1 = time.perf_counter()
+    print(f'np.eig: {(t1-t0)/500*1e6:.3f} us   (lam={lam:.4f})')
+
+    # Time numba power (already warm)
+    t0 = time.perf_counter()
+    for _ in range(500):
+        lam_nb, v_nb = power_iter_numba(A)
+    t1 = time.perf_counter()
+    print(f'numba: {(t1-t0)/500*1e6:.3f} us   (lam={lam_nb:.4f})')
+
+    # Check accuracy
+    lam_ref, v_ref = method_eig(A)
+    print(f'  Accuracy numba: {np.allclose(A @ v_nb, lam_nb * v_nb)}')
+    print(f' A @ v_nb, lam_nb * v_nb)}')
+ENDFILE
+> import numpy as np
+> import time
+> from numba import njit
+>
+> def method_eig(A):
+>     evals, evecs = np.linalg.eig(A)
+>     idx = np.abs(evals).argmax()
+>     return evals[idx], evecs[:, idx]
+>
+> @njit
+> def power_iter_numba(A, tol=1e-10, max_iter=50):
+>     n = A.shape[0]
+>     v = np.ones(n, dtype=np.float64)
+>     # Normalize v
+>     norm = 0.0
+>     for i in range(n):
+>         norm += v[i] * v[i]
+>     norm = np.sqrt(norm)
+>     v = v / norm
+>     v = v / norm
+>
+>     for iteration in range(max_iter):
+>         # v_new = A @ v
+>         v_new = np.zeros(n, dtype=np.float64)
+>         for i in range(n):
+>             s = 0.0
+>             for j in range(n):
+>                 s += A[i, j] * v[j]
+>             v_new[i] = s
+>
+>         # Compute norm
+>         norm_new = 0.0
+>         for i in range(n):
+>             norm_new += v_new[i] * v_new[i]
+>         norm_new = np.sqrt(norm_new)
+>
+>         # Check for zero
+>         if norm_new == 0:
+>             v = v_new
+>             break
+>
+>         v_new = v_new / norm_new
+>
+>         # Check convergence: |v_new - v| < tol or |v_new + v| < tol (sign flip)
+>         diff = 0.0
+>         for i in range(n):
+>             diff += (v_new[i] - v[i]) ** 2
+>         diff = np.sqrt(diff)
+>         diff = np.sqrt(diff)
+>         if diff < tol:
+>             v = v_new
+>             break
+>         # Also check with sign flip
+>         diff_flip = 0.0
+>         for i in range(n):
+>             diff_flip += (v_new[i] + v[i]) ** 2
+>         diff_flip = np.sqrt(diff_flip)
+>         if diff_flip < tol:
+>             v = v_new
+>             break
+>
+>         v = v_new
+>
+>     else:
+>         # Recompute Rayleigh quotient from final v
+>     pass
+>
+>     # Compute Rayleigh quotient lam = (v @ A @ v) / (v @ v)
+>     # Compute v_dot_v
+>     v_dot_v = 0.0
+>     for i in range(n):
+>         v_dot_v += v[i] * v[i]
+>
+>     # Compute A @ v
+>     Av = np.zeros(n, dtype=np.float64)
+>     for i in range(n):
+>         s = 0.0
+>         for j in range(n):
+>             s += A[i, j] * v[j]
+>         Av[i] = s
+>
+>     v_dot_Av = 0.0
+>     for i in range(n):
+>         v_dot_Av += v[i] * Av[i]
+>
+>     lam = v_dot_Av / v_dot_v
+>     return lam, v
+>
+> print("Bench...")
+> for size in [2,4,6,8,10]:
+>     np.random.seed(42+size)
+>     A = np.random.normal(size=(size,size)).astype(np.float64)
+>     print(f'\n--- {size}x{size} ---')
+>
+>     # Warm up numba
+>     lam, v = power_iter_numba(A)
+>
+>     # Time np.eig
+>     t0 = time.perf_counter()
+>     for _ in range(500):
+>         method_eig(A)
+>     t1 = time.perf_counter()
+>     print(f'np.eig: {(t1-t0)/500*1e6:.3f} us   (lam={lam:.4f})')
+>
+>     # Time numba power (already warm)
+>     t0 = time.perf_counter()
+>     for _ in range(500):
+>         lam_nb, v_nb = power_iter_numba(A)
+>     t1 = time.perf_counter()
+>     print(f'numba: {(t1-t0)/500*1e6:.3f} us   (lam={lam_nb:.4f})')
+>
+>     # Check accuracy
+>     lam_ref, v_ref = method_eig(A)
+>     print(f'  Accuracy numba: {np.allclose(A @ v_nb, lam_nb * v_nb)}')
+>     print(f' A @ v_nb, lam_nb * v_nb)}')
+> ENDFILE
+root@1cf7d2c19296:/app# python3 /app/test_numba.py
+  File "/app/test_numba.py", line 66
+    pass
+    ^^^^
+IndentationError: expected an indented block after 'else' statement on line 64
+root@1cf7d2c19296:/app#

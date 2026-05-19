@@ -1,0 +1,11 @@
+{
+  "analysis": "File deleted. Now I'll write a clean Python script to create app.py using Python itself (via a heredoc with proper escaping.",
+  "plan": "Run a Python command that writes the Flask app file directly.",
+  "commands": [
+    {
+      "keystrokes": "python3 -c \"\ncode = '''from flask import Flask, request, jsonify\nfrom transformers import pipeline\n\napp = Flask(__name__)\n\nMODEL_PATH = '/app/model_cache/sentiment_model'\n\nprint('Loading model...')\nsentiment_pipeline = pipeline(\n    \\\"sentiment-analysis\\\",\n    model=\\\\"distilbert-base-uncased-finetuned-sst-2-english\\\",\n    cache_dir=_PATH)\nprint('Model loaded successfully')\n\n@app.route('/sentiment', methods=['POST'])\ndef sentiment():\n    if not request.is_json:\n        return jsonify({'error': 'Request must be JSON'}), 400\n    data = request.get_json = request.get_json()\n    if not data_json or 'text' not in data_json:\n        return jsonify({'error': \\\"Missing 'text' field in JSON body\\\"}), 400\n    text = data_json['text']\n    if not isinstance(text, str) or not text.strip():\n        return jsonify({'error': \\\"'text' field must be a non-empty string\\-empty string\\\"}), 400\n    try:\n        result = sentiment_pipeline(text)\n        label = result[0]['label']\n        score = result[0]['score']\n        sentiment = \\\"positive\\\" if label.upper() == \\\"POSITIVE\\\" else \\\"negative\\\"\n        conf = {\\\"positive\\\": score if sentiment == \\\"positive\\\" else 1 - score, \\\"negative\\\": 1 - score if sentiment == \\\"positive\\\" else score}\n        return jsonify({'sentiment': sentiment, 'confidence': conf})\n    except Exception as e:\n        return jsonify({'error': str(e)}), 500\n\nif __name__ == '__main__':\n    app.run(host='0.0.0.0', port=5000)\n'''\nwith open('/app/app.py', 'w') as f:\n    f.write(code)\nprint('File written')\n\"\n",
+      "duration": 0.5
+    }
+  ],
+  "task_complete": false
+}

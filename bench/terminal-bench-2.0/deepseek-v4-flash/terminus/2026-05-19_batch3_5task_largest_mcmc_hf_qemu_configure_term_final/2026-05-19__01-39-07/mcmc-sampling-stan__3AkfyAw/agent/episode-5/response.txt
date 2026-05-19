@@ -1,0 +1,13 @@
+```json
+{
+  "analysis": "data.csv has 69 rows with y (successes) and n (trials). RStan is not installed. Need to install rstan version 2.32.7. First we should install system dependencies for building R packages, then install rstan from CRAN.",
+  "plan": "Install system dependencies for RStan (like libcurl, libssl, libxml2, etc.) via apt-get, then install rstan package in R.",
+  "commands": [
+    {
+      "keystrokes": "apt-get update -qq && apt-get install -y -qq libcurl4-openssl-dev libssl-dev libxml2-dev libgit2-dev 2>&1 | tail -5\n",
+      "duration": 5.0
+    }
+  ],
+  "task_complete": false
+}
+```

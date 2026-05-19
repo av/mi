@@ -1,0 +1,177 @@
+{
+    "id": "d8d19f89-94e7-4f5e-962b-79098ebfe812",
+    "task_name": "hf-model-inference",
+    "trial_name": "hf-model-inference__JtAL7kY",
+    "trial_uri": "file:///tmp/mi-30-eval-iter3/terminus/2026-05-19__01-39-07/hf-model-inference__JtAL7kY",
+    "task_id": {
+        "git_url": "https://github.com/laude-institute/terminal-bench-2.git",
+        "git_commit_id": "69671fbaac6d67a7ef0dfec016cc38a64ef7a77c",
+        "path": "hf-model-inference"
+    },
+    "source": "terminal-bench",
+    "task_checksum": "b96307ee0e1a454b667fb19da4b08116252525a2897250a9d7f8825fa0b86088",
+    "config": {
+        "task": {
+            "path": "hf-model-inference",
+            "git_url": "https://github.com/laude-institute/terminal-bench-2.git",
+            "git_commit_id": "69671fbaac6d67a7ef0dfec016cc38a64ef7a77c",
+            "name": null,
+            "ref": null,
+            "overwrite": false,
+            "download_dir": null,
+            "source": "terminal-bench"
+        },
+        "trial_name": "hf-model-inference__JtAL7kY",
+        "trials_dir": "/tmp/mi-30-eval-iter3/terminus/2026-05-19__01-39-07",
+        "timeout_multiplier": 1.0,
+        "agent_timeout_multiplier": null,
+        "verifier_timeout_multiplier": null,
+        "agent_setup_timeout_multiplier": null,
+        "environment_build_timeout_multiplier": null,
+        "agent": {
+            "name": "terminus-2",
+            "import_path": null,
+            "model_name": "openai/deepseek/deepseek-v4-flash",
+            "skills": [],
+            "override_timeout_sec": null,
+            "override_setup_timeout_sec": null,
+            "max_timeout_sec": null,
+            "kwargs": {},
+            "env": {},
+            "mcp_servers": []
+        },
+        "environment": {
+            "type": "docker",
+            "import_path": null,
+            "force_build": false,
+            "delete": true,
+            "override_cpus": null,
+            "override_memory_mb": null,
+            "override_storage_mb": null,
+            "override_gpus": null,
+            "suppress_override_warnings": false,
+            "mounts": null,
+            "extra_docker_compose": [],
+            "env": {},
+            "kwargs": {}
+        },
+        "verifier": {
+            "override_timeout_sec": null,
+            "max_timeout_sec": null,
+            "env": {},
+            "disable": false
+        },
+        "artifacts": [],
+        "extra_instruction_paths": [],
+        "job_id": "1741899c-2783-41a9-adb4-f0c3a9cbf86e"
+    },
+    "agent_info": {
+        "name": "terminus-2",
+        "version": "2.0.0",
+        "model_info": {
+            "name": "deepseek/deepseek-v4-flash",
+            "provider": "openai"
+        }
+    },
+    "agent_result": {
+        "n_input_tokens": 1223486,
+        "n_cache_tokens": 1078885,
+        "n_output_tokens": 28030,
+        "cost_usd": null,
+        "rollout_details": [],
+        "metadata": {
+            "n_episodes": 63,
+            "api_request_times_msec": [
+                4372.347116470337,
+                5126.775741577148,
+                2936.800479888916,
+                4782.6988697052,
+                7044.090509414673,
+                3338.4389877319336,
+                5051.655530929565,
+                2991.1344051361084,
+                5546.484708786011,
+                1947.014331817627,
+                5562.217712402344,
+                6314.944744110107,
+                2897.369384765625,
+                4657.15217590332,
+                1682.1587085723877,
+                2264.977216720581,
+                2337.0847702026367,
+                2794.670820236206,
+                1951.4427185058594,
+                3305.246114730835,
+                1937.2739791870117,
+                2021.592140197754,
+                2894.500732421875,
+                19328.32908630371,
+                3679.853916168213,
+                3827.617645263672,
+                5578.166246414185,
+                5608.665466308594,
+                1918.3430671691895,
+                5031.127452850342,
+                4994.453907012939,
+                9768.75925064087,
+                6379.859924316406,
+                9960.819482803345,
+                5938.896656036377,
+                2509.807586669922,
+                5153.53798866272,
+                10487.707138061523,
+                2802.8342723846436,
+                3825.137138366699,
+                12969.209432601929,
+                10024.85203742981,
+                7972.6293087005615,
+                2620.0242042541504,
+                5813.224792480469,
+                3033.0255031585693,
+                4753.503084182739,
+                2437.6471042633057,
+                2731.8758964538574,
+                2107.9957485198975,
+                3251.504421234131,
+                2190.4425621032715,
+                4356.663703918457,
+                3708.6594104766846,
+                4132.319211959839,
+                4332.844495773315,
+                3811.0415935516357,
+                5593.248605728149,
+                5446.270704269409,
+                4958.007574081421,
+                12007.403373718262,
+                10970.491170883179,
+                11439.656734466553
+            ],
+            "summarization_count": 0
+        }
+    },
+    "verifier_result": {
+        "rewards": {
+            "reward": 0.0
+        }
+    },
+    "exception_info": null,
+    "started_at": "2026-05-18T23:41:00.079394Z",
+    "finished_at": "2026-05-18T23:50:39.737251Z",
+    "environment_setup": {
+        "started_at": "2026-05-18T23:41:00.079868Z",
+        "finished_at": "2026-05-18T23:43:01.884197Z"
+    },
+    "agent_setup": {
+        "started_at": "2026-05-18T23:43:01.884226Z",
+        "finished_at": "2026-05-18T23:43:10.906560Z"
+    },
+    "agent_execution": {
+        "started_at": "2026-05-18T23:43:10.906644Z",
+        "finished_at": "2026-05-18T23:50:18.168236Z"
+    },
+    "verifier": {
+        "started_at": "2026-05-18T23:50:18.365332Z",
+        "finished_at": "2026-05-18T23:50:27.506170Z"
+    },
+    "step_results": null
+}

@@ -1,0 +1,45 @@
+Previous response had warnings:
+WARNINGS: - Extra text detected before JSON object
+- Extra text detected after JSON object
+
+Current Terminal Screen:
+f<evaluator_assume_aliasing<Src>::value, void*>::type) [with Dst = Eigen::Matrix<double, -1, 1>; Src = Eigen::Product<Eigen::Product<Eigen::Product<Eigen::Matri
+x<double, -1, -1>, Eigen::Transpose<const Eigen::Matrix<double, -1, -1> >, 0>, Eigen::Transpose<const Eigen::Map<Eigen::Matrix<double, -1, -1>, 0, Eigen::Stride
+<0, 0> > >, 0>, Eigen::Map<Eigen::Matrix<double, -1, 1>, 0, Eigen::Stride<0, 0> >, 0>; Func = assign_op<double, double>; typename enable_if<evaluator_assume_ali
+asing<Src>::value, void*>::type = void*; typename evaluator_traits<SrcXprType>::Shape = Eigen::DenseShape]’
+../inst/include/Eigen/src/Core/AssignEvaluator.h:836:18:   required from ‘void Eigen::internal::call_assignment(Dst&, const Src&) [with Dst = Eigen::Matrix<doub
+le, -1, 1>; Src = Eigen::Product<Eigen::Product<Eigen::Product<Eigen::Matrix<double, -1, -1>, Eigen::Transpose<const Eigen::Matrix<double, -1, -1> >, 0>, Eigen:
+:Transpose<const Eigen::Map<Eigen::Matrix<double, -1, -1>, 0, Eigen::Stride<0, 0> > >, 0>, Eigen::Map<Eigen::Matrix<double, -1, 1>, 0, Eigen::Stride<0, 0> >, 0>
+]’
+../inst/include/Eigen/src/Core/PlainObjectBase.h:779:32:   required from ‘Derived& Eigen::PlainObjectBase<Derived>::_set(const Eigen::DenseBase<OtherDerived>&)
+[with OtherDerived = Eigen::Product<Eigen::Product<Eigen::Product<Eigen::Matrix<double, -1, -1>, Eigen::Transpose<const Eigen::Matrix<double, -1, -1> >, 0>, Eig
+en::Transpose<const Eigen::Map<Eigen::Matrix<double, -1, -1>, 0, Eigen::Stride<0, 0> > >, 0>, Eigen::Map<Eigen::Matrix<double, -1, 1>, 0, Eigen::Stride<0, 0> >,
+ 0>; Derived = Eigen::Matrix<double, -1, 1>]’
+../inst/include/Eigen/src/Core/Matrix.h:225:24:   required from ‘Eigen::Matrix<_Scalar, _Rows, _Cols, _Options, _MaxRows, _MaxCols>& Eigen::Matrix<_Scalar, _Row
+s, _Cols, _Options, _MaxRows, _MaxCols>::operator=(const Eigen::DenseBase<OtherDerived>&) [with OtherDerived = Eigen::Product<Eigen::Product<Eigen::Product<Eige
+n::Matrix<double, -1, -1>, Eigen::Transpose<const Eigen::Matrix<double, -1, -1> >, 0>, Eigen::Transpose<const Eigen::Map<Eigen::Matrix<double, -1, -1>, 0, Eigen
+::Stride<0, 0> > >, 0>, Eigen::Map<Eigen::Matrix<double, -1, 1>, 0, Eigen::Stride<0, 0> >, 0>; _Scalar = double; int _Rows = -1; int _Cols = 1; int _Options = 0
+; int _MaxRows = -1; int _MaxCols = 1]’
+fastLm.cpp:183:55:   required from here
+../inst/include/Eigen/src/Core/CoreEvaluators.h:1071:54: warning: ignoring attributes on template argument ‘Eigen::internal::packet_traits<double>::type’ {aka ‘
+__m128d’} [-Wignored-attributes]
+ 1071 |     PacketAlignment = unpacket_traits<PacketScalar>::alignment,
+      |                                                      ^~~~~~~~~
+g++ -std=gnu++17 -shared -L/usr/lib/R/lib -Wl,-Bsymbolic-functions -flto=auto -ffat-lto-objects -Wl,-z,relro -o RcppEigen.so RcppEigen.o RcppExports.o fastLm.o
+-llapack -lblas -lgfortran -lm -lquadmath -L/usr/lib/R/lib -lR
+/usr/bin/ld: cannot find -llapack: No such file or directory
+/usr/bin/ld: cannot find -lblas: No such file or directory
+/usr/bin/ld: cannot find -lgfortran: No such file or directory
+collect2: error: ld returned 1 exit status
+make: *** [/usr/share/R/share/make/shlib.mk:10: RcppEigen.so] Error 1
+ERROR: compilation failed for package ‘RcppEigen’
+* removing ‘/usr/local/lib/R/site-library/RcppEigen’
+
+The downloaded source packages are in
+        ‘/tmp/RtmpEj5jFq/downloaded_packages’
+Warning message:
+In install.packages("RcppEigen", repos = "https://cloud.r-project.org/") :
+  installation of package ‘RcppEigen’ had non-zero exit status
+>
+>
+root@e91006c5764b:/app#

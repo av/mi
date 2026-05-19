@@ -1,0 +1,13 @@
+```json
+{
+  "analysis": "StanHeaders installed successfully. Now we can install rstan.",
+  "plan": "Install rstan package.",
+  "commands": [
+    {
+      "keystrokes": "R -e \"install.packages('rstan', repos='https://cloud.r-project.org/')\" 2>&1\n",
+      "duration": 60.0
+    }
+  ],
+  "task_complete": false
+}
+```

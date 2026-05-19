@@ -1,0 +1,345 @@
+[?2004hroot@6b59ef50ab31:/app# asciinema rec --stdin /logs/agent/recording.cast
+[?2004l[0;32masciinema: recording asciicast to /logs/agent/recording.cast[0m
+[0;32masciinema: press <ctrl-d> or type "exit" when you're done[0m
+[?2004hroot@6b59ef50ab31:/app# clear
+[?2004l[H[J[3J[?2004hroot@6b59ef50ab31:/app# ls -la
+[?2004ltotal 0
+drwxr-xr-x. 1 root root  0 Oct 22  2025 [0m[01;34m.[0m
+drwxr-xr-x. 1 root root 40 May 18 23:39 [01;34m..[0m
+[?2004hroot@6b59ef50ab31:/app# which git && git --version
+[?2004l[?2004hroot@6b59ef50ab31:/app# which python3 || which python
+[?2004l/usr/bin/python3
+[?2004hroot@6b59ef50ab31:/app# df -h
+[?2004lFilesystem      Size  Used Avail Use% Mounted on
+overlay         1.9T  1.3T  579G  69% /
+tmpfs            64M     0   64M   0% /dev
+shm              64M   24K   64M   1% /dev/shm
+tmpfs            61G  7.8G   53G  13% /logs/agent
+/dev/nvme0n1p3  1.9T  1.3T  579G  69% /etc/hosts
+tmpfs            61G     0   61G   0% /proc/acpi
+tmpfs            61G     0   61G   0% /proc/asound
+tmpfs            61G     0   61G   0% /proc/scsi
+tmpfs            61G     0   61G   0% /sys/devices/virtual/powercap
+tmpfs            61G     0   61G   0% /sys/firmware
+[?2004hroot@6b59ef50ab31:/app# cat /etc/os-release 2>/dev/null || cat /etc/os-release 2>/dev/null || cat /etc/issue
+[?2004lPRETTY_NAME="Ubuntu 24.04.3 LTS"
+NAME="Ubuntu"
+VERSION_ID="24.04"
+VERSION="24.04.3 LTS (Noble Numbat)"
+VERSION_CODENAME=noble
+ID=ubuntu
+ID_LIKE=debian
+HOME_URL="https://www.ubuntu.com/"
+SUPPORT_URL="https://help.ubuntu.com/"
+BUG_REPORT_URL="https://bugs.launchpad.net/ubuntu/"
+PRIVACY_POLICY_URL="https://www.ubuntu.com/legal/terms-and-policies/privacy-policy"
+UBUNTU_CODENAME=noble
+LOGO=ubuntu-logo
+[?2004hroot@6b59ef50ab31:/app# apt-get update -qq
+[?2004l[?2004hroot@6b59ef50ab31:/app# apt-get install -y git
+[?2004lReading package lists... 0%Reading package lists... 0%Reading package lists... 0%Reading package lists... 4%Reading package lists... 4%Reading package lists... 50%Reading package lists... 50%Reading package lists... 51%Reading package lists... 51%Reading package lists... 52%Reading package lists... 52%Reading package lists... 59%Reading package lists... 59%Reading package lists... 65%Reading package lists... 65%Reading package lists... 77%Reading package lists... 77%Reading package lists... 77%Reading package lists... 77%Reading package lists... 78%Reading package lists... 78%Reading package lists... 78%Reading package lists... 78%Reading package lists... 78%Reading package lists... 78%Reading package lists... 83%Reading package lists... 83%Reading package lists... 88%Reading package lists... 88%Reading package lists... 99%Reading package lists... 99%Reading package lists... 99%Reading package lists... 99%Reading package lists... Done
+Building dependency tree... 0%Building dependency tree... 0%Building dependency tree... 50%Building dependency tree... 50%Building dependency tree... 58%Building dependency tree... Done
+Reading state information... 0% Reading state information... 2%Reading state information... Done
+The following additional packages will be installed:
+  adduser curl git-man less libbsd0 libcbor0.10 libcurl3t64-gnutls libcurl4t64 libedit2 liberror-perl libfido2-1 libgdbm-compat4t64 libgdbm6t64 libperl5.38t64
+  libx11-6 libx11-data libxau6 libxcb1 libxdmcp6 libxext6 libxmuu1 openssh-client patch perl perl-modules-5.38 xauth
+Suggested packages:
+  liblocale-gettext-perl cron quota ecryptfs-utils gettext-base git-daemon-run | git-daemon-sysvinit git-doc git-email git-gui gitk gitweb git-cvs
+  git-mediawiki git-svn gdbm-l10n keychain libpam-ssh monkeysphere ssh-askpass ed diffutils-doc perl-doc libterm-readline-gnu-perl
+  | libterm-readline-perl-perl make libtap-harness-archive-perl
+The following NEW packages will be installed:
+  adduser git git-man less libbsd0 libcbor0.10 libcurl3t64-gnutls libedit2 liberror-perl libfido2-1 libgdbm-compat4t64 libgdbm6t64 libperl5.38t64 libx11-6
+  libx11-data libxau6 libxcb1 libxdmcp6 libxext6 libxmuu1 openssh-client patch perl perl-modules-5.38 xauth
+The following packages will be upgraded:
+  curl libcurl4t64
+2 upgraded, 25 newly installed, 0 to remove and 28 not upgraded.
+Need to get 16.4 MB of archives.
+After this operation, 84.5 MB of additional disk space will be used.
+0% [Working]            Get:1 http://archive.ubuntu.com/ubuntu noble-updates/main amd64 perl-modules-5.38 all 5.38.2-3.2ubuntu0.2 [3110 kB]
+0% [1 perl-modules-5.38 63.8 kB/3110 kB 2%]                                           16% [Working]             Get:2 http://archive.ubuntu.com/ubuntu noble/main amd64 libgdbm6t64 amd64 1.23-5.1build1 [34.4 kB]
+16% [2 libgdbm6t64 16.4 kB/34.4 kB 48%]                                       17% [Working]             Get:3 http://archive.ubuntu.com/ubuntu noble/main amd64 libgdbm-compat4t64 amd64 1.23-5.1build1 [6710 B]
+17% [3 libgdbm-compat4t64 6710 B/6710 B 100%]                                             18% [Working]             Get:4 http://archive.ubuntu.com/ubuntu noble-updates/main amd64 libperl5.38t64 amd64 5.38.2-3.2ubuntu0.2 [4874 kB]
+18% [4 libperl5.38t64 15.2 kB/4874 kB 0%]                                         42% [Working]             Get:5 http://archive.ubuntu.com/ubuntu noble-updates/main amd64 perl amd64 5.38.2-3.2ubuntu0.2 [231 kB]
+42% [5 perl 32.5 kB/231 kB 14%]                               44% [Working]             Get:6 http://archive.ubuntu.com/ubuntu noble/main amd64 adduser all 3.137ubuntu1 [101 kB]
+44% [6 adduser 8192 B/101 kB 8%]                                45% [Waiting for headers]                         Get:7 http://archive.ubuntu.com/ubuntu noble-updates/main amd64 less amd64 590-2ubuntu2.1 [142 kB]
+45% [7 less 8192 B/142 kB 6%]                             47% [Waiting for headers]                         Get:8 http://archive.ubuntu.com/ubuntu noble-updates/main amd64 libbsd0 amd64 0.12.1-1build1.1 [41.2 kB]
+47% [8 libbsd0 15.3 kB/41.2 kB 37%]                                   48% [Working]             Get:9 http://archive.ubuntu.com/ubuntu noble/main amd64 libcbor0.10 amd64 0.10.2-1.2ubuntu2 [25.8 kB]
+48% [9 libcbor0.10 3514 B/25.8 kB 14%]                                      49% [Working]             Get:10 http://archive.ubuntu.com/ubuntu noble/main amd64 libedit2 amd64 3.1-20230828-1build1 [97.6 kB]
+49% [10 libedit2 8192 B/97.6 kB 8%]                                   50% [Working]             Get:11 http://archive.ubuntu.com/ubuntu noble/main amd64 libfido2-1 amd64 1.14.0-1build3 [83.5 kB]
+50% [11 libfido2-1 24.6 kB/83.5 kB 29%]                                       51% [Waiting for headers]                         Get:12 http://archive.ubuntu.com/ubuntu noble/main amd64 libxau6 amd64 1:1.0.9-1build6 [7160 B]
+51% [12 libxau6 7160 B/7160 B 100%]                                   52% [Waiting for headers]                         Get:13 http://archive.ubuntu.com/ubuntu noble/main amd64 libxdmcp6 amd64 1:1.1.3-0ubuntu6 [10.3 kB]
+52% [13 libxdmcp6 10.3 kB/10.3 kB 100%]                                       52% [Working]             Get:14 http://archive.ubuntu.com/ubuntu noble/main amd64 libxcb1 amd64 1.15-1ubuntu2 [47.7 kB]
+52% [14 libxcb1 3513 B/47.7 kB 7%]                                  53% [Working]             Get:15 http://archive.ubuntu.com/ubuntu noble/main amd64 libx11-data all 2:1.8.7-1build1 [115 kB]
+54% [15 libx11-data 24.6 kB/115 kB 21%]                                       55% [Working]             Get:16 http://archive.ubuntu.com/ubuntu noble/main amd64 libx11-6 amd64 2:1.8.7-1build1 [650 kB]
+55% [16 libx11-6 9600 B/650 kB 1%]                                  59% [Working]             Get:17 http://archive.ubuntu.com/ubuntu noble/main amd64 libxext6 amd64 2:1.3.4-1build2 [30.4 kB]
+59% [17 libxext6 7737 B/30.4 kB 25%]                                    60% [Working]             Get:18 http://archive.ubuntu.com/ubuntu noble/main amd64 libxmuu1 amd64 2:1.1.3-3build2 [8958 B]
+60% [18 libxmuu1 8192 B/8958 B 91%]                                   60% [Working]             Get:19 http://archive.ubuntu.com/ubuntu noble-updates/main amd64 openssh-client amd64 1:9.6p1-3ubuntu13.16 [907 kB]
+60% [19 openssh-client 3647 B/907 kB 0%]                                        66% [Waiting for headers]                         Get:20 http://archive.ubuntu.com/ubuntu noble/main amd64 xauth amd64 1:1.1.2-1build1 [25.6 kB]
+66% [20 xauth 25.6 kB/25.6 kB 100%]                                   66% [Waiting for headers]                         Get:21 http://archive.ubuntu.com/ubuntu noble-updates/main amd64 curl amd64 8.5.0-2ubuntu10.9 [227 kB]
+66% [21 curl 8192 B/227 kB 4%]                              68% [Working]             Get:22 http://archive.ubuntu.com/ubuntu noble-updates/main amd64 libcurl4t64 amd64 8.5.0-2ubuntu10.9 [342 kB]
+68% [22 libcurl4t64 4096 B/342 kB 1%]                                     71% [Working]             Get:23 http://archive.ubuntu.com/ubuntu noble-updates/main amd64 libcurl3t64-gnutls amd64 8.5.0-2ubuntu10.9 [334 kB]
+71% [23 libcurl3t64-gnutls 6871 B/334 kB 2%]                                            73% [Waiting for headers]                         Get:24 http://archive.ubuntu.com/ubuntu noble/main amd64 liberror-perl all 0.17029-2 [25.6 kB]
+73% [24 liberror-perl 2106 B/25.6 kB 8%]                                        74% [Working]             Get:25 http://archive.ubuntu.com/ubuntu noble-updates/main amd64 git-man all 1:2.43.0-1ubuntu7.3 [1100 kB]
+74% [25 git-man 8192 B/1100 kB 1%]                                  80% [Waiting for headers]                         Get:26 http://archive.ubuntu.com/ubuntu noble-updates/main amd64 git amd64 1:2.43.0-1ubuntu7.3 [3680 kB]
+80% [26 git 12.3 kB/3680 kB 0%]                               99% [Waiting for headers]                         Get:27 http://archive.ubuntu.com/ubuntu noble/main amd64 patch amd64 2.7.6-7build3 [104 kB]
+99% [27 patch 41.3 kB/104 kB 40%]                                 100% [Working]              Fetched 16.4 MB in 0s (35.7 MB/s)
+debconf: delaying package configuration, since apt-utils is not installed
+Selecting previously unselected package perl-modules-5.38.
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 6489 files and directories currently installed.)
+Preparing to unpack .../0-perl-modules-5.38_5.38.2-3.2ubuntu0.2_all.deb ...
+Unpacking perl-modules-5.38 (5.38.2-3.2ubuntu0.2) ...
+Selecting previously unselected package libgdbm6t64:amd64.
+Preparing to unpack .../1-libgdbm6t64_1.23-5.1build1_amd64.deb ...
+Unpacking libgdbm6t64:amd64 (1.23-5.1build1) ...
+Selecting previously unselected package libgdbm-compat4t64:amd64.
+Preparing to unpack .../2-libgdbm-compat4t64_1.23-5.1build1_amd64.deb ...
+Unpacking libgdbm-compat4t64:amd64 (1.23-5.1build1) ...
+Selecting previously unselected package libperl5.38t64:amd64.
+Preparing to unpack .../3-libperl5.38t64_5.38.2-3.2ubuntu0.2_amd64.deb ...
+Unpacking libperl5.38t64:amd64 (5.38.2-3.2ubuntu0.2) ...
+Selecting previously unselected package perl.
+Preparing to unpack .../4-perl_5.38.2-3.2ubuntu0.2_amd64.deb ...
+Unpacking perl (5.38.2-3.2ubuntu0.2) ...
+Selecting previously unselected package adduser.
+Preparing to unpack .../5-adduser_3.137ubuntu1_all.deb ...
+Unpacking adduser (3.137ubuntu1) ...
+Setting up adduser (3.137ubuntu1) ...
+Selecting previously unselected package less.
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 8549 files and directories currently installed.)
+Preparing to unpack .../00-less_590-2ubuntu2.1_amd64.deb ...
+Unpacking less (590-2ubuntu2.1) ...
+Selecting previously unselected package libbsd0:amd64.
+Preparing to unpack .../01-libbsd0_0.12.1-1build1.1_amd64.deb ...
+Unpacking libbsd0:amd64 (0.12.1-1build1.1) ...
+Selecting previously unselected package libcbor0.10:amd64.
+Preparing to unpack .../02-libcbor0.10_0.10.2-1.2ubuntu2_amd64.deb ...
+Unpacking libcbor0.10:amd64 (0.10.2-1.2ubuntu2) ...
+Selecting previously unselected package libedit2:amd64.
+Preparing to unpack .../03-libedit2_3.1-20230828-1build1_amd64.deb ...
+Unpacking libedit2:amd64 (3.1-20230828-1build1) ...
+Selecting previously unselected package libfido2-1:amd64.
+Preparing to unpack .../04-libfido2-1_1.14.0-1build3_amd64.deb ...
+Unpacking libfido2-1:amd64 (1.14.0-1build3) ...
+Selecting previously unselected package libxau6:amd64.
+Preparing to unpack .../05-libxau6_1%3a1.0.9-1build6_amd64.deb ...
+Unpacking libxau6:amd64 (1:1.0.9-1build6) ...
+Selecting previously unselected package libxdmcp6:amd64.
+Preparing to unpack .../06-libxdmcp6_1%3a1.1.3-0ubuntu6_amd64.deb ...
+Unpacking libxdmcp6:amd64 (1:1.1.3-0ubuntu6) ...
+Selecting previously unselected package libxcb1:amd64.
+Preparing to unpack .../07-libxcb1_1.15-1ubuntu2_amd64.deb ...
+Unpacking libxcb1:amd64 (1.15-1ubuntu2) ...
+Selecting previously unselected package libx11-data.
+Preparing to unpack .../08-libx11-data_2%3a1.8.7-1build1_all.deb ...
+Unpacking libx11-data (2:1.8.7-1build1) ...
+Selecting previously unselected package libx11-6:amd64.
+Preparing to unpack .../09-libx11-6_2%3a1.8.7-1build1_amd64.deb ...
+Unpacking libx11-6:amd64 (2:1.8.7-1build1) ...
+Selecting previously unselected package libxext6:amd64.
+Preparing to unpack .../10-libxext6_2%3a1.3.4-1build2_amd64.deb ...
+Unpacking libxext6:amd64 (2:1.3.4-1build2) ...
+Selecting previously unselected package libxmuu1:amd64.
+Preparing to unpack .../11-libxmuu1_2%3a1.1.3-3build2_amd64.deb ...
+Unpacking libxmuu1:amd64 (2:1.1.3-3build2) ...
+Selecting previously unselected package openssh-client.
+Preparing to unpack .../12-openssh-client_1%3a9.6p1-3ubuntu13.16_amd64.deb ...
+Unpacking openssh-client (1:9.6p1-3ubuntu13.16) ...
+Selecting previously unselected package xauth.
+Preparing to unpack .../13-xauth_1%3a1.1.2-1build1_amd64.deb ...
+Unpacking xauth (1:1.1.2-1build1) ...
+Preparing to unpack .../14-curl_8.5.0-2ubuntu10.9_amd64.deb ...
+Unpacking curl (8.5.0-2ubuntu10.9) over (8.5.0-2ubuntu10.6) ...
+Preparing to unpack .../15-libcurl4t64_8.5.0-2ubuntu10.9_amd64.deb ...
+Unpacking libcurl4t64:amd64 (8.5.0-2ubuntu10.9) over (8.5.0-2ubuntu10.6) ...
+Selecting previously unselected package libcurl3t64-gnutls:amd64.
+Preparing to unpack .../16-libcurl3t64-gnutls_8.5.0-2ubuntu10.9_amd64.deb ...
+Unpacking libcurl3t64-gnutls:amd64 (8.5.0-2ubuntu10.9) ...
+Selecting previously unselected package liberror-perl.
+Preparing to unpack .../17-liberror-perl_0.17029-2_all.deb ...
+Unpacking liberror-perl (0.17029-2) ...
+Selecting previously unselected package git-man.
+Preparing to unpack .../18-git-man_1%3a2.43.0-1ubuntu7.3_all.deb ...
+Unpacking git-man (1:2.43.0-1ubuntu7.3) ...
+Selecting previously unselected package git.
+Preparing to unpack .../19-git_1%3a2.43.0-1ubuntu7.3_amd64.deb ...
+Unpacking git (1:2.43.0-1ubuntu7.3) ...
+Selecting previously unselected package patch.
+Preparing to unpack .../20-patch_2.7.6-7build3_amd64.deb ...
+Unpacking patch (2.7.6-7build3) ...
+Setting up libxau6:amd64 (1:1.0.9-1build6) ...
+Setting up libgdbm6t64:amd64 (1.23-5.1build1) ...
+Setting up libcurl4t64:amd64 (8.5.0-2ubuntu10.9) ...
+Setting up libgdbm-compat4t64:amd64 (1.23-5.1build1) ...
+Setting up libcbor0.10:amd64 (0.10.2-1.2ubuntu2) ...
+Setting up libcurl3t64-gnutls:amd64 (8.5.0-2ubuntu10.9) ...
+Setting up less (590-2ubuntu2.1) ...
+Setting up libx11-data (2:1.8.7-1build1) ...
+Setting up perl-modules-5.38 (5.38.2-3.2ubuntu0.2) ...
+Setting up patch (2.7.6-7build3) ...
+Setting up git-man (1:2.43.0-1ubuntu7.3) ...
+Setting up curl (8.5.0-2ubuntu10.9) ...
+Setting up libperl5.38t64:amd64 (5.38.2-3.2ubuntu0.2) ...
+Setting up libfido2-1:amd64 (1.14.0-1build3) ...
+Setting up libbsd0:amd64 (0.12.1-1build1.1) ...
+Setting up libxdmcp6:amd64 (1:1.1.3-0ubuntu6) ...
+Setting up libxcb1:amd64 (1.15-1ubuntu2) ...
+Setting up libedit2:amd64 (3.1-20230828-1build1) ...
+Setting up perl (5.38.2-3.2ubuntu0.2) ...
+Setting up libx11-6:amd64 (2:1.8.7-1build1) ...
+Setting up libxmuu1:amd64 (2:1.1.3-3build2) ...
+Setting up openssh-client (1:9.6p1-3ubuntu13.16) ...
+Setting up libxext6:amd64 (2:1.3.4-1build2) ...
+Setting up liberror-perl (0.17029-2) ...
+Setting up git (1:2.43.0-1ubuntu7.3) ...
+Setting up xauth (1:1.1.2-1build1) ...
+Processing triggers for libc-bin (2.39-0ubuntu8.6) ...
+[?2004hroot@6b59ef50ab31:/app# mkdir -p /git /var/www/html
+[?2004l[?2004hroot@6b59ef50ab31:/app# cd /git && git init --bare server
+[?2004l[33mhint: Using 'master' as the name for the initial branch. This default branch name[m
+[33mhint: is subject to change. To configure the initial branch name to use in all[m
+[33mhint: of your new repositories, which will suppress this warning, call:[m
+[33mhint: [m
+[33mhint: 	git config --global init.defaultBranch <name>[m
+[33mhint: [m
+[33mhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and[m
+[33mhint: 'development'. The just-created branch can be renamed via this command:[m
+[33mhint: [m
+[33mhint: 	git branch -m <name>[m
+Initialized empty Git repository in /git/server/
+[?2004hroot@6b59ef50ab31:/git# git clone /git/server /var/git/server /var/www/html
+[?2004lfatal: Too many arguments.
+
+usage: git clone [<options>] [--] <repo> [<dir>]
+
+    -v, --[no-]verbose    be more verbose
+    -q, --[no-]quiet      be more quiet
+    --[no-]progress       force progress reporting
+    --[no-]reject-shallow don't clone shallow repository
+    -n, --no-checkout     don't create a checkout
+    --checkout            opposite of --no-checkout
+    --[no-]bare           create a bare repository
+    --[no-]mirror         create a mirror repository (implies bare)
+    -l, --[no-]local      to clone from a local repository
+    --no-hardlinks        don't use local hardlinks, always copy
+    --hardlinks           opposite of --no-hardlinks
+    -s, --[no-]shared     setup as shared repository
+    --[no-]recurse-submodules[=<pathspec>]
+                          initialize submodules in the clone
+    --[no-]recursive ...  alias of --recurse-submodules
+    -j, --[no-]jobs <n>   number of submodules cloned in parallel
+    --[no-]template <template-directory>
+                          directory from which templates will be used
+    --[no-]reference <repo>
+                          reference repository
+    --[no-]reference-if-able <repo>
+                          reference repository
+    --[no-]dissociate     use --reference only while cloning
+    -o, --[no-]origin <name>
+                          use <name> instead of 'origin' to track upstream
+    -b, --[no-]branch <branch>
+                          checkout <branch> instead of the remote's HEAD
+    -u, --[no-]upload-pack <path>
+                          path to git-upload-pack on the remote
+    --[no-]depth <depth>  create a shallow clone of that depth
+    --[no-]shallow-since <time>
+                          create a shallow clone since a specific time
+    --[no-]shallow-exclude <revision>
+                          deepen history of shallow clone, excluding rev
+    --[no-]single-branch  clone only one branch, HEAD or --branch
+    --no-tags             don't clone any tags, and make later fetches not to follow them
+    --tags                opposite of --no-tags
+    --[no-]shallow-submodules
+                          any cloned submodules will be shallow
+    --[no-]separate-git-dir <gitdir>
+                          separate git dir from working tree
+    -c, --[no-]config <key=value>
+                          set config inside the new repository
+    --[no-]server-option <server-specific>
+                          option to transmit
+    -4, --ipv4            use IPv4 addresses only
+    -6, --ipv6            use IPv6 addresses only
+    --[no-]filter <args>  object filtering
+    --[no-]also-filter-submodules
+                          apply partial clone filters to submodules
+    --[no-]remote-submodules
+                          any cloned submodules will use their remote-tracking branch
+    --[no-]sparse         initialize sparse-checkout file to include only files at root
+    --[no-]bundle-uri <uri>
+                          a URI for downloading bundles before fetching from origin remote
+
+[?2004hroot@6b59ef50ab31:/git# cd /var/www && git clone /git/server html
+[?2004lCloning into 'html'...
+warning: You appear to have cloned an empty repository.
+done.
+[?2004hroot@6b59ef50ab31:/var/www# cat > /git/server/hooks/post-update << 'EOF'
+[?2004l[?2004h> #!/bin/bash
+[?2004l[?2004h> cd /var/www/html || exit
+[?2004l[?2004h> unset GIT_DIR
+[?2004l[?2004h> git pull origin master
+[?2004l[?2004h> EOF
+[?2004l[?2004hroot@6b59ef50ab31:/var/www# chmod +x /git/server/hooks/post-update
+[?2004l[?2004hroot@6b59ef50ab31:/var/www# ls -la /git/server/hooks/
+[?2004ltotal 68
+drwxr-xr-x. 1 root root  578 May 18 23:40 [0m[01;34m.[0m
+drwxr-xr-x. 1 root root   98 May 18 23:39 [01;34m..[0m
+-rwxr-xr-x. 1 root root  478 May 18 23:39 [01;32mapplypatch-msg.sample[0m
+-rwxr-xr-x. 1 root root  896 May 18 23:39 [01;32mcommit-msg.sample[0m
+-rwxr-xr-x. 1 root root 4726 May 18 23:39 [01;32mfsmonitor-watchman.sample[0m
+-rwxr-xr-x. 1 root root   74 May 18 23:40 [01;32mpost-update[0m
+-rwxr-xr-x. 1 root root  189 May 18 23:39 [01;32mpost-update.sample[0m
+-rwxr-xr-x. 1 root root  424 May 18 23:39 [01;32mpre-applypatch.sample[0m
+-rwxr-xr-x. 1 root root 1643 May 18 23:39 [01;32mpre-commit.sample[0m
+-rwxr-xr-x. 1 root root  416 May 18 23:39 [01;32mpre-merge-commit.sample[0m
+-rwxr-xr-x. 1 root root 1374 May 18 23:39 [01;32mpre-push.sample[0m
+-rwxr-xr-x. 1 root root 4898 May 18 23:39 [01;32mpre-rebase.sample[0m
+-rwxr-xr-x. 1 root root  544 May 18 23:39 [01;32mpre-receive.sample[0m
+-rwxr-xr-x. 1 root root 1492 May 18 23:39 [01;32mprepare-commit-msg.sample[0m
+-rwxr-xr-x. 1 root root 2783 May 18 23:39 [01;32mpush-to-checkout.sample[0m
+-rwxr-xr-x. 1 root root 2308 May 18 23:39 [01;32msendemail-validate.sample[0m
+-rwxr-xr-x. 1 root root 3650 May 18 23:39 [01;32mupdate.sample[0m
+[?2004hroot@6b59ef50ab31:/var/www# cd /var/www/html && git remote -v
+[?2004lorigin	/git/server (fetch)
+origin	/git/server (push)
+[?2004hroot@6b59ef50ab31:/var/www/html# cd /var/www/html && git branch -a
+[?2004l[?1h=[K[?1l>[?2004hroot@6b59ef50ab31:/var/www/html# python3 -m http.server 8080 --directory /var/www/html &
+[?2004l[1] 1182
+[?2004hroot@6b59ef50ab31:/var/www/html# sleep 1
+[?2004lServing HTTP on 0.0.0.0 port 8080 (http://0.0.0.0:8080/) ...
+[?2004hroot@6b59ef50ab31:/var/www/html# cd /tmp && rm -rf /tmp/testrepro && git clone /git/server /tmp/testrepro
+[?2004lCloning into '/tmp/testrepro'...
+warning: You appear to have cloned an empty repository.
+done.
+[?2004hroot@6b59ef50ab31:/tmp# cd /tmp/testrepro && echo 'hello world' > hello.html && git add hello.html && git commit -m 'add hello.html'
+[?2004lAuthor identity unknown
+
+*** Please tell me who you are.
+
+Run
+
+  git config --global user.email "you@example.com"
+  git config --global user.name "Your Name"
+
+to set your account's default identity.
+Omit --global to set the identity only in this repository.
+
+fatal: unable to auto-detect email address (got 'root@6b59ef50ab31.(none)')
+[?2004hroot@6b59ef50ab31:/tmp/testrepro# git config --global user.email "test@test.com" && git config --global user.name "Test User"
+[?2004l[?2004hroot@6b59ef50ab31:/tmp/testrepro# cd /tmp/testrepro && git add hello.html && git commit -m 'add hello.html'
+[?2004l[master (root-commit) ada70f0] add hello.html
+ 1 file changed, 1 insertion(+)
+ create mode 100644 hello.html
+[?2004hroot@6b59ef50ab31:/tmp/testrepro# cd /tmp/testrepro && git push origin master
+[?2004lEnumerating objects: 3, done.
+Counting objects:  33% (1/3)Counting objects:  66% (2/3)Counting objects: 100% (3/3)Counting objects: 100% (3/3), done.
+Writing objects:  33% (1/3)Writing objects:  66% (2/3)Writing objects: 100% (3/3)Writing objects: 100% (3/3), 221 bytes | 221.00 KiB/s, done.
+Total 3 (delta 0), reused 0 (delta 0), pack-reused 0
+remote: From /git/server[K
+remote:  * branch            master     -> FETCH_HEAD[K
+remote:  * [new branch]      master     -> origin/master[K
+To /git/server
+ * [new branch]      master -> master
+[?2004hroot@6b59ef50ab31:/tmp/testrepro# curl -s http://127.0.0.1:8080/hello.html
+[?2004l127.0.0.1 - - [18/May/2026 23:40:26] "GET /hello.html HTTP/1.1" 200 -
+hello world
+[?2004hroot@6b59ef50ab31:/tmp/testrepro# 127.0.0.1 - - [18/May/2026 23:40:48] "GET /hello.html HTTP/1.1" 200 -
+127.0.0.1 - - [18/May/2026 23:40:48] "GET /hello.html HTTP/1.1" 200 -

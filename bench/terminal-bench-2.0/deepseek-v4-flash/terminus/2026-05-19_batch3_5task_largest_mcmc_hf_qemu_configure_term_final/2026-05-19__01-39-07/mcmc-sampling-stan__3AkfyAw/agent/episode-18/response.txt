@@ -1,0 +1,13 @@
+```json
+{
+  "analysis": "The compilation failed because of missing lapack, blas, and gfortran libraries. These are linear algebra libraries needed by RcppEigen (and StanHeaders). I need to install the system packages for these.",
+  "plan": "Install lapack, blas, gfortran development libraries (liblapack-dev, libblas-dev, gfortran).",
+  "commands": [
+    {
+      "keystrokes": "apt-get install -y -qq liblapack-dev libblas-dev gfortran 2>&1 | tail -5\n",
+      "duration": 5.0
+    }
+  ],
+  "task_complete": false
+}
+```

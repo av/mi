@@ -1,0 +1,11 @@
+{
+  "analysis": "The QEMU process was stopped immediately. Perhaps the shell stops background jobs when they try to access the terminal. I should use `nohup` and redirect I/O properly, or use `setsid` to start QEMU in a new session group. Let me also check available commands for network testing.",
+  "plan": "1. Install netstat/netcat or just use /dev/tcp to probe\n2. Start QEMU with setsid and nohup for proper backgrounding\n3. Wait for port to become active\n4. Signal completion",
+  "commands": [
+    {
+      "keystrokes": "apt-get install -y netcat-openbsd 2>/dev/null || true\nwhich nc nc.traditional 2>/dev/null\n",
+      "duration": 1.0
+    }
+  ],
+  "task_complete": false
+}

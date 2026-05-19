@@ -1,0 +1,9 @@
+Current terminal state:
+New Terminal Output:
+
+root@e0dc3a2d2af7:/app# jobs -l
+[1]+  1880 Running                 nohup python3 /app/app.py > /app/flask_output.log 2>&1 &
+root@e0dc3a2d2af7:/app#
+
+
+Are you sure you want to mark the task as complete? This will trigger your solution to be graded and you won't be able to make any further corrections. If so, include "task_complete": true in your JSON response again.

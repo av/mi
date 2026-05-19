@@ -1,0 +1,23 @@
+New Terminal Output:
+
+root@e0dc3a2d2af7:/app# echo "--- Negative test ---" && curl -s -X POST http://127.0.0.1:5000/sentiment -H "Content-Type: application/json" -d '{"text"This is t
+errible!"}' && echo "" && echo "--- Missing text field ---" && curl -s -X POST http://127.0.0.1:5000/sentiment -H "Content-Type: application/json" -d '{}' && ec
+ho "" && echo "--- Model cache ---" && ls -la /app/model_cache/sentiment_model/ 2>/dev/null | head -10
+--- Negative test ---
+<!doctype html>
+<html lang=en>
+<title>400 Bad Request</title>
+<h1>Bad Request</h1>
+<p>The browser (or proxy) sent a request that this server could not understand.</p>
+
+--- Missing text field ---
+{"error":"Missing 'text' field in JSON body"}
+
+--- Model cache ---
+total 0
+drwxr-xr-x. 1 root root 128 May 18 23:47 .
+drwxr-xr-x. 1 root root  30 May 18 23:43 ..
+drwxr-xr-x. 1 root root 110 May 18 23:47 .locks
+drwxr-xr-x. 1 root root  54 May 18 23:48 models--distilbert-base-uncased-finetuned-sst-2-english
+drwxr-xr-x. 1 root root  66 May 18 23:47 xet
+root@e0dc3a2d2af7:/app#

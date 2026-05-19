@@ -1,0 +1,13 @@
+```json
+{
+  "analysis": "The terminal appears to be stuck in an incomplete command. I need to send a simple command to check and reset the terminal state.",
+  "plan": "Send Ctrl+C to cancel any ongoing operation, then list directory contents.",
+  "commands": [
+    {
+      "keystrokes": "C-c",
+      "duration": 0.2
+    }
+  ],
+  "task_complete": false
+}
+```

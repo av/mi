@@ -1,0 +1,5 @@
+New Terminal Output:
+
+root@e0dc3a2d2af7:/app# kill $(lsof -i :5000 2>/dev/null || fuser 5000/tcp 2>/dev/null || (apt-get install -y net-tools 2>&1 | tail -3 && netstat -tlnp 2>/dev/n
+ull | grep 5000)
+>

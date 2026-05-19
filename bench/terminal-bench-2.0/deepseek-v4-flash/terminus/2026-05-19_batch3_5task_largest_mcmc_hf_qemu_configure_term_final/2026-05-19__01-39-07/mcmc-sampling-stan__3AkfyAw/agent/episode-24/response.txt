@@ -1,0 +1,13 @@
+```json
+{
+  "analysis": "The installation is finishing up. Let me wait and then check properly.",
+  "plan": "Wait and then verify installation.",
+  "commands": [
+    {
+      "keystrokes": "",
+      "duration": 15.0
+    }
+  ],
+  "task_complete": false
+}
+```

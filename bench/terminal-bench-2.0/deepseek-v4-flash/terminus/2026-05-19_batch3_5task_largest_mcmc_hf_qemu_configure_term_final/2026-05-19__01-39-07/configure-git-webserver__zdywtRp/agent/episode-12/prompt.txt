@@ -1,0 +1,16 @@
+New Terminal Output:
+
+root@6b59ef50ab31:/tmp/testrepro# cd /tmp/testrepro && git push origin master
+Enumerating objects: 3, done.
+Counting objects: 100% (3/3), done.
+Writing objects: 100% (3/3), 221 bytes | 221.00 KiB/s, done.
+Total 3 (delta 0), reused 0 (delta 0), pack-reused 0
+remote: From /git/server
+remote:  * branch            master     -> FETCH_HEAD
+remote:  * [new branch]      master     -> origin/master
+To /git/server
+ * [new branch]      master -> master
+root@6b59ef50ab31:/tmp/testrepro# curl -s http://127.0.0.1:8080/hello.html
+127.0.0.1 - - [18/May/2026 23:40:26] "GET /hello.html HTTP/1.1" 200 -
+hello world
+root@6b59ef50ab31:/tmp/testrepro#

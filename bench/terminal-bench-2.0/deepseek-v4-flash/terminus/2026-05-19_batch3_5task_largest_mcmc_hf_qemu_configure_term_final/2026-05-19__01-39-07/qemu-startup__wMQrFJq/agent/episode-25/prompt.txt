@@ -1,0 +1,10 @@
+New Terminal Output:
+
+root@c13b8dc816d1:/app# timeout 30 python3 /tmp/wait_for_login.py
+��������
+Welcome to Alpine Linux 3.19
+Kernel 6.6.4-1-lts on an x86_64 (/dev/ttyS0)
+
+localhost login:
+[Login prompt detected!]
+root@c13b8dc816d1:/app#

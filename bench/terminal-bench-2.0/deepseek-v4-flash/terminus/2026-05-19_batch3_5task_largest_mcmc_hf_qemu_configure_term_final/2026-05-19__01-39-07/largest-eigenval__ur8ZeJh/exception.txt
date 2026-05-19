@@ -1,0 +1,146 @@
+Traceback (most recent call last):
+  File "/home/everlier/.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/lib/python3.12/asyncio/tasks.py", line 520, in wait_for
+    return await fut
+           ^^^^^^^^^
+  File "/home/everlier/.cache/uv/archive-v0/bs-Xde0XyqE_1FMsha3xU/lib/python3.12/site-packages/harbor/agents/terminus_2/terminus_2.py", line 1628, in run
+    await self._run_agent_loop(
+  File "/home/everlier/.cache/uv/archive-v0/bs-Xde0XyqE_1FMsha3xU/lib/python3.12/site-packages/harbor/agents/terminus_2/terminus_2.py", line 1311, in _run_agent_loop
+    ) = await self._handle_llm_interaction(
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/everlier/.cache/uv/archive-v0/bs-Xde0XyqE_1FMsha3xU/lib/python3.12/site-packages/harbor/agents/terminus_2/terminus_2.py", line 1186, in _handle_llm_interaction
+    llm_response = await self._query_llm(
+                   ^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/everlier/.cache/uv/archive-v0/bs-Xde0XyqE_1FMsha3xU/lib/python3.12/site-packages/tenacity/asyncio/__init__.py", line 193, in async_wrapped
+    return await copy(fn, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/everlier/.cache/uv/archive-v0/bs-Xde0XyqE_1FMsha3xU/lib/python3.12/site-packages/tenacity/asyncio/__init__.py", line 112, in __call__
+    do = await self.iter(retry_state=retry_state)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/everlier/.cache/uv/archive-v0/bs-Xde0XyqE_1FMsha3xU/lib/python3.12/site-packages/tenacity/asyncio/__init__.py", line 157, in iter
+    result = await action(retry_state)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/everlier/.cache/uv/archive-v0/bs-Xde0XyqE_1FMsha3xU/lib/python3.12/site-packages/tenacity/_utils.py", line 111, in inner
+    return call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/everlier/.cache/uv/archive-v0/bs-Xde0XyqE_1FMsha3xU/lib/python3.12/site-packages/tenacity/__init__.py", line 393, in <lambda>
+    self._add_action_func(lambda rs: rs.outcome.result())
+                                     ^^^^^^^^^^^^^^^^^^^
+  File "/home/everlier/.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/lib/python3.12/concurrent/futures/_base.py", line 449, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "/home/everlier/.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/lib/python3.12/concurrent/futures/_base.py", line 401, in __get_result
+    raise self._exception
+  File "/home/everlier/.cache/uv/archive-v0/bs-Xde0XyqE_1FMsha3xU/lib/python3.12/site-packages/tenacity/asyncio/__init__.py", line 116, in __call__
+    result = await fn(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/everlier/.cache/uv/archive-v0/bs-Xde0XyqE_1FMsha3xU/lib/python3.12/site-packages/harbor/agents/terminus_2/terminus_2.py", line 1009, in _query_llm
+    llm_response = await chat.chat(
+                   ^^^^^^^^^^^^^^^^
+  File "/home/everlier/.cache/uv/archive-v0/bs-Xde0XyqE_1FMsha3xU/lib/python3.12/site-packages/harbor/llms/chat.py", line 89, in chat
+    llm_response: LLMResponse = await self._model.call(
+                                ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/everlier/.cache/uv/archive-v0/bs-Xde0XyqE_1FMsha3xU/lib/python3.12/site-packages/tenacity/asyncio/__init__.py", line 193, in async_wrapped
+    return await copy(fn, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/everlier/.cache/uv/archive-v0/bs-Xde0XyqE_1FMsha3xU/lib/python3.12/site-packages/tenacity/asyncio/__init__.py", line 112, in __call__
+    do = await self.iter(retry_state=retry_state)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/everlier/.cache/uv/archive-v0/bs-Xde0XyqE_1FMsha3xU/lib/python3.12/site-packages/tenacity/asyncio/__init__.py", line 157, in iter
+    result = await action(retry_state)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/everlier/.cache/uv/archive-v0/bs-Xde0XyqE_1FMsha3xU/lib/python3.12/site-packages/tenacity/_utils.py", line 111, in inner
+    return call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/everlier/.cache/uv/archive-v0/bs-Xde0XyqE_1FMsha3xU/lib/python3.12/site-packages/tenacity/__init__.py", line 393, in <lambda>
+    self._add_action_func(lambda rs: rs.outcome.result())
+                                     ^^^^^^^^^^^^^^^^^^^
+  File "/home/everlier/.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/lib/python3.12/concurrent/futures/_base.py", line 449, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "/home/everlier/.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/lib/python3.12/concurrent/futures/_base.py", line 401, in __get_result
+    raise self._exception
+  File "/home/everlier/.cache/uv/archive-v0/bs-Xde0XyqE_1FMsha3xU/lib/python3.12/site-packages/tenacity/asyncio/__init__.py", line 116, in __call__
+    result = await fn(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/everlier/.cache/uv/archive-v0/bs-Xde0XyqE_1FMsha3xU/lib/python3.12/site-packages/harbor/llms/lite_llm.py", line 359, in call
+    response = await litellm.acompletion(**completion_kwargs)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/everlier/.cache/uv/archive-v0/bs-Xde0XyqE_1FMsha3xU/lib/python3.12/site-packages/litellm/utils.py", line 1898, in wrapper_async
+    result = await original_function(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/everlier/.cache/uv/archive-v0/bs-Xde0XyqE_1FMsha3xU/lib/python3.12/site-packages/litellm/main.py", line 637, in acompletion
+    response = await init_response
+               ^^^^^^^^^^^^^^^^^^^
+  File "/home/everlier/.cache/uv/archive-v0/bs-Xde0XyqE_1FMsha3xU/lib/python3.12/site-packages/litellm/llms/openai/openai.py", line 930, in acompletion
+    headers, response = await self.make_openai_chat_completion_request(
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/everlier/.cache/uv/archive-v0/bs-Xde0XyqE_1FMsha3xU/lib/python3.12/site-packages/litellm/litellm_core_utils/logging_utils.py", line 297, in async_wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/everlier/.cache/uv/archive-v0/bs-Xde0XyqE_1FMsha3xU/lib/python3.12/site-packages/litellm/llms/openai/openai.py", line 438, in make_openai_chat_completion_request
+    await openai_aclient.chat.completions.with_raw_response.create(
+  File "/home/everlier/.cache/uv/archive-v0/bs-Xde0XyqE_1FMsha3xU/lib/python3.12/site-packages/openai/_legacy_response.py", line 384, in wrapped
+    return cast(LegacyAPIResponse[R], await func(*args, **kwargs))
+                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/everlier/.cache/uv/archive-v0/bs-Xde0XyqE_1FMsha3xU/lib/python3.12/site-packages/openai/resources/chat/completions/completions.py", line 2739, in create
+    return await self._post(
+           ^^^^^^^^^^^^^^^^^
+  File "/home/everlier/.cache/uv/archive-v0/bs-Xde0XyqE_1FMsha3xU/lib/python3.12/site-packages/openai/_base_client.py", line 1931, in post
+    return await self.request(cast_to, opts, stream=stream, stream_cls=stream_cls)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/everlier/.cache/uv/archive-v0/bs-Xde0XyqE_1FMsha3xU/lib/python3.12/site-packages/openai/_base_client.py", line 1648, in request
+    response = await self._send_request(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/everlier/.cache/uv/archive-v0/bs-Xde0XyqE_1FMsha3xU/lib/python3.12/site-packages/openai/_client.py", line 946, in _send_request
+    return await self._send_with_auth_retry(request, stream=stream, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/everlier/.cache/uv/archive-v0/bs-Xde0XyqE_1FMsha3xU/lib/python3.12/site-packages/openai/_client.py", line 924, in _send_with_auth_retry
+    response = await super()._send_request(request, stream=stream, **kwargs)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/everlier/.cache/uv/archive-v0/bs-Xde0XyqE_1FMsha3xU/lib/python3.12/site-packages/openai/_base_client.py", line 1571, in _send_request
+    return await self._client.send(request, stream=stream, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/everlier/.cache/uv/archive-v0/bs-Xde0XyqE_1FMsha3xU/lib/python3.12/site-packages/httpx/_client.py", line 1643, in send
+    raise exc
+  File "/home/everlier/.cache/uv/archive-v0/bs-Xde0XyqE_1FMsha3xU/lib/python3.12/site-packages/httpx/_client.py", line 1637, in send
+    await response.aread()
+  File "/home/everlier/.cache/uv/archive-v0/bs-Xde0XyqE_1FMsha3xU/lib/python3.12/site-packages/httpx/_models.py", line 979, in aread
+    self._content = b"".join([part async for part in self.aiter_bytes()])
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/everlier/.cache/uv/archive-v0/bs-Xde0XyqE_1FMsha3xU/lib/python3.12/site-packages/httpx/_models.py", line 997, in aiter_bytes
+    async for raw_bytes in self.aiter_raw():
+  File "/home/everlier/.cache/uv/archive-v0/bs-Xde0XyqE_1FMsha3xU/lib/python3.12/site-packages/httpx/_models.py", line 1055, in aiter_raw
+    async for raw_stream_bytes in self.stream:
+  File "/home/everlier/.cache/uv/archive-v0/bs-Xde0XyqE_1FMsha3xU/lib/python3.12/site-packages/httpx/_client.py", line 176, in __aiter__
+    async for chunk in self._stream:
+  File "/home/everlier/.cache/uv/archive-v0/bs-Xde0XyqE_1FMsha3xU/lib/python3.12/site-packages/litellm/llms/custom_httpx/aiohttp_transport.py", line 86, in __aiter__
+    async for chunk in self._aiohttp_response.content.iter_chunked(
+  File "/home/everlier/.cache/uv/archive-v0/bs-Xde0XyqE_1FMsha3xU/lib/python3.12/site-packages/aiohttp/streams.py", line 53, in __anext__
+    rv = await self.read_func()
+         ^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/everlier/.cache/uv/archive-v0/bs-Xde0XyqE_1FMsha3xU/lib/python3.12/site-packages/aiohttp/streams.py", line 456, in read
+    await self._wait("read")
+  File "/home/everlier/.cache/uv/archive-v0/bs-Xde0XyqE_1FMsha3xU/lib/python3.12/site-packages/aiohttp/streams.py", line 372, in _wait
+    await waiter
+asyncio.exceptions.CancelledError
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/everlier/.cache/uv/archive-v0/bs-Xde0XyqE_1FMsha3xU/lib/python3.12/site-packages/harbor/trial/trial.py", line 238, in _run_agent_phase
+    await asyncio.wait_for(
+  File "/home/everlier/.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/lib/python3.12/asyncio/tasks.py", line 519, in wait_for
+    async with timeouts.timeout(timeout):
+               ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/everlier/.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/lib/python3.12/asyncio/timeouts.py", line 115, in __aexit__
+    raise TimeoutError from exc_val
+TimeoutError
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/everlier/.cache/uv/archive-v0/bs-Xde0XyqE_1FMsha3xU/lib/python3.12/site-packages/harbor/trial/single_step.py", line 63, in _run_agent
+    await self._run_agent_phase(
+  File "/home/everlier/.cache/uv/archive-v0/bs-Xde0XyqE_1FMsha3xU/lib/python3.12/site-packages/harbor/trial/trial.py", line 247, in _run_agent_phase
+    raise AgentTimeoutError(
+harbor.trial.errors.AgentTimeoutError: Agent execution timed out after 900.0 seconds

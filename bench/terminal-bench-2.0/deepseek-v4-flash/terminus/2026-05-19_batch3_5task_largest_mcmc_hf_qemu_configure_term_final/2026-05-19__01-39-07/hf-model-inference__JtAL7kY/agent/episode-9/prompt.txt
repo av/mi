@@ -1,0 +1,4 @@
+Previous response had parsing errors:
+ERROR: Invalid JSON: Expecting ',' delimiter: line 14 column 3 (char 2054) | Content preview: '{\n  "analysis": "The file has multiple syntax errors. I need to rewrite it correctly. Since heredoc '...
+
+Please fix these issues and provide a proper JSON response.

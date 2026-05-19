@@ -1,0 +1,19 @@
+{
+  "analysis": "Git is installed. Now I need to create the bare git repository at /git/server, a working directory for the web server, configure the post-update hook, and start an HTTP server on port 8080.",
+  "plan": "Create /git/server bare repo. Create /var/www/html (or /var/www/html) as working directory. Clone bare into working dir. Set up post-update hook to pull. Start Python HTTP server on port 8080.",
+  "commands": [
+    {
+      "keystrokes": "mkdir -p /git /var/www/html\n",
+      "duration": 0.1
+    },
+    {
+      "keystrokes": "cd /git && git init --bare server\n",
+      "duration": 0.3
+    },
+    {
+      "keystrokes": "git clone /git/server /var/git/server /var/www/html\n",
+      "duration": 0.3
+    }
+  ],
+  "task_complete": false
+}

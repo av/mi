@@ -1,0 +1,54 @@
+New Terminal Output:
+
+root@e0dc3a2d2af7:/app# python3 -c "
+> import os
+> os.environ['TRANSFORMERS_CACHE'] = '/app/model_cache/sentiment_model_cache/sentiment_model'
+> os.environ['HF_HOME'] = '/app/model_cache/sentiment_model'
+>
+> code = '''import os
+> os.environ[\"TRANSFORMERS_CACHE\"] = \"/app/model_cache/sentiment_model\"\nos.environ[\"HF_HOME\"] = \"/app/model_cache/sentiment_model\"\n
+> from flask import Flask, request, jsonify
+> from transformers import pipeline
+>
+> app = Flask(__name__)
+>
+> print(\"Loading model...\")
+> sentiment_pipeline = pipeline(
+>     \"sentiment-analysis\",
+>     model=\"distilbert-base-uncased-finetuned-sst-2-english\"
+> )
+> print(\"Model loaded successfully\")
+>
+> @app.route('/sentiment', methods=['POST'])
+> def sentiment()
+> def sentiment():
+>     if not request.is_json:
+>         return jsonify({\"error\": \"Request must be JSON\"Request must be JSON\"}), 400
+>     data = request.get_json()
+>     if not data or 'text' not in data:
+>         return jsonify({\"error\": \"Missing 'text' field in JSON body\"}), 400
+>     text = data['text']
+>     if not isinstance(text, str) or not text.strip():
+>         return jsonify({\"error\": \"'text' field must be a non-empty string\"}), 400
+>     try:
+>         result = sentiment_pipeline(text)
+>         label = result[0]['label']
+>         score = result[0]['score']
+>         sentiment = \"positive\" if label.upper() == \"POSITIVE\" else \"negative\"
+>         confidence = {
+>             \"positive\": score if sentiment == \"positive\" else 1 - score,
+>             \"negative\": 1 - score if sentiment == \"positive\" else score
+>         }
+>         return jsonify({\"sentiment\": sentiment, \"confidence\":})
+>     except Exception as e:
+>         return jsonify({\"error\": str(e)}), 500
+>
+> if __name__ == '__main__':
+>     app.run(host='0.0.0.0', port=0.0.0.0', port=5000)
+> '''
+> with open('/app/app.py', 'w') as f:
+>     f.write(code)
+> print('Done')
+> "
+Done
+root@e0dc3a2d2af7:/app#

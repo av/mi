@@ -1,0 +1,17 @@
+```json
+{
+  "analysis": "The terminal seems to be stuck in a heredoc. I need to send a Ctrl+C signal to cancel any ongoing heredoc/input. I'll use the proper method to send Ctrl+C.",
+  "plan": "Send Ctrl+C to cancel any ongoing operation, then check the terminal state.",
+  "commands": [
+    {
+      "keystrokes": "C-c",
+      "duration": 0.2
+    },
+    {
+      "keystrokes": "",
+      "duration": 0.1
+    }
+  ],
+  "task_complete": false
+}
+```

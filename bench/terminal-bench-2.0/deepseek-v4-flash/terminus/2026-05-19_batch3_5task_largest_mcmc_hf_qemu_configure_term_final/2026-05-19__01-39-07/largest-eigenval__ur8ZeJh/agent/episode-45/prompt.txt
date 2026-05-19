@@ -1,0 +1,17 @@
+Previous response had warnings:
+WARNINGS: - Extra text detected after JSON object
+
+New Terminal Output:
+
+root@1cf7d2c19296:/app# cat > /app/bench_lapack.py << 'ENDSCRIPT'
+> import numpy as np
+> import time
+>
+> # Try to access low-level LAPACK routines
+> from scipy.linalg import lapack
+>
+> # Check if dgeev (real non-symmetric eigen) is available
+> print(dir(lapack))
+> ENDSCRIPT
+root@1cf7d2c19296:/app# python3 /app/bench_lapack.py 2>&1
+

@@ -1,0 +1,41 @@
+Previous response had warnings:
+WARNINGS: - Extra text detected before JSON object
+- Extra text detected after JSON object
+
+New Terminal Output:
+
+root@1cf7d2c19296:/app# python3 -c "
+> import numpy as np
+> import time
+> from scipy.sparse.linalg import eigs as sparse_eigs
+>
+> for size in [2,4,6,8,10]:
+>     A = np.random.normal(size=(size,size)).astype(np.float64)
+>     print(f'{size}x{size}: ', end='')
+>
+>     # np.linalg.eig reference
+>     t0 = time.perf_counter()
+>     for _ in range(200):
+>         evals, evecs = np.linalg.eig(A)
+>         idx = np.abs(evals).argmax()
+>     t1 = time.perf_counter()
+>     print(f'np.eig={(t1-t0)/200*1e6:.3f}us ', end='')
+>
+>     # sparse eigs
+>     t0 = time.perf_counter()
+>     for _ in range(200):
+>         try:
+>             val, vec = sparse_eigs(A, k=1, which='LM', maxiter=1000)
+>             # returns arrays
+>         except:
+>             pass
+>     t1 = time.perf_counter()
+>     print(f'sparse.eigs={(t1-t0)/200*1e6:.3f}us')
+> "
+<string>:22: RuntimeWarning: k >= N - 1 for N * N square matrix. Attempting to use scipy.linalg.eig instead.
+2x2: np.eig=9.328us sparse.eigs=13.831us
+4x4: np.eig=9.871us sparse.eigs=76.430us
+6x6: np.eig=14.865us sparse.eigs=329.293us
+8x8: np.eig=17.436us sparse.eigs=127.130us
+10x10: np.eig=23.382us sparse.eigs=148.861us
+root@1cf7d2c19296:/app#

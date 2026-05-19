@@ -1,0 +1,11 @@
+{
+  "analysis": "Let me do a final verification by actually connecting with telnet to confirm the login prompt appears, just to be safe.",
+  "plan": "Connect via nc (or telnet if available) to check if login prompt is visible, send a newline to see if we get the prompt back.",
+  "commands": [
+    {
+      "keystrokes": "echo '' | timeout 3 telnet 127.0.0.1 6665 2>&1 || true\n",
+      "duration": 3.5
+    }
+  ],
+  "task_complete": false
+}

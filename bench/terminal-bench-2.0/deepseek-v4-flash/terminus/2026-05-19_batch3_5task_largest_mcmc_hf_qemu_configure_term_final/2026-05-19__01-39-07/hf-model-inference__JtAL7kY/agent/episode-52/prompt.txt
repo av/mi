@@ -1,0 +1,16 @@
+New Terminal Output:
+
+root@e0dc3a2d2af7:/app# sleep 15 && cat /app/flask_output.log
+[1]+  Exit 1                  nohup python3 /app/app.py > /app/flask_output.log 2>&1
+nohup: ignoring input
+/usr/local/lib/python3.13/site-packages/transformers/utils/hub.py:111: FutureWarning: Using `TRANSFORMERS_CACHE` is deprecated and will be removed in v5 of Tran
+sformers. Use `HF_HOME` instead.
+  warnings.warn(
+Device set to use cpu
+Loading model...
+Model loaded successfully
+ * Serving Flask app 'app'
+ * Debug mode: off
+Address already in use
+Port 5000 is in use by another program. Either identify and stop that program, or start the server with a different port.
+root@e0dc3a2d2af7:/app#

@@ -1,0 +1,11 @@
+{
+  "analysis": "I have alpine.iso (1GB) and qemu-system-x86_64 is installed. I also have an optional disk image alpine-disk.qcow2 (197KB). I'll start QEMU with serial output redirected to a telnet server on port 6665, booting from the ISO, without graphics. I'll run it in background and wait until port 6665 is listening.",
+  "plan": "1. Start QEMU with:\n   - `-cdrom /app/alpine.iso`\n   - `-hda /app/alpine-disk.qcow2` (for persistence if needed)\n   - `-serial telnet:0.0.0.0:6665,server,nowait`\n   - `-nographic` (no graphical output)\n   - `-m 256M` (256 MB RAM)\n   - `-boot d` (boot from CD-ROM)\n   Run in background with `&` and redirect stderr/stdout to a log file.\n2. Use a loop to wait until netstat or ss shows port 6665 is listening\n3. Then indicate task is complete",
+  "commands": [
+    {
+      "keystrokes": "qemu-system-x86_64 -cdrom /app/alpine.iso -hda /app/alpine-disk.qcow2 -serial telnet:0.0.0.0:6665,server,nowait -nographic -m 256M -boot d &> /tmp/qemu.log &\necho $!\n",
+      "duration": 0.5
+    }
+  ],
+  "task_complete": false
+}

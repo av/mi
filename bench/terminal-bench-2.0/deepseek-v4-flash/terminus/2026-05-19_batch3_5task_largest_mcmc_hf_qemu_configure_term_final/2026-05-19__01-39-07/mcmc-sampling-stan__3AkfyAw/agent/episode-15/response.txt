@@ -1,0 +1,13 @@
+```json
+{
+  "analysis": "The installation is still ongoing, currently installing 'posterior' package. It hasn't reached StanHeaders/rstan yet. This will take a long time. Let me wait more.",
+  "plan": "Continue waiting for installation to complete.",
+  "commands": [
+    {
+      "keystrokes": "",
+      "duration": 60.0
+    }
+  ],
+  "task_complete": false
+}
+```

@@ -1,0 +1,16 @@
+Previous response had warnings:
+WARNINGS: - Extra text detected after JSON object
+
+New Terminal Output:
+
+root@1cf7d2c19296:/app# rm -f bench*.py
+root@1cf7d2c19296:/app# python3 -c "
+> from scipy.linalg.linalg.lapack import get_lapack_funcs
+> import numpy as np
+> dgeev = get_lapack_funcs('geev', dtype=np.float64)
+> # Check signature
+> import inspect
+> sig = dgeev.__doc__
+> print(sig[:500] if sig else 'No docstring')
+> "
+

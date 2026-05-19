@@ -1,0 +1,5 @@
+New Terminal Output:
+
+root@e0dc3a2d2af7:/app# sleep 5 && cat /app/flask_output.log
+nohup: ignoring input
+root@e0dc3a2d2af7:/app#

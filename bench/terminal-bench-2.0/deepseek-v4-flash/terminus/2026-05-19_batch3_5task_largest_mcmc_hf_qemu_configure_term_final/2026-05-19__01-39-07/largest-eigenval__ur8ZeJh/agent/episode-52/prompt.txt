@@ -1,0 +1,21 @@
+Previous response had warnings:
+WARNINGS: - Extra text detected before JSON object
+- Extra text detected after JSON object
+
+New Terminal Output:
+
+root@1cf7d2c19296:/app# sed -i '85d' /app/bench_v6.py
+root@1cf7d2c19296:/app# python3 /app/bench_v6.py
+Testing...
+
+--- 2x2 ---
+np.eig: 8.585 us
+Traceback (most recent call last):
+  File "/app/bench_v6.py", line 95, in <module>
+    ev, evec = method_lapack(A)
+               ~~~~~~~~~~~~~^^^
+  File "/app/bench_v6.py", line 12, in method_lapack
+    w, vl, vr, info = dgeev(A, compute_vl=False, compute_vr=True)
+    ^^^^^^^^^^^^^^^
+ValueError: too many values to unpack (expected 4)
+root@1cf7d2c19296:/app#

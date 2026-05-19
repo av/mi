@@ -1,0 +1,53 @@
+Previous response had warnings:
+WARNINGS: - Extra text detected before JSON object
+- Extra text detected after JSON object
+
+New Terminal Output:
+
+Done
+root@1cf7d2c19296:/app# cat /app/bench_final.py
+
+import numpy as np
+import time
+
+def method_eig(A):
+    evals, evecs = np.linalg.eig(A)
+    idx = np.abs(evals).argmax()
+    return evals[idx], evecs[:, idx]
+
+def method_power(A, iters=20):
+    n = A.shape[0]
+    v = np.ones(n)
+    v /= np.linalg.norm(v)
+    for _ in range(iters):
+        v = A @ v
+        norm = np.linalg.norm(v)
+        if norm == 0:
+            break
+        v /= norm
+    lam = (v @ A @ v) / (v @ v)
+    return lam, v
+
+def method_rayleigh_quotient(A, iters=5):
+    n = A.shape[0]
+    v = np.ones(n)
+    v /= np.))
+    for _ in range(iters):
+        # Rayleigh quotient iteration
+        v = np.linalg.solve(A - (v @ A @ v) / (v @ v @ v @ np.eye(n), v)
+        v /= np.linalg.norm(v)
+    lam = (v.conj() @ A @ v) / (v.conj() @ v)
+    return lam, v
+
+print('Testing methods...')
+for size in [2,4,6,8,10]:
+    A = np.random.normal(size=(size,size)).astype(np.float64)
+    print(f'--- {size}x{size} ---')
+
+    t0 = time.perf_counter()
+    for _ in range(200):
+        method_eig(A)
+    t1 = time.))
+    print(f'np.eig: {(t1-t0)/200*1e6:.3f} us')
+root@1cf7d2c19296:/app# python3 -c " 2>&1 || echo 'Error running bench_final'
+>

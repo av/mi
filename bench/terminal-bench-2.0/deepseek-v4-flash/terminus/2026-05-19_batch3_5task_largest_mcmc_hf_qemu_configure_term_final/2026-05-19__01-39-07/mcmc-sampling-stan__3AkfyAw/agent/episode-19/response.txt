@@ -1,0 +1,17 @@
+```json
+{
+  "analysis": "Gfortran, lapack dev, blas dev installed. Now let's retry installing RcppEigen and StanHeaders. But first check the memory because StanHeaders compilation needs a lot of memory and may fail due to OOM.",
+  "plan": "Check available memory and then try installing RcppEigen again.",
+  "commands": [
+    {
+      "keystrokes": "free -g\n",
+      "duration": 0.1
+    },
+    {
+      "keystrokes": "R -e \"install.packages('RcppEigen', repos='https://cloud.r-project.org/')\" 2>&1\n",
+      "duration": 30.0
+    }
+  ],
+  "task_complete": false
+}
+```

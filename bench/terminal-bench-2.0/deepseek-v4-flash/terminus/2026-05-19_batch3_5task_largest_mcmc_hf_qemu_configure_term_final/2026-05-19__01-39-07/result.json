@@ -1,0 +1,49 @@
+{
+    "id": "1741899c-2783-41a9-adb4-f0c3a9cbf86e",
+    "started_at": "2026-05-19T01:39:08.486184",
+    "updated_at": "2026-05-19T02:13:38.416275",
+    "finished_at": "2026-05-19T02:13:38.416275",
+    "n_total_trials": 5,
+    "stats": {
+        "n_completed_trials": 5,
+        "n_errored_trials": 1,
+        "n_running_trials": 0,
+        "n_pending_trials": 0,
+        "n_cancelled_trials": 0,
+        "n_retries": 0,
+        "evals": {
+            "terminus-2__deepseek/deepseek-v4-flash__terminal-bench": {
+                "n_trials": 5,
+                "n_errors": 1,
+                "metrics": [
+                    {
+                        "mean": 0.6
+                    }
+                ],
+                "pass_at_k": {},
+                "reward_stats": {
+                    "reward": {
+                        "0.0": [
+                            "largest-eigenval__ur8ZeJh",
+                            "hf-model-inference__JtAL7kY"
+                        ],
+                        "1.0": [
+                            "configure-git-webserver__zdywtRp",
+                            "qemu-startup__wMQrFJq",
+                            "mcmc-sampling-stan__3AkfyAw"
+                        ]
+                    }
+                },
+                "exception_stats": {
+                    "AgentTimeoutError": [
+                        "largest-eigenval__ur8ZeJh"
+                    ]
+                }
+            }
+        },
+        "n_input_tokens": 3773969,
+        "n_cache_tokens": 2932735,
+        "n_output_tokens": 123016,
+        "cost_usd": null
+    }
+}

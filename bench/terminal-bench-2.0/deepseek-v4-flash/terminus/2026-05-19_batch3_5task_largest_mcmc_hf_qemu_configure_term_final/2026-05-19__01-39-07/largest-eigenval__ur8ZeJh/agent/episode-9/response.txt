@@ -1,0 +1,13 @@
+```json
+{
+  "analysis": "I need to write a proper benchmark script. Let me use Python inline to test various fast eigenvalue methods.",
+  "plan": "Run Python inline to test various fast methods for eigenvalue computation on-dominant eigenvalue computation.",
+  "commands": [
+    {
+      "keystrokes": "python3 -c \"\nimport numpy as np\nimport time\n\ndef method_np_eig(A):\n    evals, evecs = np.linalg.eig(A)\n    idx = np.argmax(np.abs(evals))\n    return evals[idx], evecs[:, idx]\n\ndef method_eigvals_inverse(A):\n    evals = np.linalg.eigvals(A)\n    idx = np.argmax(np.abs(evals))\n    lam = evals[idx]\n    n = A.shape\n    v = np.ones(n, dtype=np.complex128)\n    for _ in range(5):\n        v = np.linalg.solve(A - lam * np.eye(n), v)\n        v /= np.linalg.norm(v)\n    return lam, v\n\nfor size in [2,4,6,8,10]:\n    A = np.random.normal(size=(size,size)).astype(np.float64)\n    print(f'--- {size}x{size} ---')\n    \n    t0 = time.perf_counter()\n time.perf_counter()\n    for _ in range(200):\n        method_np(A)\n    t1 = time.perf_counter()\n    print(f'np.eig: {(t1-t0)/200*1e6:.3f} us')\n    \n    t0 = time.perf_counter()\n    for _ in range(200):\n        try:\n            method_eigvals_inverse(A)\n        except:\n            pass\n    t1 = time()\n    print(f'eigvals+inv: {(t1-t0)/200*1e6:.3f} us')\n\"\n",
+      "duration": 2.0
+    }
+  ],
+  "task_complete": false
+}
+```

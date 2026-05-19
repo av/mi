@@ -1,0 +1,25 @@
+Previous response had warnings:
+WARNINGS: - Extra text detected before JSON object
+- Extra text detected after JSON object
+
+New Terminal Output:
+
+ls /usr/local/lib/R/site-library/ | grep stan
+ar -rs ../inst/lib//libStanServices.a stan_fit.o stan_fit_base.o
+ar: creating ../inst/lib//libStanServices.a
+installing to /usr/local/lib/R/site-library/00LOCK-rstan/00new/rstan/libs
+** R
+** exec
+** inst
+** byte-compile and prepare package for lazy loading
+** help
+*** installing help indices
+*** copying figures
+** building package indices
+** installing vignettes
+** testing if installed package can be loaded from temporary location
+** checking absolute paths in shared objects and dynamic libraries
+** testing if installed package can be loaded from final location
+ps aux | grep -i R | grep -v grep
+ls /usr/local/lib/R/site-library/ | grep -i rstan
+

@@ -1,0 +1,33 @@
+Previous response had warnings:
+WARNINGS: - Extra text detected before JSON object
+- Extra text detected after JSON object
+
+New Terminal Output:
+
+root@e91006c5764b:/app# cd /app && Rscript analysis.R 2>&1
+Loading required package: StanHeaders
+
+rstan version 2.32.7 (Stan version 2.32.2)
+
+For execution on a local, multicore CPU with excess RAM we recommend calling
+options(mc.cores = parallel::detectCores()).
+To avoid recompilation of unchanged Stan programs, we recommend calling
+rstan_options(auto_write = TRUE)
+For within-chain threading using `reduce_sum()` or `map_rect()` Stan functions,
+change `threads_per_chain` option:
+rstan_options(threads_per_chain = 1)
+
+
+SAMPLING FOR MODEL 'anon_model' NOW (CHAIN 1).
+Chain 1:
+Chain 1: Gradient evaluation took 2e-05 seconds
+Chain 1: 1000 transitions using 10 leapfrog steps per transition would take 0.2 seconds.
+Chain 1: Adjust your expectations accordingly!
+Chain 1:
+Chain 1:
+Chain 1: Iteration:     1 / 100000 [  0%]  (Warmup)
+Chain 1: Iteration: 10000 / 100000 [ 10%]  (Warmup)
+Chain 1: Iteration: 20000 / 100000 [ 20%]  (Warmup)
+Chain 1: Iteration: 30000 / 100000 [ 30%]  (Warmup)
+Chain 1: Iteration: 40000 / 100000 [ 40%]  (Warmup)
+
