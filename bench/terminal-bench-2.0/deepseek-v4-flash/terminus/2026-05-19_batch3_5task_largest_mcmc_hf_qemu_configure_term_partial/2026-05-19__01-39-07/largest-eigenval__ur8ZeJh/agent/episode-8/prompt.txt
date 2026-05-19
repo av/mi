@@ -1,0 +1,55 @@
+Previous response had warnings:
+WARNINGS: - Extra text detected before JSON object
+- Extra text detected after JSON object
+
+New Terminal Output:
+
+root@1cf7d2c19296:/app# cat > /app/bench.py << 'ENDOFPYTHON'
+ t1 = time.perf_counter()
+    print(f"Power iter: {(t1-t0)/200*100:.6f} per call")
+ENDOFPYTHON
+> import numpy as np
+> import time
+>
+> def method_np_eig(A):
+>     evals, evecs = np.linalg.eig(A)
+>     idx = np.argmax(np.abs(evals))
+>     return evals[idx], evecs[:, idx]
+>
+> def method_power_iteration(A, max_iter=iteration(A, max_iter=200):
+>     n = A.shape[0]
+>     v = np.ones(n)
+>     v = v / np.linalg.norm(v)
+>     for _ in range(max_iter):
+>         v_new = A @ v
+>         norm = np.linalg.norm(v_new)
+>         if norm == 0:
+>             break
+>         v = v_new / norm
+>     eigenval = (v @ A @ v) / (v @ v)
+>     return eigenval, v
+>
+> np.random.seed(42)
+>
+> for size in [2,4,6,8,10]:
+>     A = np.random.normal(size=(size,size)).astype(np.float64)
+>
+>     print(f"--- {size}x{size} ---")
+>
+>     t0 = time.perf_counter()
+>     for _ in range(200):
+>         method_np_eig(A)
+>     t1 = time.perf_counter()
+>     print(f"np.eig: {(t1-t0)/200*1e6:.6f} per call")
+>
+>     t0 = time.perf_counter()
+>     for _ in range(200):
+>  range(200):
+>         try:
+>             method_power_iteration(A)
+>         except:
+>             pass
+>     t1 = time.perf_counter()
+>     print(f"Power iter: {(t1-t0)/200*100:.6f} per call")
+> ENDOFPYTHON
+root@1cf7d2c19296:/app#

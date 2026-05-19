@@ -1,0 +1,31 @@
+Previous response had warnings:
+WARNINGS: - Extra text detected before JSON object
+- Extra text detected after JSON object
+
+New Terminal Output:
+
+root@1cf7d2c19296:/app# python3 -c "
+> import numpy as np
+> import time
+> from scipy.linalg import eig as scipy_eig
+>
+> for size in [2,4,6,8,10]:
+>     A = np.random.normal(size=(size,size)).astype(np.float64)
+>     print(f'{size}x{size}: ', end='')
+>     t0 = time.perf_counter()
+>     for _ in range(200):
+>         np.linalg.eig(A)
+>     t1 = time.perf_counter()
+>     print(f'np.eig={(t1-t0)/200*1e6:.3f}us ', end='')
+>     t0 = time.perf_counter()
+>     for _ in range(200):
+>         scipy_eig(A)
+>     t1 = time.perf_counter()
+>     print(f'scipy.eig={(t1-t0)/200*1e6:.3f}us')
+> "
+2x2: np.eig=8.710us scipy.eig=12.432us
+4x4: np.eig=11.342us scipy.eig=23.047us
+6x6: np.eig=12.284us scipy.eig=27.233us
+8x8: np.eig=16.471us scipy.eig=25.826us
+10x10: np.eig=22.387us scipy.eig=36.314us
+root@1cf7d2c19296:/app#

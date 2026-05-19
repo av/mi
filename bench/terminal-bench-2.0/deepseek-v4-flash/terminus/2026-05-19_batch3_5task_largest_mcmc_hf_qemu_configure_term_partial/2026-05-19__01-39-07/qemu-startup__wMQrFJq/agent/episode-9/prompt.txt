@@ -1,0 +1,7 @@
+New Terminal Output:
+
+root@c13b8dc816d1:/app# cat /tmp/qemu.log 2>/dev/null || echo "(no log)"
+QEMU 5.2.0 monitor - type 'help' for more information
+(qemu) root@c13b8dc816d1:/app# ps aux | grep qemu
+bash: ps: command not found
+root@c13b8dc816d1:/app#

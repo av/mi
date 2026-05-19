@@ -1,0 +1,17 @@
+Previous response had warnings:
+WARNINGS: - Extra text detected before JSON object
+- Extra text detected after JSON object
+
+New Terminal Output:
+
+root@1cf7d2c19296:/app# python3 -c "import numba; print('Numb_version__)" 2>&1 || echo "numba not installed"
+  File "<string>", line 1
+    import numba; print('Numb_version__)
+                        ^
+SyntaxError: unterminated string literal (detected at line 1)
+numba not installed
+root@1cf7d2c19296:/app# pip3 install numba 2>&1 | tail -3
+
+[notice] A new release of pip is available: 25.2 -> 26.1.1
+[notice] To update, run: pip install --upgrade pip
+root@1cf7d2c19296:/app#

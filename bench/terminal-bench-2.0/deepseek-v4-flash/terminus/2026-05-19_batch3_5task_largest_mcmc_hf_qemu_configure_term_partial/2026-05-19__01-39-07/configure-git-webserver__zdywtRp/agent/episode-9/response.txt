@@ -1,0 +1,15 @@
+{
+  "analysis": "Need to set git user config first. Then commit and push.",
+  "plan": "Set git config, commit, push, then curl test.",
+  "commands": [
+    {
+      "keystrokes": "git config --global user.email \"test@test.com\" && git config --global user.name \"Test User\"\n",
+      "duration": 0.1
+    },
+    {
+      "keystrokes": "cd /tmp/testrepro && git add hello.html && git commit -m 'add hello.html'\n",
+      "duration": 0.3
+    }
+  ],
+  "task_complete": false
+}

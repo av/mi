@@ -1,0 +1,135 @@
+New Terminal Output:
+
+root@c13b8dc816d1:/app# for i in $(seq 1 30); do
+[2]-  Done                    setsid qemu-system-x86_64 -cdrom /app/alpine.iso -hda /app/alpine-disk.qcow2 -serial telnet:0.0.0.0:6665,server,nowait -nographic
+-m 256M -boot d < /dev/null &> /tmp/qemu.log
+>   if nc -z 127.0.0.1 6665 2>/dev/null; then
+>     echo "Port 6665 is ready!"
+>     exit 0
+>   fi
+>   echo "Waiting... $i"
+>   sleep 1
+> done
+Port 6665 is ready!
+exit
+There are stopped jobs.
+Waiting... 1
+Port 6665 is ready!
+exit
+There are stopped jobs.
+Waiting... 2
+Port 6665 is ready!
+exit
+There are stopped jobs.
+Waiting... 3
+Port 6665 is ready!
+exit
+There are stopped jobs.
+Waiting... 4
+Port 6665 is ready!
+exit
+There are stopped jobs.
+Waiting... 5
+Port 6665 is ready!
+exit
+There are stopped jobs.
+Waiting... 6
+Port 6665 is ready!
+exit
+There are stopped jobs.
+Waiting... 7
+Port 6665 is ready!
+exit
+There are stopped jobs.
+Waiting... 8
+Port 6665 is ready!
+exit
+There are stopped jobs.
+Waiting... 9
+Port 6665 is ready!
+exit
+There are stopped jobs.
+Waiting... 10
+Port 6665 is ready!
+exit
+There are stopped jobs.
+Waiting... 11
+Port 6665 is ready!
+exit
+There are stopped jobs.
+Waiting... 12
+Port 6665 is ready!
+exit
+There are stopped jobs.
+Waiting... 13
+Port 6665 is ready!
+exit
+There are stopped jobs.
+Waiting... 14
+Port 6665 is ready!
+exit
+There are stopped jobs.
+Waiting... 15
+Port 6665 is ready!
+exit
+There are stopped jobs.
+Waiting... 16
+Port 6665 is ready!
+exit
+There are stopped jobs.
+Waiting... 17
+Port 6665 is ready!
+exit
+There are stopped jobs.
+Waiting... 18
+Port 6665 is ready!
+exit
+There are stopped jobs.
+Waiting... 19
+Port 6665 is ready!
+exit
+There are stopped jobs.
+Waiting... 20
+Port 6665 is ready!
+exit
+There are stopped jobs.
+Waiting... 21
+Port 6665 is ready!
+exit
+There are stopped jobs.
+Waiting... 22
+Port 6665 is ready!
+exit
+There are stopped jobs.
+Waiting... 23
+Port 6665 is ready!
+exit
+There are stopped jobs.
+Waiting... 24
+Port 6665 is ready!
+exit
+There are stopped jobs.
+Waiting... 25
+Port 6665 is ready!
+exit
+There are stopped jobs.
+Waiting... 26
+Port 6665 is ready!
+exit
+There are stopped jobs.
+Waiting... 27
+Port 6665 is ready!
+exit
+There are stopped jobs.
+Waiting... 28
+Port 6665 is ready!
+exit
+There are stopped jobs.
+Waiting... 29
+Port 6665 is ready!
+exit
+There are stopped jobs.
+Waiting... 30
+root@c13b8dc816d1:/app# echo "Timed out waiting for port 6665"
+Timed out waiting for port 6665
+root@c13b8dc816d1:/app#

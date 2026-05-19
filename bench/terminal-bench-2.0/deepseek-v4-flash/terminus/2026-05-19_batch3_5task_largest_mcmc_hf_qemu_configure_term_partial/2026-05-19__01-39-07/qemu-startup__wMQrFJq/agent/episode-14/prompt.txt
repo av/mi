@@ -1,0 +1,8 @@
+New Terminal Output:
+
+root@c13b8dc816d1:/app# ps aux | grep 211 | grep -v grep
+root         211 32.4  1.0 1804556 1325704 ?     Ssl  23:52   0:41 qemu-system-x86_64 -cdrom /app/alpine.iso -hda /app/alpine-disk.qcow2 -serial telnet:0.0.0.0:
+6665,server,nowait -nographic -m 256M -boot d
+root@c13b8dc816d1:/app# cat /tmp/qemu.log 2>/dev/null | tail -20
+QEMU 5.2.0 monitor - type 'help' for more information
+(qemu) root@c13b8dc816d1:/app#

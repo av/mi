@@ -1,0 +1,7 @@
+New Terminal Output:
+
+root@6b59ef50ab31:/git# cd /var/www && git clone /git/server html
+Cloning into 'html'...
+warning: You appear to have cloned an empty repository.
+done.
+root@6b59ef50ab31:/var/www#

@@ -1,0 +1,5 @@
+New Terminal Output:
+
+root@e0dc3a2d2af7:/app# curl -s -X POST http://127.0.0.1:5000/sentiment -H "Content-Type: application/json" -d '{"text": "I love this movie!"}'
+{"confidence":{"negative":0.00012242794036865234,"positive":0.9998775720596313},"sentiment":"positive"}
+root@e0dc3a2d2af7:/app#

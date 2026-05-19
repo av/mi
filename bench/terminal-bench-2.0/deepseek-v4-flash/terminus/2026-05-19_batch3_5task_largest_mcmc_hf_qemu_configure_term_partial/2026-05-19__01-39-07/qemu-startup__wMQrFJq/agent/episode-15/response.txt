@@ -1,0 +1,11 @@
+{
+  "analysis": "Python3 is available. I'll write a Python script that connects to the telnet port, sends an initial newline (in case Alpine is at the \"boot:\" prompt), and waits for \"login:\" to appear. Once seen, it exits, indicating Alpine is ready. I'll run this with a timeout to avoid hanging forever.",
+  "plan": "1. Write a Python script that:\n   - Connects to 127.0.0.1:6665\n   - Sends carriage return (\\n) in case boot selection is needed\n   - Reads output until \"login:\" appears (or time out)\n   - Exits with success if login prompt found, failure otherwise\n2. Run the script with timeout (e.g., 120 seconds for Alpine to boot)\n3. If successful, mark task complete",
+  "commands": [
+    {
+      "keystrokes": "cat > /tmp/wait_for_login.py << 'EOF'\nimport socket\nimport sys\nimport re\nimport time\n\ndef wait_for_login(host, port, timeout=120):\n    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)\n    sock.settimeout(timeout)\n    try:\n        sock.connect((host, port))\n        # Give it a moment to start\n        time.sleep(1)\n        # Send a newline in case it's waiting at boot prompt\n        sock.send(b'\\n')\n        # Wait for login prompt\n        data = b''\n        end_time = time.time() + timeout\n        while time.time() < end_time:\n            try:\n                chunk = sock.recv(4096)\n                if not chunk:\n                    break\n                data += chunk\n                # Print received data for debugging\n                sys.stdout.write(chunk.decode('utf-8', errors='replace'))\n                sys.stdout.flush()\n                # Check for login prompt\n                if b'login:' in data or b'login' in data:\n                    print(\"\\n[Login prompt detected!]\")\n                    return True\n            except socket.timeout:\n                continue\n        print(\"\\n[Timed out waiting for login prompt]\")\n        return False\n    finally:\n        sock.close()\n\nif __name__ == '__main__':\n    if wait_for_login('127.0.0.1', 6665):\n        sys.exit(0)\n    else:\n        sys.exit(1)\nEOF\necho \"Script created\"\n",
+      "duration": 0.2
+    }
+  ],
+  "task_complete": false
+}

@@ -1,0 +1,11 @@
+{
+  "analysis": "`nc` is available. Now I'll start QEMU properly using `setsid` to ensure it runs in a new session group and isn't stopped by the shell. I'll also check the QEMU log for any immediate errors. Then loop until the telnet port is open.",
+  "plan": "1. Start QEMU with setsid: `setsid qemu-system-x86_64 ... </dev/null &>/tmp/qemu.log &`\n2. Sleep a bit then check if process is running and port is open\n3. Keep checking until port 6665 is reachable via nc\n4. Once ready, print confirmation",
+  "commands": [
+    {
+      "keystrokes": "setsid qemu-system-x86_64 -cdrom /app/alpine.iso -hda /app/alpine-disk.qcow2 -serial telnet:0.0.0.0:6665,server,nowait -nographic -m 256M -boot d </dev/null &>/tmp/qemu.log &\necho \"QEMU PID: $!\"\n",
+      "duration": 0.3
+    }
+  ],
+  "task_complete": false
+}

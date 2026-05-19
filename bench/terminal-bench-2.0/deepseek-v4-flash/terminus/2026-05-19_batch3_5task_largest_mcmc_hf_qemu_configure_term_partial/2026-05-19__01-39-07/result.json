@@ -1,0 +1,47 @@
+{
+    "id": "1741899c-2783-41a9-adb4-f0c3a9cbf86e",
+    "started_at": "2026-05-19T01:39:08.486184",
+    "updated_at": "2026-05-18T23:54:34.705562Z",
+    "finished_at": null,
+    "n_total_trials": 5,
+    "stats": {
+        "n_completed_trials": 3,
+        "n_errored_trials": 1,
+        "n_running_trials": 2,
+        "n_pending_trials": 0,
+        "n_cancelled_trials": 0,
+        "n_retries": 0,
+        "evals": {
+            "terminus-2__deepseek/deepseek-v4-flash__terminal-bench": {
+                "n_trials": 3,
+                "n_errors": 1,
+                "metrics": [
+                    {
+                        "mean": 0.3333333333333333
+                    }
+                ],
+                "pass_at_k": {},
+                "reward_stats": {
+                    "reward": {
+                        "1.0": [
+                            "configure-git-webserver__zdywtRp"
+                        ],
+                        "0.0": [
+                            "hf-model-inference__JtAL7kY",
+                            "largest-eigenval__ur8ZeJh"
+                        ]
+                    }
+                },
+                "exception_stats": {
+                    "AgentTimeoutError": [
+                        "largest-eigenval__ur8ZeJh"
+                    ]
+                }
+            }
+        },
+        "n_input_tokens": 3014486,
+        "n_cache_tokens": 2587340,
+        "n_output_tokens": 104259,
+        "cost_usd": null
+    }
+}

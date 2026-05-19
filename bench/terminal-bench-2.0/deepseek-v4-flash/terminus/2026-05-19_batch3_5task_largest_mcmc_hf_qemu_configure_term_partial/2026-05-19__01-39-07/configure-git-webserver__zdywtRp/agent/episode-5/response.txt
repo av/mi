@@ -1,0 +1,19 @@
+{
+  "analysis": "Now I have a working directory at /var/www/html cloned from the bare repo. I need to configure the post-update hook in the bare repo to pull changes to /var/www/html whenever someone pushes. Then start HTTP server on port 8080.",
+  "plan": "Create the post-update hook script in /git/server/hooks/, make it executable. Then test by starting python HTTP server in background. Then verify the setup.",
+  "commands": [
+    {
+      "keystrokes": "cat > /git/server/hooks/post-update << 'EOF'\n#!/bin/bash\ncd /var/www/html || exit\nunset GIT_DIR\ngit pull origin master\nEOF\n",
+      "duration": 0.1
+    },
+    {
+      "keystrokes": "chmod +x /git/server/hooks/post-update\n",
+      "duration": 0.1
+    },
+    {
+      "keystrokes": "ls -la /git/server/hooks/\n",
+      "duration": 0.1
+    }
+  ],
+  "task_complete": false
+}

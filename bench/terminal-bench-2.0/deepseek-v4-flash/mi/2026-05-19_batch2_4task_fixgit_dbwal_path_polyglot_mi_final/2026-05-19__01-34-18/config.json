@@ -1,0 +1,86 @@
+{
+    "job_name": "2026-05-19__01-34-18",
+    "jobs_dir": "/tmp/mi-30-eval-iter2/mi",
+    "n_attempts": 1,
+    "timeout_multiplier": 1.0,
+    "agent_timeout_multiplier": null,
+    "verifier_timeout_multiplier": null,
+    "agent_setup_timeout_multiplier": null,
+    "environment_build_timeout_multiplier": null,
+    "debug": false,
+    "n_concurrent_trials": 1,
+    "quiet": false,
+    "retry": {
+        "max_retries": 0,
+        "include_exceptions": null,
+        "exclude_exceptions": [
+            "VerifierTimeoutError",
+            "VerifierOutputParseError",
+            "AgentTimeoutError",
+            "RewardFileEmptyError",
+            "RewardFileNotFoundError"
+        ],
+        "wait_multiplier": 1.0,
+        "min_wait_sec": 1.0,
+        "max_wait_sec": 60.0
+    },
+    "environment": {
+        "type": "docker",
+        "import_path": null,
+        "force_build": false,
+        "delete": true,
+        "override_cpus": null,
+        "override_memory_mb": null,
+        "override_storage_mb": null,
+        "override_gpus": null,
+        "suppress_override_warnings": false,
+        "mounts": null,
+        "extra_docker_compose": [],
+        "env": {},
+        "kwargs": {}
+    },
+    "verifier": {
+        "override_timeout_sec": null,
+        "max_timeout_sec": null,
+        "env": {},
+        "disable": false
+    },
+    "metrics": [],
+    "agents": [
+        {
+            "name": null,
+            "import_path": "mi_harbor.mi_agent:MiAgent",
+            "model_name": "openai/deepseek/deepseek-v4-flash",
+            "skills": [],
+            "override_timeout_sec": null,
+            "override_setup_timeout_sec": null,
+            "max_timeout_sec": null,
+            "kwargs": {},
+            "env": {},
+            "mcp_servers": []
+        }
+    ],
+    "datasets": [
+        {
+            "path": null,
+            "name": "terminal-bench",
+            "version": "2.0",
+            "ref": null,
+            "registry_url": null,
+            "registry_path": null,
+            "overwrite": false,
+            "download_dir": null,
+            "task_names": [
+                "fix-git",
+                "db-wal-recovery",
+                "path-tracing",
+                "polyglot-c-py"
+            ],
+            "exclude_task_names": null,
+            "n_tasks": 4
+        }
+    ],
+    "tasks": [],
+    "artifacts": [],
+    "extra_instruction_paths": []
+}

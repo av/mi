@@ -1,0 +1,8 @@
+Previous response had warnings:
+WARNINGS: - Extra text detected before JSON object
+
+New Terminal Output:
+
+(qemu) root@c13b8dc816d1:/app# which python3 || which python
+/usr/bin/python3
+root@c13b8dc816d1:/app#

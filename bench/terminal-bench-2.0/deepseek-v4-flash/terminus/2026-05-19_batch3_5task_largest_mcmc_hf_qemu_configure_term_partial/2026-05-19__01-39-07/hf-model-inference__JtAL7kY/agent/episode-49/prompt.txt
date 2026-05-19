@@ -1,0 +1,5 @@
+New Terminal Output:
+
+root@e0dc3a2d2af7:/app# fuser -k 5000/tcp 2>/dev/null; sleep 2; nohup python3 /app/app.py > /app/flask_output.log 2>&1 &
+[1] 1744
+root@e0dc3a2d2af7:/app#

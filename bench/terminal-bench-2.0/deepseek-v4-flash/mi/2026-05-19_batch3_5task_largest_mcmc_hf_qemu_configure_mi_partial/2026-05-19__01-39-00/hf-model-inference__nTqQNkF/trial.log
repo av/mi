@@ -1,0 +1,2 @@
+Skipping image OS validation for alexgshaw/hf-model-inference:20251031: docker inspect returned 1
+Running command: if command -v apk &> /dev/null; then  apk add --no-cache nodejs npm bc curl iputils; elif command -v apt-get &> /dev/null; then  apt-get update && apt-get install -y nodejs npm bc curl iputils-ping; elif command -v yum &> /dev/null; then  yum install -y nodejs npm bc curl iputils; fi

@@ -1,0 +1,4 @@
+Previous response had parsing errors:
+ERROR: Invalid JSON: Expecting ',' delimiter: line 7 column 23 (char 391) | Content preview: '{\n  "analysis": "The JSON parsing error is due to a misplaced comma or duplicate field. I\'ll wait fo'...
+
+Please fix these issues and provide a proper JSON response.

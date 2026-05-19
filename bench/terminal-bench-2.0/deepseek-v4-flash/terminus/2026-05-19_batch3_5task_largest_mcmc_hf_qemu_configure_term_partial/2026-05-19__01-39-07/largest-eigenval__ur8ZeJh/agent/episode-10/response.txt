@@ -1,0 +1,49 @@
+```json
+{
+  "analysis: The inline Python is getting mangled. Let me write the benchmark script to a file properly and then execute it.
+plan: Write benchmark script to a file using cat with a unique heredoc delimiter that won't conflict with the script content.
+commands:
+  - keystrokes: cat > /app/bench2.py << 'PYTHON_SCRIPT_END'
+import numpy as np
+import time
+
+def method_np_eig(A):
+    evals, evecs = np.linalg.eig(A)
+    idx = np.argmax(np.abs(evals)).argmax()
+    return evals[idx], evecs[:, idx]
+
+def method_eigvals_inverse(A):
+    evals = np.linalg.eigvals(A)
+    idx = np.abs(evals).argmax()
+    lam = evals[idx]
+    n = A.shape[0]
+    v = np.ones(n, dtype=np.complex128)
+    for _ in range(10):
+        v = np.linalg.solve(A - lam * np.eye(n), v)
+        v /= np.linalg.norm(v)
+    return lam, v
+
+for size in [2,4,6,8,10]:
+    A = np.random.normal(size=(size,size)).astype(np.float64)
+    print(f'--- {size}x{size} ---')
+    
+    t0 = time.perf_counter()
+    for _ in range(500):
+        method_np_eig(A)
+    t1 = time.perf_counter()
+    print(f'np.eig: {(t1-t0)/500*1e6:.3f} us')
+    
+    t0 = time.perf_counter()
+    for _ in range(500):
+        try:
+            method_eigvals_inverse(A)
+        except:
+            pass
+    t1 = time.perf_counter()
+    print(f'eigvals+inv: {(t1-t0)/500*1e6:.3f} us')
+PYTHON_SCRIPT_END
+    duration: 0.1
+  - keystrokes: python3 bench2.py\n
+    duration: 3.0
+  task_complete: false
+```

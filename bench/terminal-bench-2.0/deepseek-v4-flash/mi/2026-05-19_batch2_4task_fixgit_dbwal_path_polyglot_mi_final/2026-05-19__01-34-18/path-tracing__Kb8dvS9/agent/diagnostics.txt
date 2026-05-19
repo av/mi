@@ -1,0 +1,14 @@
+[2026-05-18T23:35:27+00:00] === MI AGENT START ===
+[2026-05-18T23:35:27+00:00] LLM endpoint: https://openrouter.ai/api/v1 (normalized: https://openrouter.ai/api/v1/models)
+[2026-05-18T23:35:27+00:00] Model: deepseek/deepseek-v4-flash
+[2026-05-18T23:35:27+00:00] Pre-flight LLM connectivity check...
+[2026-05-18T23:35:27+00:00] Pre-flight completed: HTTP 200 in 0.169609s
+[2026-05-18T23:35:27+00:00] Starting mi agent...
+[2026-05-18T23:39:29+00:00] MI agent finished with exit code 1 after 242.116898525s
+[2026-05-18T23:39:29+00:00] === MI AGENT END ===
+[2026-05-18T23:39:29+00:00] === SIGNAL/EXIT CLEANUP (code=1) ===
+[2026-05-18T23:39:29+00:00] Output lines: 181
+[2026-05-18T23:39:29+00:00] Last output timestamp: none
+[2026-05-18T23:39:29+00:00] Post-mortem LLM status: HTTP 200
+[2026-05-18T23:39:29+00:00] Post-mortem ping gateway: 64 bytes from 172.17.0.1: icmp_seq=1 ttl=64 time=0.100 ms
+[2026-05-18T23:39:29+00:00] === CLEANUP COMPLETE ===

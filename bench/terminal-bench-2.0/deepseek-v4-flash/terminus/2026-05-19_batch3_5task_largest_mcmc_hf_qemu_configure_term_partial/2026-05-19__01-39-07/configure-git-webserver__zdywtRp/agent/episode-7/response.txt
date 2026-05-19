@@ -1,0 +1,11 @@
+{
+  "analysis": "The HTTP server is running. Now I need to simulate the user workflow: clone the bare repo to a temp dir, add hello.html, commit, push, then push, and verify with curl that /var/www/html/hello.html is served. The hook should pull changes to the working directory.",
+  "plan": "Create /tmp/testrepro, clone bare repo there, add hello.html, commit, push, then curl localhost:8080/hello.html to verify.",
+  "commands": [
+    {
+      "keystrokes": "cd /tmp && rm -rf /tmp/testrepro && git clone /git/server /tmp/testrepro\n",
+      "duration": 0.3
+    }
+  ],
+  "task_complete": false
+}

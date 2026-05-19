@@ -1,0 +1,55 @@
+{
+    "task": {
+        "path": "db-wal-recovery",
+        "git_url": "https://github.com/laude-institute/terminal-bench-2.git",
+        "git_commit_id": "69671fbaac6d67a7ef0dfec016cc38a64ef7a77c",
+        "name": null,
+        "ref": null,
+        "overwrite": false,
+        "download_dir": null,
+        "source": "terminal-bench"
+    },
+    "trial_name": "db-wal-recovery__gvmcjU3",
+    "trials_dir": "/tmp/mi-30-eval-iter2/mi/2026-05-19__01-34-18",
+    "timeout_multiplier": 1.0,
+    "agent_timeout_multiplier": null,
+    "verifier_timeout_multiplier": null,
+    "agent_setup_timeout_multiplier": null,
+    "environment_build_timeout_multiplier": null,
+    "agent": {
+        "name": null,
+        "import_path": "mi_harbor.mi_agent:MiAgent",
+        "model_name": "openai/deepseek/deepseek-v4-flash",
+        "skills": [],
+        "override_timeout_sec": null,
+        "override_setup_timeout_sec": null,
+        "max_timeout_sec": null,
+        "kwargs": {},
+        "env": {},
+        "mcp_servers": []
+    },
+    "environment": {
+        "type": "docker",
+        "import_path": null,
+        "force_build": false,
+        "delete": true,
+        "override_cpus": null,
+        "override_memory_mb": null,
+        "override_storage_mb": null,
+        "override_gpus": null,
+        "suppress_override_warnings": false,
+        "mounts": null,
+        "extra_docker_compose": [],
+        "env": {},
+        "kwargs": {}
+    },
+    "verifier": {
+        "override_timeout_sec": null,
+        "max_timeout_sec": null,
+        "env": {},
+        "disable": false
+    },
+    "artifacts": [],
+    "extra_instruction_paths": [],
+    "job_id": "f0de37e4-d813-4acd-b395-7d85cc4d0cdd"
+}

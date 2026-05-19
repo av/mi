@@ -1,0 +1,13 @@
+```json
+{
+  "analysis": "The terminal is stuck in a heredoc. I need to properly cancel it and reset.",
+  "plan": "Send Ctrl+C (\\x03) to cancel the current operation, then check the shell prompt.",
+  "commands": [
+    {
+      "keystrokes": "\003\n",
+      "duration": 0.2
+    }
+  ],
+  "task_complete": false
+}
+```

@@ -1,0 +1,18 @@
+=== Launching Batch 3 (5 tasks: largest-eigenval mcmc-sampling-stan hf-model-inference qemu-startup configure-git-webserver) at Tue May 19 01:38:57 AM CEST 2026 ===
+=== Launching Batch 3 (5 tasks: largest-eigenval mcmc-sampling-stan hf-model-inference qemu-startup configure-git-webserver) at Tue May 19 01:38:57 AM CEST 2026 ===
+Tasks chosen for diversity (sci/comp, sci/stats/ML, ML/inference, systems, SWE/git-web) from the 30-task preset list, not overlapping prior batches (regex-chess/crack-7z-hash, fix-git/db-wal/path-tracing/polyglot-c-py).
+Tasks chosen for diversity (sci/comp, sci/stats/ML, ML/inference, systems, SWE/git-web) from the 30-task preset list, not overlapping prior batches (regex-chess/crack-7z-hash, fix-git/db-wal/path-tracing/polyglot-c-py).
+Launching mi side (adapter, n-concurrent=1)...
+Launching mi side (adapter, n-concurrent=1)...
+  mi python PID captured: 1269524
+  mi python PID captured: 1269524
+  mi parent launcher PID: 1269524
+  mi parent launcher PID: 1269524
+Launching terminus-2 side (n-concurrent=2)...
+Launching terminus-2 side (n-concurrent=2)...
+  terminus python PID captured: 1272212
+  terminus python PID captured: 1272212
+  terminus parent launcher PID: 1272212
+  terminus parent launcher PID: 1272212
+=== Batch 3 launched successfully. Use /tmp/mi-30-eval-iter3-*.pid and logs for monitoring. ===
+=== Batch 3 launched successfully. Use /tmp/mi-30-eval-iter3-*.pid and logs for monitoring. ===

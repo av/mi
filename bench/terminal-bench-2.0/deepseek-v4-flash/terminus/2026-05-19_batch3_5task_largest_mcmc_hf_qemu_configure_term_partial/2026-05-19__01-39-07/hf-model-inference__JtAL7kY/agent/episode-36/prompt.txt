@@ -1,0 +1,5 @@
+New Terminal Output:
+
+root@e0dc3a2d2af7:/app# ls -la /app/app.py 2>/dev/null || echo "File not found"
+-rw-r--r--. 1 root root 1511 May 18 23:45 /app/app.py
+root@e0dc3a2d2af7:/app#

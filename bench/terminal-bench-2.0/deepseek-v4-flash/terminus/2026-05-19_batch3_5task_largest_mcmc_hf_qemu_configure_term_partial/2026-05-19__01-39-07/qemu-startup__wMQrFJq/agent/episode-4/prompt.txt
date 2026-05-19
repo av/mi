@@ -1,0 +1,19 @@
+New Terminal Output:
+
+root@c13b8dc816d1:/app# kill 121 2>/dev/null; sleep 0.2
+root@c13b8dc816d1:/app# cat /tmp/qemu.log 2>/dev/null || echo "(no log)"
+root@c13b8dc816d1:/app#
+
+
+
+
+
+
+
+
+
+
+
+
+
+

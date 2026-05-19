@@ -1,0 +1,11 @@
+New Terminal Output:
+
+root@e0dc3a2d2af7:/app# cat > /tmp/test_heredoc.sh << 'EOF'
+> python3 << 'BLOCK'
+> print("Hello from heredoc")
+> BLOCK
+> EOF
+root@e0dc3a2d2af7:/app# echo "Script created"; bash /tmp/test_heredoc.sh
+Script created
+Hello from heredoc
+root@e0dc3a2d2af7:/app#

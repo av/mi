@@ -1,0 +1,77 @@
+New Terminal Output:
+
+root@e0dc3a2d2af7:/app# python3 -c "
+> lines = []
+> lines.append('import os')
+> lines.append(\"os.environ['TRANSFORMERS_CACHE'] = '/app/model_cache/sentiment_model'\")
+> lines.append(\"os.environ['HF_HOME'] = '/app/model_cache/sentiment_model'\")
+> lines.append('')
+> lines.append('from flask import Flask, request, jsonify')
+> lines.append('from transformers import pipeline')
+> lines.append('')
+> lines.append('app = Flask(__name__)')
+> lines.append('')
+> lines.append('print(\"Loading model...\")')
+> lines.append('sentiment_pipeline = pipeline(')
+> lines.append(\"    'sentiment-analysis',\")
+> lines.append(\"    model='distilbert-base-uncased-finetuned-sst-2-english'\")
+> lines.append(')')
+> lines.append('print(\"Model loaded successfully\")')
+> lines.append('')
+> lines.append(\"@app.route('/sentiment', methods=['POST'])\")
+> lines.append('def sentiment():')
+> lines.append("    if not request.is_json:")
+> lines.append("        return jsonify({'error': 'Request must be JSON'}), 400")
+bash: syntax error near unexpected token `('
+root@e0dc3a2d2af7:/app# lines.append("    data = request.get_json()")
+bash: syntax error near unexpected token `"    data = request.get_json()"'
+root@e0dc3a2d2af7:/app# lines.append("    if not data or 'text' not in data:")
+bash: syntax error near unexpected token `"    if not data or 'text' not in data:"'
+root@e0dc3a2d2af7:/app# lines.append("        return jsonify({'error': \"Missing 'text' field in JSON body\"}), 400")
+bash: syntax error near unexpected token `"        return jsonify({'error': \"Missing 'text' field in JSON body\"}), 400"'
+root@e0dc3a2d2af7:/app# lines.append("    text = data['text']")
+bash: syntax error near unexpected token `"    text = data['text']"'
+root@e0dc3a2d2af7:/app# lines.append("    if not isinstance(text, str) or not text.strip():")
+bash: syntax error near unexpected token `"    if not isinstance(text, str) or not text.strip():"'
+root@e0dc3a2d2af7:/app# lines.append("        return jsonify({'error': \"'text' field must be a non-empty string\"}), 400")
+bash: syntax error near unexpected token `"        return jsonify({'error': \"'text' field must be a non-empty string\"}), 400"'
+root@e0dc3a2d2af7:/app# lines.append('    try:')
+bash: syntax error near unexpected token `'    try:''
+root@e0dc3a2d2af7:/app# lines.append('        result = sentiment_pipeline(text)')
+bash: syntax error near unexpected token `'        result = sentiment_pipeline(text)''
+root@e0dc3a2d2af7:/app# lines.append(\"        label = result[0]['label']\")
+bash: syntax error near unexpected token `\"'
+root@e0dc3a2d2af7:/app# lines.append(\"        score = result[0]['score']\")
+bash: syntax error near unexpected token `\"'
+root@e0dc3a2d2af7:/app# lines.append("        sentiment = 'positive' if label.upper() == 'POSITIVE' else 'negative'")
+bash: syntax error near unexpected token `"        sentiment = 'positive' if label.upper() == 'POSITIVE' else 'negative'"'
+root@e0dc3a2d2af7:/app# lines.append('        confidence = {')
+bash: syntax error near unexpected token `'        confidence = {''
+root@e0dc3a2d2af7:/app# lines.append("            'positive': score if sentiment == 'positive' else 1 - score,")
+bash: syntax error near unexpected token `"            'positive': score if sentiment == 'positive' else 1 - score,"'
+root@e0dc3a2d2af7:/app# lines.append("            'negative': 1 - score if sentiment == 'positive' else score")
+bash: syntax error near unexpected token `"            'negative': 1 - score if sentiment == 'positive' else score"'
+root@e0dc3a2d2af7:/app# lines.append('        }')
+bash: syntax error near unexpected token `'        }''
+root@e0dc3a2d2af7:/app# lines.append(\"        return jsonify({'sentiment': sentiment, 'confidence': confidence})\")
+bash: syntax error near unexpected token `\"'
+root@e0dc3a2d2af7:/app# lines.append('    except Exception as e:')
+bash: syntax error near unexpected token `'    except Exception as e:''
+root@e0dc3a2d2af7:/app# lines.append("        return jsonify({'error': str(e)}), 500")
+bash: syntax error near unexpected token `"        return jsonify({'error': str(e)}), 500"'
+root@e0dc3a2d2af7:/app# lines.append('')
+bash: syntax error near unexpected token `'''
+root@e0dc3a2d2af7:/app# lines.append(\"if __name__ == '__main__':\")
+bash: syntax error near unexpected token `\"if'
+root@e0dc3a2d2af7:/app# lines.append(\"    app.run(host='0.0.0.0', port=5000)\")
+bash: syntax error near unexpected token `\"'
+root@e0dc3a2d2af7:/app# lines.append('')
+bash: syntax error near unexpected token `'''
+root@e0dc3a2d2af7:/app# with open('/app/app.py', 'w') as f:
+bash: syntax error near unexpected token `('
+root@e0dc3a2d2af7:/app#     f.write('\\n'.join(lines))
+bash: syntax error near unexpected token `'\\n'.join'
+root@e0dc3a2d2af7:/app# print('Written')
+bash: syntax error near unexpected token `'Written''
+root@e0dc3a2d2af7:/app# "
+>

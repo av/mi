@@ -1,0 +1,22 @@
+=== Batch 2 launch at $(date) ===
+Tasks (4 diverse from 30-list, excluding regex-chess/crack-7z-hash): fix-git, db-wal-recovery, path-tracing, polyglot-c-py
+Following config from committed mi_harbor/presets/openrouter-deepseek-v4-flash-tb2-30.sh (same model, openrouter deepseek-v4-flash, includes the task list logic)
+Tue May 19 01:34:07 AM CEST 2026
+=== Launching Batch 2 (4 tasks: fix-git db-wal-recovery path-tracing polyglot-c-py) at Tue May 19 01:34:18 AM CEST 2026 ===
+=== Launching Batch 2 (4 tasks: fix-git db-wal-recovery path-tracing polyglot-c-py) at Tue May 19 01:34:18 AM CEST 2026 ===
+Tasks chosen for diversity (SWE, systems, sci, polyglot) from the 30-task preset list, not overlapping prior regex-chess/crack-7z-hash.
+Tasks chosen for diversity (SWE, systems, sci, polyglot) from the 30-task preset list, not overlapping prior regex-chess/crack-7z-hash.
+Launching mi side (adapter, n-concurrent=1)...
+Launching mi side (adapter, n-concurrent=1)...
+  mi python PID captured: 1165089
+  mi python PID captured: 1165089
+  mi parent launcher PID: 1165089
+  mi parent launcher PID: 1165089
+Launching terminus-2 side (n-concurrent=2)...
+Launching terminus-2 side (n-concurrent=2)...
+  terminus python PID captured: 1168602
+  terminus python PID captured: 1168602
+  terminus parent launcher PID: 1168602
+  terminus parent launcher PID: 1168602
+=== Batch 2 launched successfully. Use /tmp/mi-30-eval-iter2-*.pid and logs for monitoring. ===
+=== Batch 2 launched successfully. Use /tmp/mi-30-eval-iter2-*.pid and logs for monitoring. ===

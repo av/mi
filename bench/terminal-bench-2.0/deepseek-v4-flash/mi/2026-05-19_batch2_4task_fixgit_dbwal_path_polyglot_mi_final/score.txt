@@ -1,0 +1,25 @@
+# FINAL RESULT - 2026-05-19 batch2 4-task (fix-git, db-wal-recovery, path-tracing, polyglot-c-py) - mi
+
+Harness: mi (via mi_harbor adapter)
+Model: deepseek/deepseek-v4-flash (OpenRouter)
+Benchmark: terminal-bench@2.0 (batch 2 of 30-task stratified for mi vs terminus-2 comparison)
+
+=== SCORE (final at snapshot ~02:00 after cycles, 4/4 completed) ===
+Pass rate: 1 / 4  (25%)
+Mean reward: 0.25
+
+Passed (verified by reward.txt=1):
+- fix-git
+
+Failed (3):
+- db-wal-recovery (0)
+- path-tracing (0)
+- polyglot-c-py (0)
+
+Note: result.json n_completed=4/4, finished=True; 4 reward files, only 1 pass (fix-git consistent with 10-task baseline pass for mi). polyglot-c-py completed last with 0. Good clean run for mi on this batch despite n-conc=1.
+
+Duration: ~26 minutes (launched ~01:34, finished by ~02:00 per result)
+Job dir: 2026-05-19__01-34-18
+n_total: 4
+
+This is the final snapshot for batch2 mi (earlier partial at 3/4 captured during collection; now complete with all 4 tasks verified). Complements batch1 term final and batch3 mi partial (which reached 3 passes).

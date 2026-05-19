@@ -1,0 +1,64 @@
+Previous response had warnings:
+WARNINGS: - Extra text detected before JSON object
+- Extra text detected after JSON object
+
+New Terminal Output:
+
+root@1cf7d2c19296:/app# cat > /app/bench_fast.py << 'ENDPY'
+> import numpy as np
+> import time
+>
+> def method_eig(A):
+>     evals, evecs = np.linalg.eig(A)
+>     idx = np.abs(evals).argmax()
+>     return evals[idx], evecs[:, idx]
+>
+> def method_eigvals_inverse1(A):
+>     evals = np.linalg.eigvals(A)
+>     idx = np.abs(evals).argmax()
+>     lam = evals[idx]
+>     n = A.shape[0]
+>     v = np.ones(n, dtype=np.complex128)
+>     try:
+>         v = np.linalg.solve(A - lam * np.eye(n), v)
+>         v /= np.linalg.norm(v)
+>         lam = (v.conj() @ A @ v) / (v.conj() @ v)
+>     except np.linalg.LinalgError:
+>         pass
+>     return lam, v
+>
+> print('Benchmarking...')
+> for size in [2,4,6,8,10]:
+>     A = np.random.normal(size=(size,size)).astype(np.float64)
+>     print(f'--- {size}x{size} ---')
+>
+>     t0 = time.perf_counter()
+>     for _ in range(200):
+>         method_eig(A)
+>     t1 = time.perf_counter()
+>     print(f'np.eig: {(t1-t0)/200*1e6:.3f} us')
+>
+>     t0 = time.perf_counter()
+>     for _ in range(200):
+>         method_eigvals_inverse1(A)
+>     t1 = time.perf_counter()
+>     print(f'eigvals+inv1: {(t1-t0)/200*1e6:.3f} us')
+> ENDPY
+root@1cf7d2c19296:/app# python3 /app/bench_fast.py
+Benchmarking...
+--- 2x2 ---
+np.eig: 9.127 us
+eigvals+inv1: 18.829 us
+--- 4x4 ---
+np.eig: 10.697 us
+eigvals+inv1: 22.456 us
+--- 6x6 ---
+np.eig: 13.884 us
+eigvals+inv1: 24.191 us
+--- 8x8 ---
+np.eig: 16.293 us
+eigvals+inv1: 25.882 us
+--- 10x10 ---
+np.eig: 20.637 us
+eigvals+inv1: 30.099 us
+root@1cf7d2c19296:/app#

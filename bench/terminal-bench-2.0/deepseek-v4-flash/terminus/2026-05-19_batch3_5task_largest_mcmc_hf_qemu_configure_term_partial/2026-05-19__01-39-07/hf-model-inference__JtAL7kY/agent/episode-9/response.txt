@@ -1,0 +1,11 @@
+{
+  "analysis": "The file has multiple syntax errors. I need to delete it and write a correct version using Python or a careful heredoc approach.",
+  "plan": "Delete the broken file, then use Python to write a clean app.py file (using a Python heredoc to avoid shell escaping issues).",
+  "commands": [
+    {
+      "keystrokes": "rm /app/app.py\n",
+      "duration": 0.1
+    }
+  ],
+  "task_complete": false
+}

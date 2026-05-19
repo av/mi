@@ -1,0 +1,130 @@
+Previous response had warnings:
+WARNINGS: - Extra text detected before JSON object
+- Extra text detected after JSON object
+
+New Terminal Output:
+
+root@1cf7d2c19296:/app# cat > /app/bench_v6.py << 'ENDSCRIPT'
+> import numpy as np
+> import time
+> from scipy.linalg.lapack import get_lapack_funcs
+>
+> def method_eig(A):
+>     evals, evecs = np.linalg.eig(A)
+>     idx = np.abs(evals).argmax()
+>     return evals[idx], evecs[:, idx]
+>
+> def method_lapack(A):
+>     dgeev = get_lapack_funcs('geev', dtype=np.float64)
+>     w, vl, vr, info = dgeev(A, compute_vl=False, compute_vr=True)
+>     evals = w
+>     evecs = vr
+>     idx = np.abs(evals).argmax()
+>     return evals[idx], evecs[:, idx]
+>
+> def method_analytic_2x2(A):
+>     """Analytic formula for 2x2 matrix"""
+>     a, b, c, d = A[0,0], A[0,1], A[1,0], A[1,1]
+>     trace = a + d
+>     det = a * d - b * c
+>     disc = trace*trace - 4*det
+>     sqrt_disc = np.sqrt(complex(disc, 0))
+>     lam1 = (trace + sqrt_disc) / 2
+>     lam2 = (trace - sqrt_disc) / 2
+>     if abs(lam1) >= abs(lam2):
+>         lam = lam1
+>     else:
+>         lam = lam2
+>     # Compute eigenvector via solving (A - lambda*I)x = 0
+>     M = A - lam * np.eye(2)
+>     # M has rank < 2. Find non-zero row, set x[1]=1, solve for x[0]
+>     if abs(M[0,0]) > 1e-12:
+>         x0 = -M[0,1] / M[0,0]
+>         x = np.array([x0, 1.0], dtype=np.complex128)
+>     else:
+>         # Row 0 is zero or problematic
+>         if abs(M[1,0]) > 1e-12:
+>             x1 = -M[1,1] / M[1,0]
+>             x = np.array([1.0, x1], dtype=np.complex128)
+>         else:
+>             x = np.array([1.0, 0.0], dtype=np.complex128)
+>     x /= np.linalg.norm(x)
+>     lam = (x.conj() @ A @ x) / (x.conj() @ x)
+>     return lam, x
+>
+> def method_eigvals_nullspace(A):
+>     """eigvals + find eigenvector via reduced system"""
+>     evals = np.linalg.eigvals(A)
+>     idx = np.abs(evals).argmax()
+>     lam = evals[idx]
+>     n = A.shape[0]
+>     M = A - lam * np.eye(n)
+>     # Find a row with max element
+>     max_idx = np.unravel_index(np.abs(M).argmax(), M.shape)
+>     i_row, fix_idx = max_idx
+>
+>     rows_keep = [r for r in range(n) if r != i_row]
+>     cols_keep = [c for c in range(n) if c != fix_idx]
+>
+>     A_reduced = M[np.ix_(rows_keep, cols_keep)]
+>     b_reduced = -M[np.ix_(rows_keep, [fix_idx])].flatten()
+>
+>     try:
+>         x_other = np.linalg.solve(A_reduced, b_reduced)
+>         x = np.zeros(n, dtype=np.complex128)
+>         x[cols_keep] = x_other
+>         x[fix_idx] = 1.0 + 0.0j
+>         x /= np.linalg.norm(x)
+>         lam = (x.conj() @ A @ x) / (x.conj() @ x)
+>         return lam, x
+>     except np.linalg.LinalgError:
+>         # Fall back to full eig
+>         return method_eig(A)
+>
+> # Test all methods for accuracy and speed
+> print("Testing...")
+> for size in [2,4,6,8,10]:
+>     np.random.seed(42 + size)
+>     A = np.random.normal(size=(size,size)).astype(np.float64)
+>     print(f'\n--- {size}x{size} ---')
+>
+>     # Time np.eig
+>     t0 = time.
+>     t0 = time.perf_counter()
+>     for _ in range(500):
+>         ev, evec = method_eig(A)
+>     t1 = time.perf_counter()
+>     t_eig = (t1-t0)/500*1e6
+>     print(f'np.eig: {t_eig:.3f} us')
+>
+>     # Time lapack direct
+>     t0 = time.perf_counter()
+>     for _ in range(500):
+>         ev, evec = method_lapack(A)
+>     t1 = time.perf_counter()
+>     t_lapack = (t1-t0)/500*1e6
+>     print(f'lapack: {t_lapack:.3f} us')
+>
+>     # Time eigvals + nullspace
+>     t0 = time.perf_counter()
+>     for _ in range(500):
+>         method_eigvals_nullspace(A)
+>     t1 = time.perf_counter()
+>     t_null = (t1-t0)/500*1e6
+>     print(f'nullspace: {t_null:.3f} us')
+>
+>     if size == 2:
+>         # Time analytical 2x2
+>         t0 = time.perf_counter()
+>         for _ in range(500):
+>             method_analytic_2x2(A)
+>         t1 = time.perf_counter()
+>         t_anal = (t1-t0)/500*1e6
+>         print(f'analytic: {t_anal:.3f} us')
+> ENDSCRIPT
+root@1cf7d2c19296:/app# python3 /app/bench_v6.py
+  File "/app/bench_v6.py", line 85
+    t0 = time.
+              ^
+SyntaxError: invalid syntax
+root@1cf7d2c19296:/app#

@@ -1,0 +1,185 @@
+{
+    "schema_version": 1,
+    "created_at": "2026-05-18T23:34:21.563112Z",
+    "harbor": {
+        "version": "0.7.1",
+        "is_editable": false
+    },
+    "invocation": [
+        "/home/everlier/.cache/uv/archive-v0/kk6uRRevclPkoIGG-xkff/bin/harbor",
+        "run",
+        "--dataset",
+        "terminal-bench@2.0",
+        "--agent-import-path",
+        "mi_harbor.mi_agent:MiAgent",
+        "--model",
+        "openai/deepseek/deepseek-v4-flash",
+        "--n-concurrent",
+        "1",
+        "--n-tasks",
+        "4",
+        "--yes",
+        "--include-task-name",
+        "fix-git",
+        "--include-task-name",
+        "db-wal-recovery",
+        "--include-task-name",
+        "path-tracing",
+        "--include-task-name",
+        "polyglot-c-py",
+        "--jobs-dir",
+        "/tmp/mi-30-eval-iter2/mi"
+    ],
+    "n_concurrent_trials": 1,
+    "retry": {
+        "max_retries": 0,
+        "exclude_exceptions": [
+            "VerifierTimeoutError",
+            "VerifierOutputParseError",
+            "AgentTimeoutError",
+            "RewardFileEmptyError",
+            "RewardFileNotFoundError"
+        ],
+        "wait_multiplier": 1.0,
+        "min_wait_sec": 1.0,
+        "max_wait_sec": 60.0
+    },
+    "trials": [
+        {
+            "task": {
+                "name": "path-tracing",
+                "type": "git",
+                "digest": "sha256:dfff1e9272b44ff8918e0b28414b126c21a6703cf76a6fb88122c44bff41f943",
+                "source": "terminal-bench",
+                "path": "path-tracing",
+                "git_url": "https://github.com/laude-institute/terminal-bench-2.git",
+                "git_commit_id": "69671fbaac6d67a7ef0dfec016cc38a64ef7a77c"
+            },
+            "timeout_multiplier": 1.0,
+            "agent": {
+                "import_path": "mi_harbor.mi_agent:MiAgent",
+                "model_name": "openai/deepseek/deepseek-v4-flash",
+                "skills": [],
+                "kwargs": {},
+                "env": {},
+                "mcp_servers": []
+            },
+            "skills": [],
+            "environment": {
+                "type": "docker",
+                "force_build": false,
+                "delete": true,
+                "suppress_override_warnings": false,
+                "extra_docker_compose": [],
+                "env": {},
+                "kwargs": {}
+            },
+            "verifier": {
+                "env": {},
+                "disable": false
+            }
+        },
+        {
+            "task": {
+                "name": "db-wal-recovery",
+                "type": "git",
+                "digest": "sha256:35aeff78e6f412bb15a449b854114061791b5e6d54923576db8ab7c80ab1bf94",
+                "source": "terminal-bench",
+                "path": "db-wal-recovery",
+                "git_url": "https://github.com/laude-institute/terminal-bench-2.git",
+                "git_commit_id": "69671fbaac6d67a7ef0dfec016cc38a64ef7a77c"
+            },
+            "timeout_multiplier": 1.0,
+            "agent": {
+                "import_path": "mi_harbor.mi_agent:MiAgent",
+                "model_name": "openai/deepseek/deepseek-v4-flash",
+                "skills": [],
+                "kwargs": {},
+                "env": {},
+                "mcp_servers": []
+            },
+            "skills": [],
+            "environment": {
+                "type": "docker",
+                "force_build": false,
+                "delete": true,
+                "suppress_override_warnings": false,
+                "extra_docker_compose": [],
+                "env": {},
+                "kwargs": {}
+            },
+            "verifier": {
+                "env": {},
+                "disable": false
+            }
+        },
+        {
+            "task": {
+                "name": "fix-git",
+                "type": "git",
+                "digest": "sha256:31f6063693d71cdbb49d8ae17848ae54eed7a1953228164efbb3f4100251600d",
+                "source": "terminal-bench",
+                "path": "fix-git",
+                "git_url": "https://github.com/laude-institute/terminal-bench-2.git",
+                "git_commit_id": "69671fbaac6d67a7ef0dfec016cc38a64ef7a77c"
+            },
+            "timeout_multiplier": 1.0,
+            "agent": {
+                "import_path": "mi_harbor.mi_agent:MiAgent",
+                "model_name": "openai/deepseek/deepseek-v4-flash",
+                "skills": [],
+                "kwargs": {},
+                "env": {},
+                "mcp_servers": []
+            },
+            "skills": [],
+            "environment": {
+                "type": "docker",
+                "force_build": false,
+                "delete": true,
+                "suppress_override_warnings": false,
+                "extra_docker_compose": [],
+                "env": {},
+                "kwargs": {}
+            },
+            "verifier": {
+                "env": {},
+                "disable": false
+            }
+        },
+        {
+            "task": {
+                "name": "polyglot-c-py",
+                "type": "git",
+                "digest": "sha256:de6785fc9ec4d82b78e71c9699a345f142388440fcbf7bae5044aa31fc85d7d7",
+                "source": "terminal-bench",
+                "path": "polyglot-c-py",
+                "git_url": "https://github.com/laude-institute/terminal-bench-2.git",
+                "git_commit_id": "69671fbaac6d67a7ef0dfec016cc38a64ef7a77c"
+            },
+            "timeout_multiplier": 1.0,
+            "agent": {
+                "import_path": "mi_harbor.mi_agent:MiAgent",
+                "model_name": "openai/deepseek/deepseek-v4-flash",
+                "skills": [],
+                "kwargs": {},
+                "env": {},
+                "mcp_servers": []
+            },
+            "skills": [],
+            "environment": {
+                "type": "docker",
+                "force_build": false,
+                "delete": true,
+                "suppress_override_warnings": false,
+                "extra_docker_compose": [],
+                "env": {},
+                "kwargs": {}
+            },
+            "verifier": {
+                "env": {},
+                "disable": false
+            }
+        }
+    ]
+}

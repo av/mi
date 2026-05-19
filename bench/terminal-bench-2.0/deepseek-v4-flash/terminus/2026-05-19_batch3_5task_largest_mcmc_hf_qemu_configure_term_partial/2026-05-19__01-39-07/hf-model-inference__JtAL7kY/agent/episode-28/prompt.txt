@@ -1,0 +1,5 @@
+Previous response had parsing errors:
+ERROR: Invalid JSON: Expecting ',' delimiter: line 6 column 33 (char 574) | Content preview: '{\n  "analysis": "The command line approach with Python -c is too error-prone due to quoting issues. '...
+WARNINGS: - Extra text detected before JSON object
+
+Please fix these issues and provide a proper JSON response.

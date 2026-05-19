@@ -1,0 +1,44 @@
+New Terminal Output:
+
+root@e0dc3a2d2af7:/app# cat /app/app.py
+from flask import Flask, request, jsonify
+from transformers import pipeline
+
+app = Flask(__name__)
+
+MODEL_PATH = '/app/model_cache/sentiment_model'
+
+print("Loading model...")
+sentiment_pipeline = pipeline(
+    "sentiment-analysis",
+    model="distilbert-base-uncased-finetuned-sst-2-english",
+    cache_dir=MODEL_PATH
+)
+print("Model loaded successfully")
+
+@app.route('/sentiment', methods=['POST'])
+def sentiment():
+    if not request.is_json:
+        return jsonify({"error": "Request must be JSON"}), 400
+    data = request.get_json()
+    if not data or 'text' not in data:
+        return jsonify({"error": "Missing 'text' field in JSON body"}), 400
+    text = data['text']
+    if not isinstance(text, str) or not text.strip():
+        return jsonify({"error": "'text' field must be a non-empty string"}), 400
+    try:
+        result = sentiment_pipeline(text)
+        label = result[0]['label']
+        score = result[0]['score']
+        sentiment = "positive" if label.upper() == "POSITIVE" else "negative"
+        confidence = dict(
+            positive=score if sentiment == "positive" else 1 - score,
+            negative=1 - score if sentiment == "positive" else score
+        )
+        return jsonify({"sentiment": sentiment, "confidence": confidence})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)
+root@e0dc3a2d2af7:/app#

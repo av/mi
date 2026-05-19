@@ -1,0 +1,5 @@
+New Terminal Output:
+
+root@e0dc3a2d2af7:/app# kill -9 830 2>/dev/null; sleep 1; nohup python3 /app/app.py > /app/flask_output.log 2>&1 &
+[1] 1880
+root@e0dc3a2d2af7:/app#

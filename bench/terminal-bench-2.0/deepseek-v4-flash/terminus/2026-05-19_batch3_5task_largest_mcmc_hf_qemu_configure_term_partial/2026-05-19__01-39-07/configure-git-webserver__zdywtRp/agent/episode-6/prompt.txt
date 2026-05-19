@@ -1,0 +1,29 @@
+New Terminal Output:
+
+root@6b59ef50ab31:/var/www# cat > /git/server/hooks/post-update << 'EOF'
+> #!/bin/bash
+> cd /var/www/html || exit
+> unset GIT_DIR
+> git pull origin master
+> EOF
+root@6b59ef50ab31:/var/www# chmod +x /git/server/hooks/post-update
+root@6b59ef50ab31:/var/www# ls -la /git/server/hooks/
+total 68
+drwxr-xr-x. 1 root root  578 May 18 23:40 .
+drwxr-xr-x. 1 root root   98 May 18 23:39 ..
+-rwxr-xr-x. 1 root root  478 May 18 23:39 applypatch-msg.sample
+-rwxr-xr-x. 1 root root  896 May 18 23:39 commit-msg.sample
+-rwxr-xr-x. 1 root root 4726 May 18 23:39 fsmonitor-watchman.sample
+-rwxr-xr-x. 1 root root   74 May 18 23:40 post-update
+-rwxr-xr-x. 1 root root  189 May 18 23:39 post-update.sample
+-rwxr-xr-x. 1 root root  424 May 18 23:39 pre-applypatch.sample
+-rwxr-xr-x. 1 root root 1643 May 18 23:39 pre-commit.sample
+-rwxr-xr-x. 1 root root  416 May 18 23:39 pre-merge-commit.sample
+-rwxr-xr-x. 1 root root 1374 May 18 23:39 pre-push.sample
+-rwxr-xr-x. 1 root root 4898 May 18 23:39 pre-rebase.sample
+-rwxr-xr-x. 1 root root  544 May 18 23:39 pre-receive.sample
+-rwxr-xr-x. 1 root root 1492 May 18 23:39 prepare-commit-msg.sample
+-rwxr-xr-x. 1 root root 2783 May 18 23:39 push-to-checkout.sample
+-rwxr-xr-x. 1 root root 2308 May 18 23:39 sendemail-validate.sample
+-rwxr-xr-x. 1 root root 3650 May 18 23:39 update.sample
+root@6b59ef50ab31:/var/www#

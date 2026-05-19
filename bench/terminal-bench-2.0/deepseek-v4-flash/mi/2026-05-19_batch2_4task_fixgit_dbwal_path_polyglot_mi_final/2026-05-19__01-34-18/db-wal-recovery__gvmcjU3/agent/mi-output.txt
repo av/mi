@@ -1,0 +1,15 @@
+[    3.96s] [90m⟡ bash({"command":"ls -la /app/"})[0m
+[    3.97s] [90mtotal 28
+[    3.97s] drwxr-xr-x. 1 root root    22 Oct 31  2025 .
+[    3.97s] drwxr-xr-x. 1 root root    76 May 18 23:39 ..
+[    3.97s] -rw-r--r--. 1 root root  8192 Oct 24  2025 main.db
+[    3.97s] -rw-r--r--. 1 root root 16512 Oct 24  2025 main.d…[0m
+[    9.26s] [90m⟡ bash({"command":"cd /app && sqlite3 main.db \".tables\" 2>&1; sqlite3 main.db \"SELECT count(*) FROM t\" 2>&1; sqlite3 main.db \"SELECT * FROM t\" 2>&1"})[0m
+[    9.28s] [90mitems
+[    9.28s] Error: in prepare, no such table: t
+[    9.28s] Error: in prepare, no such table: t
+[    9.28s] [0m
+[    9.28s] [90m⟡ bash({"command":"cd /app && sqlite3 main.db \"PRAGMA wal_checkpoint; PRAGMA integrity_check;\" 2>&1"})[0m
+[    9.28s] [90m0|0|0
+[    9.28s] ok
+[    9.29s] [0m

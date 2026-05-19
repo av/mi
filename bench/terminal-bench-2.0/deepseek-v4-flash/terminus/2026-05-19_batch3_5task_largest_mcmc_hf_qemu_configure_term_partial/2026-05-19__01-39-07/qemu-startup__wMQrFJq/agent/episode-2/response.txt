@@ -1,0 +1,11 @@
+{
+  "analysis": "QEMU is started in background (PID 121). I need to wait for the telnet port 6665 to be ready. Let me check if it's listening yet, and loop until it is.",
+  "plan": "Use ss -tlnp to check if port 6665 is listening. If not, wait a bit and retry. Once ready, report completion.",
+  "commands": [
+    {
+      "keystrokes": "ss -tlnp | grep 6665\n",
+      "duration": 0.1
+    }
+  ],
+  "task_complete": false
+}

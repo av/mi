@@ -1,0 +1,6 @@
+Previous response had parsing errors:
+ERROR: Invalid JSON: Invalid control character at: line 7 column 23 (char 5647) | Content preview: '{\n  "analysis": "The terminal state has had many failed commands. The last few commands were malform'...
+WARNINGS: - Extra text detected before JSON object
+- Extra text detected after JSON object
+
+Please fix these issues and provide a proper JSON response.

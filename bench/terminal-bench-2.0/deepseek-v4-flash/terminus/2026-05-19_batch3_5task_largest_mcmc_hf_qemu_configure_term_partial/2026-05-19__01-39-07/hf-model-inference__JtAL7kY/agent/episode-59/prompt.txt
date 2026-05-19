@@ -1,0 +1,4 @@
+Previous response had parsing errors:
+ERROR: Invalid JSON: Expecting ',' delimiter: line 6 column 33 (char 1056) | Content preview: '{\n  "analysis": "The negative sentiment test had a malformed JSON request (missing colon and quotes)'...
+
+Please fix these issues and provide a proper JSON response.

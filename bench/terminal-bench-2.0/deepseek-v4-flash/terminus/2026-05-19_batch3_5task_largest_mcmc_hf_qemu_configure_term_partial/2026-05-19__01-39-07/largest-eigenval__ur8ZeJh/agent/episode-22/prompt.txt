@@ -1,0 +1,27 @@
+Previous response had warnings:
+WARNINGS: - Extra text detected before JSON object
+- Extra text detected after JSON object
+
+New Terminal Output:
+
+> "
+Written bench.py
+root@1cf7d2c19296:/app# ls -la bench.py
+-rw-r--r--. 1 root root 1239 May 18 23:42 bench.py
+root@1cf7d2c19296:/app# python3 bench.py
+--- 2x2 ---
+np.eig: 8.537 us
+eigvals+inv: 332.566 us
+--- 4x4 ---
+np.eig: 9.393 us
+eigvals+inv: 93.634 us
+--- 6x6 ---
+np.eig: 13.604 us
+eigvals+inv: 97.772 us
+--- 8x8 ---
+np.eig: 16.684 us
+eigvals+inv: 102.123 us
+--- 10x10 ---
+np.eig: 20.958 us
+eigvals+inv: 109.687 us
+root@1cf7d2c19296:/app#

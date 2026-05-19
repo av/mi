@@ -1,0 +1,11 @@
+{
+  "analysis": "QEMU started with PID 210. Now I need to wait for the telnet port to be ready. I'll use a loop that checks every second if the port is listening using `nc -z 127.0.0.1 6665` or `timeout 1 bash -c 'echo >/dev/tcp/127.0.0.1/6665' 2>/dev/null`. Once ready, I'll announce completion.",
+  "plan": "Loop until port 6665 is open. Use `nc -z 127.0.0.1 6665` to test. Loop every second for up to 30 seconds.",
+  "commands": [
+    {
+      "keystrokes": "for i in $(seq 1 30); do\n  if nc -z 127.0.0.1 6665 2>/dev/null; then\n    echo \"Port 6665 is ready!\"\n    exit 0\n  fi\n  echo \"Waiting... $i\"\n  sleep 1\ndone\necho \"Timed out waiting for port 6665\"\n",
+      "duration": 35.0
+    }
+  ],
+  "task_complete": false
+}

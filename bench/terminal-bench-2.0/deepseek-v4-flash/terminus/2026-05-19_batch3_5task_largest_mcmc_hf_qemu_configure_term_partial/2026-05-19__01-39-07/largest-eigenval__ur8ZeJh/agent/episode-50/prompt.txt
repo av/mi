@@ -1,0 +1,68 @@
+Previous response had warnings:
+WARNINGS: - Extra text detected before JSON object
+- Extra text detected after JSON object
+
+New Terminal Output:
+
+root@1cf7d2c19296:/app# python3 /app/bench_lapack.py 2>&1
+['HAS_ILP64', '__all__', '__builtins__', '__cached__', '__doc__', '__file__', '__loader__', '__name__', '__package__', '__spec__', '_check_work_float', '_clapac
+k', '_compute_lwork', '_flapack', '_flapack_64', '_get_funcs', '_int32_max', '_int64_max', '_lapack_alias', '_lapack_cast_dict', '_memoize_get_funcs', '_normali
+ze_lapack_dtype', '_normalize_lapack_dtype1', 'cgbcon', 'cgbsv', 'cgbtrf', 'cgbtrs', 'cgebal', 'cgecon', 'cgeequ', 'cgeequb', 'cgees', 'cgeev', 'cgeev_lwork', '
+cgehrd', 'cgehrd_lwork', 'cgels', 'cgels_lwork', 'cgelsd', 'cgelsd_lwork', 'cgelss', 'cgelss_lwork', 'cgelsy', 'cgelsy_lwork', 'cgemqrt', 'cgeqp3', 'cgeqrf', 'c
+geqrf_lwork', 'cgeqrfp', 'cgeqrfp_lwork', 'cgeqrt', 'cgerqf', 'cgesc2', 'cgesdd', 'cgesdd_lwork', 'cgesv', 'cgesvd', 'cgesvd_lwork', 'cgesvx', 'cgetc2', 'cgetrf
+', 'cgetri', 'cgetri_lwork', 'cgetrs', 'cgges', 'cggev', 'cgglse', 'cgglse_lwork', 'cgtcon', 'cgtsv', 'cgtsvx', 'cgttrf', 'cgttrs', 'chbevd', 'chbevx', 'checon'
+, 'cheequb', 'cheev', 'cheev_lwork', 'cheevd', 'cheevd_lwork', 'cheevr', 'cheevr_lwork', 'cheevx', 'cheevx_lwork', 'chegst', 'chegv', 'chegv_lwork', 'chegvd', '
+chegvx', 'chegvx_lwork', 'chesv', 'chesv_lwork', 'chesvx', 'chesvx_lwork', 'chetrd', 'chetrd_lwork', 'chetrf', 'chetrf_lwork', 'chetri', 'chetrs', 'chfrk', 'cla
+ngb', 'clange', 'clantr', 'clarf', 'clarfg', 'clartg', 'claswp', 'clauum', 'cpbsv', 'cpbtrf', 'cpbtrs', 'cpftrf', 'cpftri', 'cpftrs', 'cpocon', 'cposv', 'cposvx
+', 'cpotrf', 'cpotri', 'cpotrs', 'cppcon', 'cppsv', 'cpptrf', 'cpptri', 'cpptrs', 'cpstf2', 'cpstrf', 'cpteqr', 'cptsv', 'cptsvx', 'cpttrf', 'cpttrs', 'crot', '
+csycon', 'csyconv', 'csyequb', 'csysv', 'csysv_lwork', 'csysvx', 'csysvx_lwork', 'csytf2', 'csytrf', 'csytrf_lwork', 'csytri', 'csytrs', 'ctbtrs', 'ctfsm', 'ctf
+ttp', 'ctfttr', 'ctgexc', 'ctgsen', 'ctgsen_lwork', 'ctpmqrt', 'ctpqrt', 'ctpttf', 'ctpttr', 'ctrcon', 'ctrexc', 'ctrsen', 'ctrsen_lwork', 'ctrsyl', 'ctrtri', '
+ctrtrs', 'ctrttf', 'ctrttp', 'ctzrzf', 'ctzrzf_lwork', 'cuncsd', 'cuncsd_lwork', 'cunghr', 'cunghr_lwork', 'cungqr', 'cungrq', 'cunmqr', 'cunmrz', 'cunmrz_lwork
+', 'dgbcon', 'dgbsv', 'dgbtrf', 'dgbtrs', 'dgebal', 'dgecon', 'dgeequ', 'dgeequb', 'dgees', 'dgeev', 'dgeev_lwork', 'dgehrd', 'dgehrd_lwork', 'dgejsv', 'dgels',
+ 'dgels_lwork', 'dgelsd', 'dgelsd_lwork', 'dgelss', 'dgelss_lwork', 'dgelsy', 'dgelsy_lwork', 'dgemqrt', 'dgeqp3', 'dgeqrf', 'dgeqrf_lwork', 'dgeqrfp', 'dgeqrfp
+_lwork', 'dgeqrt', 'dgerqf', 'dgesc2', 'dgesdd', 'dgesdd_lwork', 'dgesv', 'dgesvd', 'dgesvd_lwork', 'dgesvx', 'dgetc2', 'dgetrf', 'dgetri', 'dgetri_lwork', 'dge
+trs', 'dgges', 'dggev', 'dgglse', 'dgglse_lwork', 'dgtcon', 'dgtsv', 'dgtsvx', 'dgttrf', 'dgttrs', 'dlamch', 'dlangb', 'dlange', 'dlantr', 'dlarf', 'dlarfg', 'd
+lartg', 'dlasd4', 'dlaswp', 'dlauum', 'dorcsd', 'dorcsd_lwork', 'dorghr', 'dorghr_lwork', 'dorgqr', 'dorgrq', 'dormqr', 'dormrz', 'dormrz_lwork', 'dpbsv', 'dpbt
+rf', 'dpbtrs', 'dpftrf', 'dpftri', 'dpftrs', 'dpocon', 'dposv', 'dposvx', 'dpotrf', 'dpotri', 'dpotrs', 'dppcon', 'dppsv', 'dpptrf', 'dpptri', 'dpptrs', 'dpstf2
+', 'dpstrf', 'dpteqr', 'dptsv', 'dptsvx', 'dpttrf', 'dpttrs', 'dsbev', 'dsbevd', 'dsbevx', 'dsfrk', 'dstebz', 'dstein', 'dstemr', 'dstemr_lwork', 'dsterf', 'dst
+ev', 'dstevd', 'dsycon', 'dsyconv', 'dsyequb', 'dsyev', 'dsyev_lwork', 'dsyevd', 'dsyevd_lwork', 'dsyevr', 'dsyevr_lwork', 'dsyevx', 'dsyevx_lwork', 'dsygst', '
+dsygv', 'dsygv_lwork', 'dsygvd', 'dsygvx', 'dsygvx_lwork', 'dsysv', 'dsysv_lwork', 'dsysvx', 'dsysvx_lwork', 'dsytf2', 'dsytrd', 'dsytrd_lwork', 'dsytrf', 'dsyt
+rf_lwork', 'dsytri', 'dsytrs', 'dtbtrs', 'dtfsm', 'dtfttp', 'dtfttr', 'dtgexc', 'dtgsen', 'dtgsen_lwork', 'dtgsyl', 'dtpmqrt', 'dtpqrt', 'dtpttf', 'dtpttr', 'dt
+rcon', 'dtrexc', 'dtrsen', 'dtrsen_lwork', 'dtrsyl', 'dtrtri', 'dtrtrs', 'dtrttf', 'dtrttp', 'dtzrzf', 'dtzrzf_lwork', 'find_best_lapack_type', 'get_lapack_func
+s', 'ilaver', 'np', 'routine', 'sgbcon', 'sgbsv', 'sgbtrf', 'sgbtrs', 'sgebal', 'sgecon', 'sgeequ', 'sgeequb', 'sgees', 'sgeev', 'sgeev_lwork', 'sgehrd', 'sgehr
+d_lwork', 'sgejsv', 'sgels', 'sgels_lwork', 'sgelsd', 'sgelsd_lwork', 'sgelss', 'sgelss_lwork', 'sgelsy', 'sgelsy_lwork', 'sgemqrt', 'sgeqp3', 'sgeqrf', 'sgeqrf
+_lwork', 'sgeqrfp', 'sgeqrfp_lwork', 'sgeqrt', 'sgerqf', 'sgesc2', 'sgesdd', 'sgesdd_lwork', 'sgesv', 'sgesvd', 'sgesvd_lwork', 'sgesvx', 'sgetc2', 'sgetrf', 's
+getri', 'sgetri_lwork', 'sgetrs', 'sgges', 'sggev', 'sgglse', 'sgglse_lwork', 'sgtcon', 'sgtsv', 'sgtsvx', 'sgttrf', 'sgttrs', 'slamch', 'slangb', 'slange', 'sl
+antr', 'slarf', 'slarfg', 'slartg', 'slasd4', 'slaswp', 'slauum', 'sorcsd', 'sorcsd_lwork', 'sorghr', 'sorghr_lwork', 'sorgqr', 'sorgrq', 'sormqr', 'sormrz', 's
+ormrz_lwork', 'spbsv', 'spbtrf', 'spbtrs', 'spftrf', 'spftri', 'spftrs', 'spocon', 'sposv', 'sposvx', 'spotrf', 'spotri', 'spotrs', 'sppcon', 'sppsv', 'spptrf',
+ 'spptri', 'spptrs', 'spstf2', 'spstrf', 'spteqr', 'sptsv', 'sptsvx', 'spttrf', 'spttrs', 'ssbev', 'ssbevd', 'ssbevx', 'ssfrk', 'sstebz', 'sstein', 'sstemr', 's
+stemr_lwork', 'ssterf', 'sstev', 'sstevd', 'ssycon', 'ssyconv', 'ssyequb', 'ssyev', 'ssyev_lwork', 'ssyevd', 'ssyevd_lwork', 'ssyevr', 'ssyevr_lwork', 'ssyevx',
+ 'ssyevx_lwork', 'ssygst', 'ssygv', 'ssygv_lwork', 'ssygvd', 'ssygvx', 'ssygvx_lwork', 'ssysv', 'ssysv_lwork', 'ssysvx', 'ssysvx_lwork', 'ssytf2', 'ssytrd', 'ss
+ytrd_lwork', 'ssytrf', 'ssytrf_lwork', 'ssytri', 'ssytrs', 'stbtrs', 'stfsm', 'stfttp', 'stfttr', 'stgexc', 'stgsen', 'stgsen_lwork', 'stgsyl', 'stpmqrt', 'stpq
+rt', 'stpttf', 'stpttr', 'strcon', 'strexc', 'strsen', 'strsen_lwork', 'strsyl', 'strtri', 'strtrs', 'strttf', 'strttp', 'stzrzf', 'stzrzf_lwork', 'zgbcon', 'zg
+bsv', 'zgbtrf', 'zgbtrs', 'zgebal', 'zgecon', 'zgeequ', 'zgeequb', 'zgees', 'zgeev', 'zgeev_lwork', 'zgehrd', 'zgehrd_lwork', 'zgels', 'zgels_lwork', 'zgelsd',
+'zgelsd_lwork', 'zgelss', 'zgelss_lwork', 'zgelsy', 'zgelsy_lwork', 'zgemqrt', 'zgeqp3', 'zgeqrf', 'zgeqrf_lwork', 'zgeqrfp', 'zgeqrfp_lwork', 'zgeqrt', 'zgerqf
+', 'zgesc2', 'zgesdd', 'zgesdd_lwork', 'zgesv', 'zgesvd', 'zgesvd_lwork', 'zgesvx', 'zgetc2', 'zgetrf', 'zgetri', 'zgetri_lwork', 'zgetrs', 'zgges', 'zggev', 'z
+gglse', 'zgglse_lwork', 'zgtcon', 'zgtsv', 'zgtsvx', 'zgttrf', 'zgttrs', 'zhbevd', 'zhbevx', 'zhecon', 'zheequb', 'zheev', 'zheev_lwork', 'zheevd', 'zheevd_lwor
+k', 'zheevr', 'zheevr_lwork', 'zheevx', 'zheevx_lwork', 'zhegst', 'zhegv', 'zhegv_lwork', 'zhegvd', 'zhegvx', 'zhegvx_lwork', 'zhesv', 'zhesv_lwork', 'zhesvx',
+'zhesvx_lwork', 'zhetrd', 'zhetrd_lwork', 'zhetrf', 'zhetrf_lwork', 'zhetri', 'zhetrs', 'zhfrk', 'zlangb', 'zlange', 'zlantr', 'zlarf', 'zlarfg', 'zlartg', 'zla
+swp', 'zlauum', 'zpbsv', 'zpbtrf', 'zpbtrs', 'zpftrf', 'zpftri', 'zpftrs', 'zpocon', 'zposv', 'zposvx', 'zpotrf', 'zpotri', 'zpotrs', 'zppcon', 'zppsv', 'zpptrf
+', 'zpptri', 'zpptrs', 'zpstf2', 'zpstrf', 'zpteqr', 'zptsv', 'zptsvx', 'zpttrf', 'zpttrs', 'zrot', 'zsycon', 'zsyconv', 'zsyequb', 'zsysv', 'zsysv_lwork', 'zsy
+svx', 'zsysvx_lwork', 'zsytf2', 'zsytrf', 'zsytrf_lwork', 'zsytri', 'zsytrs', 'ztbtrs', 'ztfsm', 'ztfttp', 'ztfttr', 'ztgexc', 'ztgsen', 'ztgsen_lwork', 'ztpmqr
+t', 'ztpqrt', 'ztpttf', 'ztpttr', 'ztrcon', 'ztrexc', 'ztrsen', 'ztrsen_lwork', 'ztrsyl', 'ztrtri', 'ztrtrs', 'ztrttf', 'ztrttp', 'ztzrzf', 'ztzrzf_lwork', 'zun
+csd', 'zuncsd_lwork', 'zunghr', 'zunghr_lwork', 'zungqr', 'zungrq', 'zunmqr', 'zunmrz', 'zunmrz_lwork']
+root@1cf7d2c19296:/app# echo "Starting clean..."
+Starting clean...
+root@1cf7d2c19296:/app# ls -la
+total 24
+drwxr-xr-x. 1 root root  134 May 18 23:47 .
+drwxr-xr-x. 1 root root   46 May 18 23:39 ..
+drwxr-xr-x. 1 root root   42 May 18 23:39 __pycache__
+-rw-r--r--. 1 root root 1026 May 18 23:45 bench_fast.py
+-rw-r--r--. 1 root root 1068 May 18 23:44 bench_final.py
+-rw-r--r--. 1 root root  183 May 18 23:47 bench_lapack.py
+-rw-r--r--. 1 root root 1139 May 18 23:44 bench_power.py
+-rw-r--r--. 1 root root  642 Sep 13  2025 eigen.py
+-rw-r--r--. 1 root root 2246 Sep 13  2025 eval.py
+root@1cf7d2c19296:/app# rm -f bench*.py test*.py
+root@1cf7d2c19296:/app#

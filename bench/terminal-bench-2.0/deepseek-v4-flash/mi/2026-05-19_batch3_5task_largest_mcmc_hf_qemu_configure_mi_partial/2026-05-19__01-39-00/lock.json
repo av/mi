@@ -1,0 +1,221 @@
+{
+    "schema_version": 1,
+    "created_at": "2026-05-18T23:39:02.940127Z",
+    "harbor": {
+        "version": "0.7.1",
+        "is_editable": false
+    },
+    "invocation": [
+        "/home/everlier/.cache/uv/archive-v0/bs-Xde0XyqE_1FMsha3xU/bin/harbor",
+        "run",
+        "--dataset",
+        "terminal-bench@2.0",
+        "--agent-import-path",
+        "mi_harbor.mi_agent:MiAgent",
+        "--model",
+        "openai/deepseek/deepseek-v4-flash",
+        "--n-concurrent",
+        "1",
+        "--n-tasks",
+        "5",
+        "--yes",
+        "--include-task-name",
+        "largest-eigenval",
+        "--include-task-name",
+        "mcmc-sampling-stan",
+        "--include-task-name",
+        "hf-model-inference",
+        "--include-task-name",
+        "qemu-startup",
+        "--include-task-name",
+        "configure-git-webserver",
+        "--jobs-dir",
+        "/tmp/mi-30-eval-iter3/mi"
+    ],
+    "n_concurrent_trials": 1,
+    "retry": {
+        "max_retries": 0,
+        "exclude_exceptions": [
+            "VerifierOutputParseError",
+            "RewardFileNotFoundError",
+            "RewardFileEmptyError",
+            "AgentTimeoutError",
+            "VerifierTimeoutError"
+        ],
+        "wait_multiplier": 1.0,
+        "min_wait_sec": 1.0,
+        "max_wait_sec": 60.0
+    },
+    "trials": [
+        {
+            "task": {
+                "name": "largest-eigenval",
+                "type": "git",
+                "digest": "sha256:2bfa63009e386065e419e09018ddf20ecaeceaeb864844ebcac67e87360a8304",
+                "source": "terminal-bench",
+                "path": "largest-eigenval",
+                "git_url": "https://github.com/laude-institute/terminal-bench-2.git",
+                "git_commit_id": "69671fbaac6d67a7ef0dfec016cc38a64ef7a77c"
+            },
+            "timeout_multiplier": 1.0,
+            "agent": {
+                "import_path": "mi_harbor.mi_agent:MiAgent",
+                "model_name": "openai/deepseek/deepseek-v4-flash",
+                "skills": [],
+                "kwargs": {},
+                "env": {},
+                "mcp_servers": []
+            },
+            "skills": [],
+            "environment": {
+                "type": "docker",
+                "force_build": false,
+                "delete": true,
+                "suppress_override_warnings": false,
+                "extra_docker_compose": [],
+                "env": {},
+                "kwargs": {}
+            },
+            "verifier": {
+                "env": {},
+                "disable": false
+            }
+        },
+        {
+            "task": {
+                "name": "configure-git-webserver",
+                "type": "git",
+                "digest": "sha256:367c8c1983aabd745ac1bfd54b72877dcc1d3136f0f81603c6a6e8713f2580ab",
+                "source": "terminal-bench",
+                "path": "configure-git-webserver",
+                "git_url": "https://github.com/laude-institute/terminal-bench-2.git",
+                "git_commit_id": "69671fbaac6d67a7ef0dfec016cc38a64ef7a77c"
+            },
+            "timeout_multiplier": 1.0,
+            "agent": {
+                "import_path": "mi_harbor.mi_agent:MiAgent",
+                "model_name": "openai/deepseek/deepseek-v4-flash",
+                "skills": [],
+                "kwargs": {},
+                "env": {},
+                "mcp_servers": []
+            },
+            "skills": [],
+            "environment": {
+                "type": "docker",
+                "force_build": false,
+                "delete": true,
+                "suppress_override_warnings": false,
+                "extra_docker_compose": [],
+                "env": {},
+                "kwargs": {}
+            },
+            "verifier": {
+                "env": {},
+                "disable": false
+            }
+        },
+        {
+            "task": {
+                "name": "hf-model-inference",
+                "type": "git",
+                "digest": "sha256:c3bddc31278033ec47e718cb0174c9733236a57f468ccd542eb0f20409aededb",
+                "source": "terminal-bench",
+                "path": "hf-model-inference",
+                "git_url": "https://github.com/laude-institute/terminal-bench-2.git",
+                "git_commit_id": "69671fbaac6d67a7ef0dfec016cc38a64ef7a77c"
+            },
+            "timeout_multiplier": 1.0,
+            "agent": {
+                "import_path": "mi_harbor.mi_agent:MiAgent",
+                "model_name": "openai/deepseek/deepseek-v4-flash",
+                "skills": [],
+                "kwargs": {},
+                "env": {},
+                "mcp_servers": []
+            },
+            "skills": [],
+            "environment": {
+                "type": "docker",
+                "force_build": false,
+                "delete": true,
+                "suppress_override_warnings": false,
+                "extra_docker_compose": [],
+                "env": {},
+                "kwargs": {}
+            },
+            "verifier": {
+                "env": {},
+                "disable": false
+            }
+        },
+        {
+            "task": {
+                "name": "qemu-startup",
+                "type": "git",
+                "digest": "sha256:8ca9793ec30d3b26ac351f5b9ac0a2631003c365c60be9fcafc0451256a072a7",
+                "source": "terminal-bench",
+                "path": "qemu-startup",
+                "git_url": "https://github.com/laude-institute/terminal-bench-2.git",
+                "git_commit_id": "69671fbaac6d67a7ef0dfec016cc38a64ef7a77c"
+            },
+            "timeout_multiplier": 1.0,
+            "agent": {
+                "import_path": "mi_harbor.mi_agent:MiAgent",
+                "model_name": "openai/deepseek/deepseek-v4-flash",
+                "skills": [],
+                "kwargs": {},
+                "env": {},
+                "mcp_servers": []
+            },
+            "skills": [],
+            "environment": {
+                "type": "docker",
+                "force_build": false,
+                "delete": true,
+                "suppress_override_warnings": false,
+                "extra_docker_compose": [],
+                "env": {},
+                "kwargs": {}
+            },
+            "verifier": {
+                "env": {},
+                "disable": false
+            }
+        },
+        {
+            "task": {
+                "name": "mcmc-sampling-stan",
+                "type": "git",
+                "digest": "sha256:2315677f166e4478361ba23b4587bb75eeb3c9d13020f0acbf12829a00b43266",
+                "source": "terminal-bench",
+                "path": "mcmc-sampling-stan",
+                "git_url": "https://github.com/laude-institute/terminal-bench-2.git",
+                "git_commit_id": "69671fbaac6d67a7ef0dfec016cc38a64ef7a77c"
+            },
+            "timeout_multiplier": 1.0,
+            "agent": {
+                "import_path": "mi_harbor.mi_agent:MiAgent",
+                "model_name": "openai/deepseek/deepseek-v4-flash",
+                "skills": [],
+                "kwargs": {},
+                "env": {},
+                "mcp_servers": []
+            },
+            "skills": [],
+            "environment": {
+                "type": "docker",
+                "force_build": false,
+                "delete": true,
+                "suppress_override_warnings": false,
+                "extra_docker_compose": [],
+                "env": {},
+                "kwargs": {}
+            },
+            "verifier": {
+                "env": {},
+                "disable": false
+            }
+        }
+    ]
+}

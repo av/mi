@@ -1,0 +1,15 @@
+{
+  "analysis": "The previous JSON had unescaped quotes in the analysis field. Let me check the QEMU log and process status to diagnose why QEMU failed.",
+  "plan": "1. Check /tmp/qemu.log for errors\n2. Check if any QEMU processes are running\n3. Kill any stale processes\n4. Restart QEMU with simpler options and verify",
+  "commands": [
+    {
+      "keystrokes": "cat /tmp/qemu.log 2>/dev/null || echo \"(no log)\"\n",
+      "duration": 0.1
+    },
+    {
+      "keystrokes": "ps aux | grep qemu\n",
+      "duration": 0.1
+    }
+  ],
+  "task_complete": false
+}

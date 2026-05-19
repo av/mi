@@ -1,0 +1,5 @@
+New Terminal Output:
+
+root@e0dc3a2d2af7:/app# ls -la /app/app.py 2>/dev
+bash: /dev: Is a directory
+root@e0dc3a2d2af7:/app#

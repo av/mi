@@ -1,0 +1,29 @@
+New Terminal Output:
+
+root@c13b8dc816d1:/app# qemu-system-x86_64 -cdrom /app/alpine.iso -hda /app/alpine-disk.qcow2 -serial telnet:0.0.0.0:6665,server,nowait -nographic -m 256M -boot
+ d &> /tmp/qemu.log &
+[1] 121
+root@c13b8dc816d1:/app# echo $!
+121
+root@c13b8dc816d1:/app#
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

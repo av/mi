@@ -1,0 +1,17 @@
+```json
+{
+  "analysis": "The terminal seems to be stuck in a weird state (waiting for more input). I need to cancel whatever is pending.",
+  "plan": "Send Ctrl+C to cancel any pending operation, then check the terminal state.",
+  "commands": [
+    {
+      "keystrokes": "\003",
+      "duration": 0.2
+    },
+    {
+      "keystrokes": "",
+      "duration": 0.1
+    }
+  ],
+  "task_complete": false
+}
+```

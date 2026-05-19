@@ -1,0 +1,5 @@
+Previous response had parsing errors:
+ERROR: Invalid JSON: Expecting ',' delimiter: line 2 column 25 (char 26) | Content preview: '{\n  "analysis": "analysis": "The Flask server is running successfully! The model loaded from cache, '...
+WARNINGS: - Extra text detected before JSON object
+
+Please fix these issues and provide a proper JSON response.

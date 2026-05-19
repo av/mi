@@ -1,0 +1,98 @@
+[?2004hroot@e91006c5764b:/app# asciinema rec --stdin /logs/agent/recording.cast
+[?2004l[0;32masciinema: recording asciicast to /logs/agent/recording.cast[0m
+[0;32masciinema: press <ctrl-d> or type "exit" when you're done[0m
+[?2004hroot@e91006c5764b:/app# clear
+[?2004l[H[J[3J[?2004hroot@e91006c5764b:/app# ls -la
+[?2004ltotal 4
+drwxr-xr-x. 1 root root  16 Oct 31  2025 [0m[01;34m.[0m
+drwxr-xr-x. 1 root root  40 May 18 23:54 [01;34m..[0m
+-rw-r--r--. 1 root root 351 Oct 24  2025 data.csv
+[?2004hroot@e91006c5764b:/app# which R
+[?2004l/usr/bin/R
+[?2004hroot@e91006c5764b:/app# R --version
+[?2004lR version 4.3.3 (2024-02-29) -- "Angel Food Cake"
+Copyright (C) 2024 The R Foundation for Statistical Computing
+Platform: x86_64-pc-linux-gnu (64-bit)
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under the terms of the
+GNU General Public License versions 2 or 3.
+For more information about these matters see
+https://www.gnu.org/licenses/.
+
+[?2004hroot@e91006c5764b:/app# which g++
+[?2004l/usr/bin/g++
+[?2004hroot@e91006c5764b:/app# which make
+[?2004l/usr/bin/make
+[?2004hroot@e91006c5764b:/app# cat /app/data.csv
+[?2004ly,n
+0,20
+0,20
+0,20
+0,20
+0,20
+0,19
+0,19
+0,19
+0,19
+0,18
+0,17
+0,20
+1,20
+1,20
+1,20
+1,19
+1,19
+1,18
+1,18
+2,25
+2,24
+2,23
+2,20
+2,20
+2,20
+2,20
+2,20
+2,20
+1,10
+5,49
+2,19
+5,46
+3,27
+2,17
+7,49
+7,47
+3,20
+3,20
+2,13
+9,48
+10,50
+4,20
+4,20
+4,20
+4,20
+4,20
+4,20
+4,20
+10,48
+4,19
+4,19
+4,19
+5,22
+11,46
+12,49
+5,20
+5,20
+6,23
+5,19
+6,22
+6,20
+6,20
+6,20
+16,52
+15,46
+15,47
+9,24
+4,14
+[?2004hroot@e91006c5764b:/app# R -e "installed.packages()[, 'Package']" 2>/dev/null | tr ',' '\n' | grep -i rstan
+[?2004l[?2004hroot@e91006c5764b:/app# 

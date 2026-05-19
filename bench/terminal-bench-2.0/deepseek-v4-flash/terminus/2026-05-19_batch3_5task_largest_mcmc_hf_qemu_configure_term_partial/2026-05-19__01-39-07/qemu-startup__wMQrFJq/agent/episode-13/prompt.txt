@@ -1,0 +1,9 @@
+New Terminal Output:
+
+root@c13b8dc816d1:/app# kill -9 121 2>/dev/null; echo "killed stopped process"
+killed stopped process
+root@c13b8dc816d1:/app# timeout 3 nc 127.0.0.1 6665 2>&1 || echo "(timeout or connection closed)"
+[1]+  Killed                  qemu-system-x86_64 -cdrom /app/alpine.iso -hda /app/alpine-disk.qcow2 -serial telnet:0.0.0.0:6665,server,nowait -nographic -m 256M
+ -boot d &> /tmp/qemu.log
+(timeout or connection closed)
+root@c13b8dc816d1:/app#

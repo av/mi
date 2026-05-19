@@ -1,0 +1,39 @@
+Previous response had warnings:
+WARNINGS: - Extra text detected before JSON object
+- Extra text detected after JSON object
+
+New Terminal Output:
+
+root@e91006c5764b:/app# R --version
+R version 4.3.3 (2024-02-29) -- "Angel Food Cake"
+Copyright (C) 2024 The R Foundation for Statistical Computing
+Platform: x86_64-pc-linux-gnu (64-bit)
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under the terms of the
+GNU General Public License versions 2 or 3.
+For more information about these matters see
+https://www.gnu.org/licenses/.
+
+root@e91006c5764b:/app# which g++
+/usr/bin/g++
+root@e91006c5764b:/app# which make
+/usr/bin/make
+root@e91006c5764b:/app#
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

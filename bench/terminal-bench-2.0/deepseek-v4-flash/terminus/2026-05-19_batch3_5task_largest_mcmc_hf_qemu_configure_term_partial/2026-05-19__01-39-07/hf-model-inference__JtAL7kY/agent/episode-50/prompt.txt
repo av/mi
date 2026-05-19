@@ -1,0 +1,4 @@
+Previous response had parsing errors:
+ERROR: Invalid JSON: Expecting ',' delimiter: line 6 column 33 (char 241) | Content preview: '{\n  "analysis": "Server restarted in background. Waiting for it to initialize and checking the log."'...
+
+Please fix these issues and provide a proper JSON response.

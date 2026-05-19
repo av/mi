@@ -1,0 +1,11 @@
+New Terminal Output:
+
+root@6b59ef50ab31:/var/www# cd /var/www/html && git remote -v
+origin  /git/server (fetch)
+origin  /git/server (push)
+root@6b59ef50ab31:/var/www/html# cd /var/www/html && git branch -a
+root@6b59ef50ab31:/var/www/html# python3 -m http.server 8080 --directory /var/www/html &
+[1] 1182
+root@6b59ef50ab31:/var/www/html# sleep 1
+Serving HTTP on 0.0.0.0 port 8080 (http://0.0.0.0:8080/) ...
+root@6b59ef50ab31:/var/www/html#

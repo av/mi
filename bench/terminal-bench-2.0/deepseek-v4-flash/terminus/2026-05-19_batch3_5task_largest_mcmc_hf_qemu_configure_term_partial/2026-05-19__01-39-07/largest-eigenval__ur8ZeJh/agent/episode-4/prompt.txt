@@ -1,0 +1,39 @@
+Previous response had warnings:
+WARNINGS: - Extra text detected before JSON object
+- Extra text detected after JSON object
+
+New Terminal Output:
+
+root@1cf7d2c19296:/app# python3 -c "
+> import numpy as np
+> import time
+>
+> # Compare eig vs eigvals
+> for size in [2,4,6,8,10]:
+>     A = np.random.normal(size=(size,size)).astype(np.float64)
+>
+>     # eig full
+>     t0 = time.perf_counter()
+>     for _ in range(1000):
+>         evals, evecs = np.linalg.eig(A)
+>     t1 = time.perf_counter()
+>     print(f'{size}x{size} eig: {(t1-t0)/1000*1e6:.1f} us')
+>
+>     # eigvals only
+>     t0 = time.perf_counter()
+>     for _ in range(1000):
+>         evals = np.linalg.eigvals(A)
+>     t1 = time.perf_counter()
+>     print(f'{size}x{size} eigvals: {(t1-t0)/1000*1e6:.1f} us')
+> "
+2x2 eig: 7.0 us
+2x2 eigvals: 6.3 us
+4x4 eig: 61.2 us
+4x4 eigvals: 7.4 us
+6x6 eig: 11.9 us
+6x6 eigvals: 10.6 us
+8x8 eig: 15.4 us
+8x8 eigvals: 12.4 us
+10x10 eig: 19.2 us
+10x10 eigvals: 15.4 us
+root@1cf7d2c19296:/app#

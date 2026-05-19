@@ -1,0 +1,31 @@
+Previous response had warnings:
+WARNINGS: - Extra text detected before JSON object
+- Extra text detected after JSON object
+
+New Terminal Output:
+
+root@1cf7d2c19296:/app# python3 -c "
+> import numba
+> import numpy as np
+>
+> @numba
+> import numpy as np
+>
+> def method_eig(A):
+>     evals, evecs = np.linalg.eig(A)
+>     idx = np.abs(evals).argmax()
+>     return evals[idx], evecs[:, idx]
+>
+> # Test Numba compilation
+> print('Trying Numba...')
+> numba_method = numba.njit()(method_eig)
+> print('Success!')
+> A = np.random.normal(size=(5,5))
+> result = numba_method(A)
+> print('Result:', result)
+> "
+  File "<string>", line 6
+    import numpy as np
+    ^^^^^^
+SyntaxError: invalid syntax
+root@1cf7d2c19296:/app#

@@ -1,0 +1,41 @@
+New Terminal Output:
+root@6b59ef50ab31:/app# ls -la
+total 0
+drwxr-xr-x. 1 root root  0 Oct 22  2025 .
+drwxr-xr-x. 1 root root 40 May 18 23:39 ..
+root@6b59ef50ab31:/app# which git && git --version
+root@6b59ef50ab31:/app# which python3 || which python
+/usr/bin/python3
+root@6b59ef50ab31:/app# df -h
+Filesystem      Size  Used Avail Use% Mounted on
+overlay         1.9T  1.3T  579G  69% /
+tmpfs            64M     0   64M   0% /dev
+shm              64M   24K   64M   1% /dev/shm
+tmpfs            61G  7.8G   53G  13% /logs/agent
+/dev/nvme0n1p3  1.9T  1.3T  579G  69% /etc/hosts
+tmpfs            61G     0   61G   0% /proc/acpi
+tmpfs            61G     0   61G   0% /proc/asound
+tmpfs            61G     0   61G   0% /proc/scsi
+tmpfs            61G     0   61G   0% /sys/devices/virtual/powercap
+tmpfs            61G     0   61G   0% /sys/firmware
+root@6b59ef50ab31:/app#
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

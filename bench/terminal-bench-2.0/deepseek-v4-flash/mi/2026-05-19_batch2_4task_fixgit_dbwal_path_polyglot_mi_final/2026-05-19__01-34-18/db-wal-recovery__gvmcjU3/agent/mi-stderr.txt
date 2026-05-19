@@ -1,0 +1,10 @@
+[    9.28s] undefined:1
+[    9.28s] {
+[    9.28s] 
+[    9.29s] SyntaxError: Unexpected end of JSON input
+[    9.29s]     at JSON.parse (<anonymous>)
+[    9.29s]     at run (file:///usr/local/lib/node_modules/@avcodes/mi/index.mjs:45:116)
+[    9.29s]     at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+[    9.29s]     at async file:///usr/local/lib/node_modules/@avcodes/mi/index.mjs:68:93
+[    9.29s] 
+[    9.29s] Node.js v18.19.1
