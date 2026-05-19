@@ -1,0 +1,25 @@
+Previous response had warnings:
+WARNINGS: - Extra text detected before JSON object
+- Extra text detected after JSON object
+
+New Terminal Output:
+
+root@c454cc25e7a1:/app# python3 -c "
+> import struct
+> with open('orig', 'rb') as f:
+>     data = f.read()
+> # Search for common_floats = []
+>  for i in range(0, len(data)-4, 4):
+>     val = struct.unpack('f', data[i:i+4])[0]
+>     if 0 < abs(val) < 10 and val != 0 and abs(val - int(val)) > 0.0001:
+>         common_floats.append(val)
+> # Find unique nearby floats
+> unique = sorted(set(round(v, 6) for v in common_floats))
+> print('Number of unique floats:', len(unique))
+> print('Sample:', unique[:30])
+> " 2>&1 | head -30
+  File "<string>", line 6
+    for i in range(0, len(data)-4, 4):
+                                      ^
+IndentationError: unindent does not match any outer indentation level
+root@c454cc25e7a1:/app#

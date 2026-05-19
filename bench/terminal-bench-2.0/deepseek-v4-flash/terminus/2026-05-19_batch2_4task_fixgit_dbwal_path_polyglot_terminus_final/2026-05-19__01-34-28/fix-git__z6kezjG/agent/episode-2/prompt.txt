@@ -1,0 +1,55 @@
+New Terminal Output:
+root@049ad556a07f:/app/personal-site# ls -la
+total 44
+drwxr-xr-x. 1 root root   252 Sep 13  2025 .
+drwxr-xr-x. 1 root root    26 Sep 13  2025 ..
+drwxr-xr-x. 1 root root   184 Sep 13  2025 .git
+-rw-r--r--. 1 root root   100 Sep 13  2025 .gitignore
+-rw-r--r--. 1 root root    14 Sep 13  2025 CNAME
+-rw-r--r--. 1 root root    42 Sep 13  2025 Gemfile
+-rw-r--r--. 1 root root   152 Sep 13  2025 _config.yml
+drwxr-xr-x. 1 root root    60 Sep 13  2025 _includes
+drwxr-xr-x. 1 root root    24 Sep 13  2025 _layouts
+drwxr-xr-x. 1 root root    76 Sep 13  2025 _posters
+drwxr-xr-x. 1 root root   650 Sep 13  2025 _publications
+drwxr-xr-x. 1 root root    84 Sep 13  2025 biblib
+drwxr-xr-x. 1 root root   522 Sep 13  2025 css
+drwxr-xr-x. 1 root root   416 Sep 13  2025 fonts
+-rw-r--r--. 1 root root    47 Sep 13  2025 index.md
+drwxr-xr-x. 1 root root   104 Sep 13  2025 js
+-rw-r--r--. 1 root root  2382 Sep 13  2025 make_pubs.py
+-rw-r--r--. 1 root root 19618 Sep 13  2025 me.bib
+drwxr-xr-x. 1 root root   296 Sep 13  2025 resources
+root@049ad556a07f:/app/personal-site# git status
+On branch master
+nothing to commit, working tree clean
+root@049ad556a07f:/app/personal-site# git branch -a
+* master
+root@049ad556a07f:/app/personal-site# git log --oneline --all -20
+d7d3e4b (HEAD -> master) off the job market woo
+c4e38a1 Add code link for BLADE
+6f46fa0 CV Update
+dd7e395 Adds BLADE to bib
+2cd355a n+1 (for the last time???)
+8eaf505 Add BLADE
+cc2ec78 Underline
+d71094e Underline Conferences
+232b279 Remove posters
+3fdf5f5 Add NeurIPS
+8c4731d Add EMNLP acceptance
+f54f66b Add GR link
+18d2430 Add other links
+1dd055e Ignore Gemfile, etc
+5c77a6d Dont overwrite
+c7d2f95 Delete unsused files
+20b05d9 Remove more unused files
+2d144f7 Add yamls for new papers
+7882f2d Don't track _site
+cd2b8de Add new papers
+root@049ad556a07f:/app/personal-site# git reflog
+d7d3e4b (HEAD -> master) HEAD@{0}: checkout: moving from 650dba427e0a9dcd118f41a4c5e35c8017550a5a to master
+650dba4 HEAD@{1}: commit: Move to Stanford
+c4e38a1 HEAD@{2}: checkout: moving from master to HEAD~1
+d7d3e4b (HEAD -> master) HEAD@{3}: reset: moving to d7d3e4b
+b0d59cd HEAD@{4}: clone: from https://github.com/TheMikeMerrill/personal-site.git
+root@049ad556a07f:/app/personal-site#

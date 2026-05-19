@@ -1,0 +1,11 @@
+{"version": 2, "width": 160, "height": 40, "timestamp": 1779148312, "env": {"SHELL": "/bin/bash", "TERM": "tmux-256color"}}
+[0.003819, "o", "\u001b[?2004hroot@279141645ba3:/app# "]
+[0.95361, "i", "clear\r"]
+[0.953857, "o", "clear\r\n\u001b[?2004l\r"]
+[0.954624, "o", "\u001b[H\u001b[J\u001b[3J"]
+[0.954767, "o", "\u001b[?2004hroot@279141645ba3:/app# "]
+[381.322864, "i", "ls -la /app\n"]
+[381.323056, "o", "ls -la /app\r\n\u001b[?2004l\r"]
+[381.32424, "o", "total 0\r\n"]
+[381.324283, "o", "drwxr-xr-x. 1 root root  0 Oct 22  2025 \u001b[0m\u001b[01;34m.\u001b[0m\r\ndrwxr-xr-x. 1 root root 40 May 18 23:51 \u001b[01;34m..\u001b[0m\r\n"]
+[381.324397, "o", "\u001b[?2004hroot@279141645ba3:/app# "]

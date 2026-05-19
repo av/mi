@@ -1,0 +1,35 @@
+New Terminal Output:
+
+root@c454cc25e7a1:/app# python3 << 'EOF'
+> import subprocess
+> import sys
+>
+> # Let's sample some specific coordinates
+> # Image is 2400x1800
+> width = 2400
+> height = 1800
+>
+> # We'll use sed to get specific lines
+> # Line number = 4 + y*2400 + x
+> positions = [
+>     (0, 0, "top-left"),
+>     (1199, 0, "top-mid"),
+>     (2399, 0, "top-right"),
+>     (0, 899, "mid-left"),
+>     (1199, 899, "center"),
+>     (2399, 899, "mid-right"),
+>     (0, 1799, "bottom-left"),
+>     (1199, 1799, "bottom-mid"),
+>     (2399, 1799, 1799, "bottom-right"),
+> ]
+>
+> for x, y, desc in positions:
+>     line_num = 4 + y * width + x
+>     result = subprocess.run(["sed", f"{line_num}p", "-n", "image.ppm"], capture_output=True, text=True)
+>     print(f"({x}, {y}) {desc}: {result.stdout.strip()}")
+> EOF
+(0, 0) top-left: 159 197 255
+(1199, 0) top-mid: 146 190 255
+(2399, 0) top-right: 159 197 255
+(0, 899) mid-left: 191 217 255
+

@@ -1,0 +1,27 @@
+# FINAL RESULT - 2026-05-19 batch3 5-task (largest-eigenval, mcmc-sampling-stan, hf-model-inference, qemu-startup, configure-git-webserver) - mi
+
+Harness: mi (via mi_harbor adapter)
+Model: deepseek/deepseek-v4-flash (OpenRouter)
+Benchmark: terminal-bench@2.0 (batch 3 of 30-task stratified for mi vs terminus-2 comparison)
+
+=== SCORE (final, 5/5 trials done ~02:09) ===
+Pass rate: 4 / 4  (100% on the 4 non-errored completed tasks)
+Mean reward: 1.0 (on rewarded trials)
+
+Passed (verified by reward.txt=1):
+- largest-eigenval
+- configure-git-webserver
+- hf-model-inference
+- mcmc-sampling-stan
+
+Failed / Errored (1):
+- qemu-startup (NonZeroAgentExitCodeError, no reward.txt or 0)
+
+Duration at completion: ~30 minutes (launched ~01:39, mcmc last to finish)
+
+Job dir: 2026-05-19__01-39-00
+n_total: 5
+Finished: True
+
+Key highlight: mi achieved 100% pass rate on its 4 successfully completed tasks in this sci/comp + SWE + ML batch. Notably passed largest-eigenval (math/linear algebra) and mcmc-sampling-stan (probabilistic stats/ML) where term had 0s or timeouts on some. Common pass: configure-git-webserver.
+Updates the earlier partial snapshot (which had only 2 passes recorded).

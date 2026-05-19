@@ -1,0 +1,37 @@
+Downloading numpy (15.9MiB)
+ Downloaded numpy
+Installed 104 packages in 252ms
+01:39:04 - LiteLLM:WARNING: common_utils.py:979 - litellm: could not pre-load 
+bedrock-runtime response stream shape — Bedrock event-stream decoding will be 
+unavailable. Error: No module named 'botocore'
+01:39:05 - LiteLLM:WARNING: common_utils.py:24 - litellm: could not pre-load 
+sagemaker-runtime response stream shape — SageMaker event-stream decoding will 
+be unavailable. Error: No module named 'botocore'
+  5/5 Mean: 0.800 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 0:29:48 0:00:00
+
+terminal-bench • mi • deepseek/deepseek-v4-flash
+┏━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━┓
+┃ Trials ┃ Exceptions ┃  Mean ┃
+┡━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━┩
+│      4 │          1 │ 0.800 │
+└────────┴────────────┴───────┘
+
+┏━━━━━━━━┳━━━━━━━┓
+┃ Reward ┃ Count ┃
+┡━━━━━━━━╇━━━━━━━┩
+│ 1.0    │     4 │
+└────────┴───────┘
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━┓
+┃ Exception                 ┃ Count ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━┩
+│ NonZeroAgentExitCodeError │     1 │
+└───────────────────────────┴───────┘
+
+Job Info
+Total runtime: 29m 48s
+Results written to /tmp/mi-30-eval-iter3/mi/2026-05-19__01-39-00/result.json
+Inspect results by running `harbor view /tmp/mi-30-eval-iter3/mi`
+Share results by running `harbor upload 
+/tmp/mi-30-eval-iter3/mi/2026-05-19__01-39-00`
+

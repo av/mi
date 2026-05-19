@@ -1,0 +1,6 @@
+Previous response had parsing errors:
+ERROR: Invalid JSON: Expecting ',' delimiter: line 13 column 1 (char 809) | Content preview: '{\n  "analysis": "Good, we\'re back to a normal terminal. The trajectory.json content was just the com'...
+WARNINGS: - Extra text detected before JSON object
+- Extra text detected after JSON object
+
+Please fix these issues and provide a proper JSON response.

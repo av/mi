@@ -1,0 +1,75 @@
+[    3.61s] checking python and pip.
+[    3.61s] 
+[    3.88s] 
+[    3.88s] [90m⟡ bash({"command":"which python3 && python3 --version && pip3 --version"})[0m
+[    4.01s] [90m/usr/local/bin/python3
+[    4.01s] Python 3.13.7
+[    4.01s] pip 25.2 from /usr/local/lib/python3.13/site-packages/pip (python 3.13)
+[    4.02s] [0m
+[    7.08s] [90m⟡ bash({"command":"pip3 install transformers torch flask 2>&1 | tail -5","timeout":"120000"})[0m
+[    7.65s] [90mRequirement already satisfied: certifi>=2017.4.17 in /usr/local/lib/python3.13/site-packages (from requests->transformers) (2025.8.3)
+[    7.65s] WARNING: Running pip as the 'root' user can result in broken permi…[0m
+[   10.86s] [90m⟡ bash({"command":"mkdir -p /app/model_cache/sentiment_model"})[0m
+[   10.87s] [90m[0m
+[   12.98s] downloading model to local cache.
+[   12.98s] 
+[   14.10s] 
+[   14.11s] [90m⟡ bash({"command":"cd /app && python3 -c \"\nfrom transformers import AutoModelForSequenceClassification, AutoTokenizer\nmodel_name = 'distilbert-base-uncased-finetuned-sst-2-english'\nsave_path = '/app/model_cache/sentiment_model'\n\nprint('downloading tokenizer...')\ntokenizer = AutoTokenizer.from_pretrained(model_name)\ntokenizer.save_pretrained(save_path)\n\nprint('downloading model...')\nmodel = AutoModelForSequenceClassification.from_pretrained(model_name)\nmodel.save_pretrained(save_path)\n\nprint('done. files:')\nimport os\nfor f in os.listdir(save_path):\n    print(f'  {f}')\n\" 2>&1","timeout":"180000"})[0m
+[   24.59s] [90mdownloading tokenizer...
+[   24.60s] downloading model...
+[   24.60s] done. files:
+[   24.60s]   tokenizer_config.json
+[   24.60s]   special_tokens_map.json
+[   24.60s]   vocab.txt
+[   24.60s]   tokenizer.json
+[   24.60s]   config.json
+[   24.60s]   model.safetensors
+[   24.60s] [0m
+[   30.52s] model saved. writing flask api
+[   30.52s] [90m⟡ bash({"command":"cat > /app/sentiment_api.py << 'EOF'\nimport os\nimport sys\nfrom flask import Flask, request, jsonify\nfrom transformers import pipeline\n\napp = Flask(__name__)\n\nmodel_path = \"/app/model_cache/sentiment_model\"\nclassifier = pipeline(\n    \"sentiment-analysis\",\n    model=model_path,\n    tokenizer=model_path,\n)\n\n@app.route(\"/sentiment\", methods=[\"POST\"])\ndef sentiment():\n    data = request.get_json(silent=True)\n    if not data:\n        return jsonify({\"error\": \"request body must be valid json\"}), 400\n\n    text = data.get(\"text\")\n    if not isinstance(text, str) or not text.strip():\n        return jsonify({\"error\": \"field 'text' is required and must be a non-empty string\"}), 400\n\n    try:\n        result = classifier(text)[0]\n        label = result[\"label\"].lower()\n        score = result[\"score\"]\n\n        if label == \"positive\":\n            response = {\n                \"sentiment\": \"positive\",\n                \"confidence\": {\"positive\": round(score, 6), \"negative\": round(1 - score, 6)},\n            }\n        else:\n            response = {\n                \"sentiment\": \"negative\",\n                \"confidence\": {\"positive\": round(1 - score, 6), \"negative\": round(score, 6)},\n            }\n        return jsonify(response)\n    except Exception as e:\n        return jsonify({\"error\": str(e)}), 400\n\nif __name__ == \"__main__\":\n    app.run(host=\"0.0.0.0\", port=5000)\nEOF"})[0m
+[   30.52s] [90m[0m
+[   33.01s] starting server in background.
+[   33.01s] 
+[   33.40s] 
+[   33.40s] [90m⟡ bash({"bg":"true","command":"cd /app && python3 sentiment_api.py"})[0m
+[   33.40s] [90mpid:8533 log:/tmp/mi-1779148658923.log[0m
+[   36.88s] [90m⟡ bash({"command":"sleep 3 && curl -s -X POST http://localhost:5000/sentiment -H 'Content-Type: application/json' -d '{\"text\": \"this movie was fantastic\"}' | python3 -m json.tool","timeout":10000})[0m
+[   40.34s] [90m{
+[   40.34s]     "confidence": {
+[   40.34s]         "negative": 0.000121,
+[   40.34s]         "positive": 0.999879
+[   40.34s]     },
+[   40.34s]     "sentiment": "positive"
+[   40.35s] }
+[   40.35s] [0m
+[   43.71s] [90m⟡ bash({"command":"curl -s -X POST http://localhost:5000/sentiment -H 'Content-Type: application/json' -d '{\"text\": \"this movie was terrible\"}' | python3 -m json.tool && echo \"---\" && curl -s -X POST http://localhost:5000/sentiment -H 'Content-Type: application/json' -d '{\"wrong\": \"x\"}' | python3 -m json.tool","timeout":10000})[0m
+[   43.96s] [90m{
+[   43.96s]     "confidence": {
+[   43.96s]         "negative": 0.999695,
+[   43.96s]         "positive": 0.000305
+[   43.96s]     },
+[   43.96s]     "sentiment": "negative"
+[   43.97s] }
+[   43.97s] ---
+[   43.97s] {
+[   43.97s]     "error": "field 'text' is required and must be a non-empty string"
+[   43.97s] }
+[   43.97s] [0m
+[   46.22s] done. model saved to `/app/model_cache/sentiment_model`, flask api running on port 5000.
+[   46.22s] 
+[   46.24s] proof calls:
+[   46.25s] 
+[   46.25s] ```
+[   46.63s] curl -s -X POST http://localhost:5000/sentiment -H 'Content-Type: application/json' -d '{"text": "this movie was fantastic"}'
+[   46.63s] ```
+[   46.74s] → positive, 0.999879 / 0.000121
+[   46.74s] 
+[   46.74s] ```
+[   47.20s] curl -s -X POST http://localhost:5000/sentiment -H 'Content-Type: application/json' -d '{"text": "this movie was terrible"}'
+[   47.24s] ```
+[   47.34s] → negative, 0.999695 / 0.000305
+[   47.34s] 
+[   47.34s] ```
+[   47.66s] curl -s -X POST http://localhost:5000/sentiment -H 'Content-Type: application/json' -d '{"wrong": "x"}'
+[   47.66s] ```
+[   48.29s] → 400 error: "field 'text' is required and must be a non-empty string"

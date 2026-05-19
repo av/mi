@@ -1,0 +1,17 @@
+Previous response had warnings:
+WARNINGS: - Extra text detected before JSON object
+- Extra text detected after JSON object
+
+New Terminal Output:
+
+root@93525de64552:/app# mount | grep overlay | head -1
+overlay on / type overlay (rw,relatime,seclabel,lowerdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/17258/fs:/var/lib/containerd/io.co
+ntainerd.snapshotter.v1.overlayfs/snapshots/17257/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/17256/fs:/var/lib/containerd/io.contai
+nerd.snapshotter.v1.overlayfs/snapshots/17255/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/17246/fs:/var/lib/containerd/io.containerd
+.snapshotter.v1.overlayfs/snapshots/17214/fs,upperdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/17259/fs,workdir=/var/lib/containerd/
+io.containerd.snapshotter.v1.overlayfs/snapshots/17259/work)
+root@93525de64552:/app# ls -la /var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/17214/fs/app/ 2>&1
+ls: cannot access '/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/17214/fs/app/': No such file or directory
+root@93525de64552:/app# ls -la /var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/ 2>&1 | head -10
+ls: cannot access '/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/': No such file or directory
+root@93525de64552:/app#

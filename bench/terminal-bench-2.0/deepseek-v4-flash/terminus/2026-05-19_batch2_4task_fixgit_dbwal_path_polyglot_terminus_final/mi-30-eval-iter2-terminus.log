@@ -1,0 +1,36 @@
+01:34:30 - LiteLLM:WARNING: common_utils.py:979 - litellm: could not pre-load 
+bedrock-runtime response stream shape — Bedrock event-stream decoding will be 
+unavailable. Error: No module named 'botocore'
+01:34:30 - LiteLLM:WARNING: common_utils.py:24 - litellm: could not pre-load 
+sagemaker-runtime response stream shape — SageMaker event-stream decoding will 
+be unavailable. Error: No module named 'botocore'
+  4/4 Mean: 0.250 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 0:32:43 0:00:00
+
+terminal-bench • terminus-2 • deepseek/deepseek-v4-flash
+┏━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━┓
+┃ Trials ┃ Exceptions ┃  Mean ┃
+┡━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━┩
+│      4 │          3 │ 0.250 │
+└────────┴────────────┴───────┘
+
+┏━━━━━━━━┳━━━━━━━┓
+┃ Reward ┃ Count ┃
+┡━━━━━━━━╇━━━━━━━┩
+│ 0.0    │     3 │
+│ 1.0    │     1 │
+└────────┴───────┘
+
+┏━━━━━━━━━━━━━━━━━━━┳━━━━━━━┓
+┃ Exception         ┃ Count ┃
+┡━━━━━━━━━━━━━━━━━━━╇━━━━━━━┩
+│ AgentTimeoutError │     3 │
+└───────────────────┴───────┘
+
+Job Info
+Total runtime: 32m 43s
+Results written to 
+/tmp/mi-30-eval-iter2/terminus/2026-05-19__01-34-28/result.json
+Inspect results by running `harbor view /tmp/mi-30-eval-iter2/terminus`
+Share results by running `harbor upload 
+/tmp/mi-30-eval-iter2/terminus/2026-05-19__01-34-28`
+

@@ -1,0 +1,5 @@
+Previous response had parsing errors:
+ERROR: Invalid JSON: Invalid control character at: line 6 column 384 (char 1539) | Content preview: '{\n  "analysis": "Now I can see the trace function structure:\\n\\n1. It calls sphere_intersect with a '...
+WARNINGS: - Extra text detected before JSON object
+
+Please fix these issues and provide a proper JSON response.

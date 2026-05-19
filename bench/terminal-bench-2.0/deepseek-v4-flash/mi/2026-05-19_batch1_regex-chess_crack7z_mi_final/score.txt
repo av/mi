@@ -1,0 +1,24 @@
+# FINAL RESULT - 2026-05-19 batch1 2-task (regex-chess + crack-7z-hash) - mi
+
+Harness: mi (via mi_harbor adapter)
+Model: deepseek/deepseek-v4-flash (OpenRouter)
+Benchmark: terminal-bench@2.0 (first 2 of the 30-task stratified preset for mi vs terminus-2 comparison)
+
+=== SCORE (final, completed at ~02:08 after long run on crack-7z) ===
+Pass rate: 1 / 2  (50%)
+Mean reward: 0.5
+
+Passed (verified by reward.txt=1):
+- crack-7z-hash
+
+Failed (1):
+- regex-chess (0, NonZeroAgentExitCodeError)
+
+Duration: ~38 minutes wall (launched ~01:30, finished ~02:08; long sim on crack incremental john + regex chess engine gen)
+
+Job dir: 2026-05-19__01-30-34
+n_total: 2
+Finished: True
+
+This is the final snapshot for batch1 mi. Notably matches terminus batch1 result exactly: both harnesses pass crack-7z-hash (crypto/hash cracking with john), fail on regex-chess (complex LLM-written regex chess move validator? hard long-horizon).
+Complements the early iter1 2task snapshot and term final.

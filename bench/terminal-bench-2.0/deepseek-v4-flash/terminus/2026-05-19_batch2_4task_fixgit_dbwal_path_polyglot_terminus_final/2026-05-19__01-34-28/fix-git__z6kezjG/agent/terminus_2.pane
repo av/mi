@@ -1,0 +1,90 @@
+[?2004hroot@049ad556a07f:/app/personal-site# asciinema rec --stdin /logs/agent/recording.cast
+[?2004l[0;32masciinema: recording asciicast to /logs/agent/recording.cast[0m
+[0;32masciinema: press <ctrl-d> or type "exit" when you're done[0m
+[?2004hroot@049ad556a07f:/app/personal-site# clear
+[?2004l[H[J[3J[?2004hroot@049ad556a07f:/app/personal-site# ls -la
+[?2004ltotal 44
+drwxr-xr-x. 1 root root   252 Sep 13  2025 .
+drwxr-xr-x. 1 root root    26 Sep 13  2025 ..
+drwxr-xr-x. 1 root root   184 Sep 13  2025 .git
+-rw-r--r--. 1 root root   100 Sep 13  2025 .gitignore
+-rw-r--r--. 1 root root    14 Sep 13  2025 CNAME
+-rw-r--r--. 1 root root    42 Sep 13  2025 Gemfile
+-rw-r--r--. 1 root root   152 Sep 13  2025 _config.yml
+drwxr-xr-x. 1 root root    60 Sep 13  2025 _includes
+drwxr-xr-x. 1 root root    24 Sep 13  2025 _layouts
+drwxr-xr-x. 1 root root    76 Sep 13  2025 _posters
+drwxr-xr-x. 1 root root   650 Sep 13  2025 _publications
+drwxr-xr-x. 1 root root    84 Sep 13  2025 biblib
+drwxr-xr-x. 1 root root   522 Sep 13  2025 css
+drwxr-xr-x. 1 root root   416 Sep 13  2025 fonts
+-rw-r--r--. 1 root root    47 Sep 13  2025 index.md
+drwxr-xr-x. 1 root root   104 Sep 13  2025 js
+-rw-r--r--. 1 root root  2382 Sep 13  2025 make_pubs.py
+-rw-r--r--. 1 root root 19618 Sep 13  2025 me.bib
+drwxr-xr-x. 1 root root   296 Sep 13  2025 resources
+[?2004hroot@049ad556a07f:/app/personal-site# git status
+[?2004lOn branch master
+nothing to commit, working tree clean
+[?2004hroot@049ad556a07f:/app/personal-site# git branch -a
+[?2004l[?1h=* [32mmaster[m[m
+[K[?1l>[?2004hroot@049ad556a07f:/app/personal-site# git log --oneline --all -20
+[?2004l[?1h=[33md7d3e4b[m[33m ([m[1;36mHEAD -> [m[1;32mmaster[m[33m)[m off the job market woo[m
+[33mc4e38a1[m Add code link for BLADE[m
+[33m6f46fa0[m CV Update[m
+[33mdd7e395[m Adds BLADE to bib[m
+[33m2cd355a[m n+1 (for the last time???)[m
+[33m8eaf505[m Add BLADE[m
+[33mcc2ec78[m Underline[m
+[33md71094e[m Underline Conferences[m
+[33m232b279[m Remove posters[m
+[33m3fdf5f5[m Add NeurIPS[m
+[33m8c4731d[m Add EMNLP acceptance[m
+[33mf54f66b[m Add GR link[m
+[33m18d2430[m Add other links[m
+[33m1dd055e[m Ignore Gemfile, etc[m
+[33m5c77a6d[m Dont overwrite[m
+[33mc7d2f95[m Delete unsused files[m
+[33m20b05d9[m Remove more unused files[m
+[33m2d144f7[m Add yamls for new papers[m
+[33m7882f2d[m Don't track _site[m
+[33mcd2b8de[m Add new papers[m
+[K[?1l>[?2004hroot@049ad556a07f:/app/personal-site# git reflog
+[?2004l[?1h=[33md7d3e4b[m[33m ([m[1;36mHEAD -> [m[1;32mmaster[m[33m)[m HEAD@{0}: checkout: moving from 650dba427e0a9dcd118f41a4c5e35c8017550a5a to master[m
+[33m650dba4[m HEAD@{1}: commit: Move to Stanford[m
+[33mc4e38a1[m HEAD@{2}: checkout: moving from master to HEAD~1[m
+[33md7d3e4b[m[33m ([m[1;36mHEAD -> [m[1;32mmaster[m[33m)[m HEAD@{3}: reset: moving to d7d3e4b[m
+[33mb0d59cd[m HEAD@{4}: clone: from https://github.com/TheMikeMerrill/personal-site.git[m
+[K[?1l>[?2004hroot@049ad556a07f:/app/personal-site# git merge 650dba4
+[?2004lAuto-merging _includes/about.md
+CONFLICT (content): Merge conflict in _includes/about.md
+Automatic merge failed; fix conflicts and then commit the result.
+[?2004hroot@049ad556a07f:/app/personal-site# cat _includes/about.md
+[?2004l<<<<<<< HEAD
+I am a sixth PhD candidate at the [Paul G. Allen School of Computer Science & Engineering](https://www.cs.washington.edu/) at The University of Washington, where I am advised by [Tim Althoff](http://www.timalthoff.com/). I am affiliated with [UW NLP](https://twitter.com/uwnlp).
+
+ Previously, I was a Student Researcher at [Google Research](https://research.google/), an ML Research Intern at [Apple Health AI](https://machinelearning.apple.com/work-with-us) and a data scientist and the second full-time employee at [HealthRhythms](https://www.healthrhythms.com). 
+=======
+I am a Postdoctoral Researcher at Stanford CS.
+
+Previously, I was a Student Researcher at [Google Research](https://research.google/), an ML Research Intern at [Apple Health AI](https://machinelearning.apple.com/work-with-us) and a data scientist and the second full-time employee at [HealthRhythms](https://www.healthrhythms.com). 
+>>>>>>> 650dba4
+[?2004hroot@049ad556a07f:/app/personal-site# git diff 650dba4^..650dba4 -- _includes/about.md
+[?2004l[?1h=[1mdiff --git a/_includes/about.md b/_includes/about.md[m[m
+[1mindex 5322c14..7561d9e 100644[m[m
+[1m--- a/_includes/about.md[m[m
+[1m+++ b/_includes/about.md[m[m
+[36m@@ -1,3 +1,3 @@[m[m
+[31m-I am a sixth year PhD student at the [Paul G. Allen School of Computer Science & Engineering](https://www.cs.washington.edu/) at The University of Washington, [m [31mwhere I am advised by [Tim Althoff](http://www.timalthoff.com/). I am affiliated with [UW NLP](https://twitter.com/uwnlp).[m[m
+[32m+[m[32mI am a Postdoctoral Researcher at Stanford CS.[m[m
+ [m[m
+[31m-**I am looking for a full time job!** If you think we would be a good match, please reach out. Previously, I was a Student Researcher at [Google Research](http[m [31ms://research.google/), an ML Research Intern at [Apple Health AI](https://machinelearning.apple.com/work-with-us) and a data scientist and the second full-time [m [31memployee at [HealthRhythms](https://www.healthrhythms.com). [m[m
+\ No newline at end of file[m[m
+[32m+[m[32mPreviously, I was a Student Researcher at [Google Research](https://research.google/), an ML Research Intern at [Apple Health AI](https://machinelearning.apple[m [32m[m[32m.com/work-with-us) and a data scientist and the second full-time employee at [HealthRhythms](https://www.healthrhythms.com).[m[41m [m[m
+\ No newline at end of file[m[m
+[K[?1l>[?2004hroot@049ad556a07f:/app/personal-site# git checkout --theirs _includes/about.md
+[?2004lUpdated 1 path from the index
+[?2004hroot@049ad556a07f:/app/personal-site# git add _includes/about.md
+[?2004l[?2004hroot@049ad556a07f:/app/personal-site# git commit -m "Merge Move to Stanford changes"
+[?2004l[master c033167] Merge Move to Stanford changes
+[?2004hroot@049ad556a07f:/app/personal-site# 

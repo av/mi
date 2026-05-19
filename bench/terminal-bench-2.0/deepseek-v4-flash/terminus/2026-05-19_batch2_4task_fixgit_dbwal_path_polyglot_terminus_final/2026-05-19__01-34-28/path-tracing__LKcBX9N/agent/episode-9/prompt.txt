@@ -1,0 +1,41 @@
+Current Terminal Screen:
+fwrite
+libm.so.6
+libc.so.6
+GLIBC_2.2.5
+GLIBC_2.4
+GLIBC_2.34
+PTE1
+u+UH
+Error: Could not open file %s for writing
+%d %d
+%d %d %d
+Wrote image to %s
+Creating high-resolution image: %dx%d
+root@c454cc25e7a1:/app# ./orig 2>&1 || echo 'exited'
+Creating high-resolution image: 2400x1800
+This will be downsampled with ffmpeg after rendering
+Rendering high-resolution image...
+Progress: 20.9%sed -n '4p; 2404p; 4804p; 7204p' image.ppm
+Progress: 99.9%
+Rendering complete
+Wrote image to image.ppm
+Done.
+root@c454cc25e7a1:/app# sed -n '4p; 2404p; 4804p; 7204p' image.ppm
+159 197 255
+159 197 255
+159 197 255
+159 197 255
+root@c454cc25e7a1:/app# ./orig &
+[1] 599
+root@c454cc25e7a1:/app# sleep 3
+Creating high-resolution image: 2400x1800
+This will be downsampled with ffmpeg after rendering
+Rendering high-resolution image...
+Progress: 99.9%
+Rendering complete
+Wrote image to image.ppm
+Done.
+[1]+  Done                    ./orig
+root@c454cc25e7a1:/app# kill %1 2>/dev/null
+root@c454cc25e7a1:/app#

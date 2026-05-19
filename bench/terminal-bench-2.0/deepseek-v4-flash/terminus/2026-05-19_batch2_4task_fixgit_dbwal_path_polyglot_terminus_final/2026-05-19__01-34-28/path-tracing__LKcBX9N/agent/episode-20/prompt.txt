@@ -1,0 +1,33 @@
+New Terminal Output:
+
+ x=900: (147, 191, 255)
+ x=1199: (146, 190, 255)
+ x=1500: (147, 191, 255)
+ x=1800: (151, 193, 255)
+ x=2100: (155, 195, 255)
+ x=2399: (159, 197, 255)
+
+y=900 (mid):
+Traceback (most recent call last):
+  File "<string>", line 17, in <module>
+TypeError: pixel() takes 2 positional arguments but 3 were given
+root@c454cc25e7a1:/app# cat > /tmp/analyze.py << 'ENDSCRIPT'
+> import subprocess
+>
+> def pixel(x, y):
+>     ln = 4 + y * 2400 + x
+>     r = subprocess.run(['sed', f"{ln}p", '-n', 'image.ppm'], capture_output=True, text=True)
+>     parts = r.stdout.strip().split()
+>     return tuple(map(int, parts)) if len(parts) == 3 else None
+>
+> print("Sampling across middle row (y=899):")
+> for x in range(0, 2400, 100):
+>     p = pixel(x, 899)
+>     print(f"x={x:4d}: R={p[0]:3d} G={p[1]:3d} B={p[2]:3d}")
+>
+> print("\nSampling down left column (x=0):")
+> for y in range(0, 1800, 100):
+>     p = pixel(0, y)
+>     print(f"y={y:4d}: R={p[0]:3d} G={p[1]:3d} B={p[2]:3d}")
+> ENDSCRIPT
+root@c454cc25e7a1:/app#

@@ -1,0 +1,21 @@
+```json
+{
+  "analysis": "We have a SQLite database file `main.db` (8192 bytes) and its WAL file `main.db-wal` (16512 bytes). The WAL file contains changes that should bring total records from 5 to 11. Need to examine the database and the WAL file to understand how to fix corruption.",
+  "plan": "Use sqlite3 to examine the database: show tables, count records, see schema. Also try to read the WAL file hexdump to check for corruption/encryption.",
+  "commands": [
+    {
+      "keystrokes": "sqlite3 main.db\n",
+      "duration": 0.1
+    },
+    {
+      "keystrokes": "sqlite3 main.db \".tables\"\n",
+      "duration": 0.1
+    },
+    {
+      "keystrokes": "sqlite3 main.db \"SELECT count(*) FROM data;\"\n",
+      "duration": 0.1
+    }
+  ],
+  "task_complete": false
+}
+```

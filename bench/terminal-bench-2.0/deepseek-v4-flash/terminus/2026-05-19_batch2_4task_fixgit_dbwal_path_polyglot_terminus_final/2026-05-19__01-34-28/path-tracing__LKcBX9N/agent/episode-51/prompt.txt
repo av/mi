@@ -1,0 +1,9 @@
+Previous response had warnings:
+WARNINGS: - Extra text detected before JSON object
+- Extra text detected after JSON object
+
+New Terminal Output:
+
+root@c454cc25e7a1:/app# objdump -d orig --start-address=0x1d=0x1d5c --stop-address=0x2203 2>&1 | head -200
+objdump: --start-address: bad number: 0x1d=0x1d5c
+root@c454cc25e7a1:/app#

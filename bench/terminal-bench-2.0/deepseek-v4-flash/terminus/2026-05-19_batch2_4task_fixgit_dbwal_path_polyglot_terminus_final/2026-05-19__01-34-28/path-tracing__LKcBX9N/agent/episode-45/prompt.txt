@@ -1,0 +1,46 @@
+Previous response had warnings:
+WARNINGS: - Extra text detected before JSON object
+- Extra text detected after JSON object
+
+New Terminal Output:
+
+root@c454cc25e7a1:/app# objdump -d orig 2>&1 | grep -E '^[0-9a-f]+ <' | head -80
+0000000000001000 <_init>:
+0000000000001020 <.plt>:
+00000000000010e0 <__cxa_finalize@plt>:
+00000000000010f0 <free@plt>:
+0000000000001100 <fmax@plt>:
+0000000000001110 <fclose@plt>:
+0000000000001120 <__stack_chk_fail@plt>:
+0000000000001130 <fprintf@plt>:
+0000000000001140 <fmin@plt>:
+0000000000001150 <malloc@plt>:
+0000000000001160 <fopen@plt>:
+0000000000001170 <floor@plt>:
+0000000000001180 <fwrite@plt>:
+0000000000001190 <sqrt@plt>:
+00000000000011a0 <_start>:
+00000000000011d0 <deregister_tm_clones>:
+0000000000001200 <register_tm_clones>:
+0000000000001240 <__do_global_dtors_aux>:
+0000000000001280 <frame_dummy>:
+0000000000001289 <vector_create>:
+00000000000012df <vector_add>:
+0000000000001371 <vector_subtract>:
+0000000000001403 <vector_multiply>:
+000000000000147a <vector_dot>:
+00000000000014d8 <vector_length>:
+0000000000001532 <vector_normalize>:
+00000000000015be <ray_create>:
+0000000000001643 <ray_at>:
+00000000000016c4 <sphere_intersect>:
+00000000000019e5 <plane_intersect>:
+0000000000001b4d <sky_color>:
+0000000000001c8d <is_in_shadow>:
+0000000000001d5c <trace>:
+0000000000002203 <write_image>:
+000000000000245d <allocate_image>:
+00000000000024da <free_image>:
+0000000000002530 <main>:
+0000000000002c30 <_fini>:
+root@c454cc25e7a1:/app#

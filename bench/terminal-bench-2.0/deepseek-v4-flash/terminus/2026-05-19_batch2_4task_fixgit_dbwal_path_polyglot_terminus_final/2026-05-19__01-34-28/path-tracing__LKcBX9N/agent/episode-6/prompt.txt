@@ -1,0 +1,16 @@
+New Terminal Output:
+
+root@c454cc25e7a1:/app# awk 'NR==4{print} NR==500{print} NR==1000{print} NR==2000{print} NR==2404{print}' image.ppm
+159 197 255
+152 193 255
+147 190 255
+153 194 255
+159 197 255
+root@c454cc25e7a1:/app# awk 'NR==100000{print} NR==500000{print} NR==1000000{print} NR==2000000{print} NR==4000000{print} NR==4300000{print}' image.ppm
+149 192 255
+155 195 255
+163 200 255
+187 215 255
+152 152 152
+152 152 152
+root@c454cc25e7a1:/app#

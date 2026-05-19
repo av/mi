@@ -1,0 +1,22 @@
+Previous response had warnings:
+WARNINGS: - Extra text detected before JSON object
+- Extra text detected after JSON object
+
+New Terminal Output:
+
+root@93525de64552:/app# ls -la
+total 40
+drwxr-xr-x. 1 root root    58 May 18 23:37 .
+drwxr-xr-x. 1 root root    46 May 18 23:34 ..
+-rw-r--r--. 1 root root  8192 Oct 24  2025 main.db
+-rw-r--r--. 1 root root 32768 May 18 23:37 main.db-shm
+-rw-r--r--. 1 root root     0 May 18 23:37 main.db-wal
+root@93525de64552:/app# sqlite3 main.db "SELECT * FROM items;"
+1|apple|100
+2|banana|200
+3|cherry|300
+4|date|400
+5|elderberry|500
+root@93525de64552:/app# xxd main.db-shm | head -80
+xxd: main.db-shm: No such file or directory
+root@93525de64552:/app#

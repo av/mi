@@ -1,0 +1,4 @@
+Previous response had parsing errors:
+ERROR: Invalid JSON: Expecting ',' delimiter: line 10 column 1 (char 4313) | Content preview: '{\n  "analysis": "I\'m getting repeated JSON parsing errors. The issue is that my analysis and plan fi'...
+
+Please fix these issues and provide a proper JSON response.

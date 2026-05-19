@@ -1,0 +1,31 @@
+Previous response had warnings:
+WARNINGS: - Extra text detected before JSON object
+- Extra text detected after JSON object
+
+New Terminal Output:
+
+root@93525de64552:/app# which extundelete debugfs foremost scalpel recoverjpeg 2>/dev/null || echo 'none found'
+/usr/sbin/debugfs
+none found
+root@93525de64552:/app# df -h
+Filesystem      Size  Used Avail Use% Mounted on
+overlay         1.9T  1.3T  578G  69% /
+tmpfs            64M     0   64M   0% /dev
+shm              64M   24K   64M   1% /dev/shm
+tmpfs            61G  7.8G   53G  13% /logs/agent
+/dev/nvme0n1p3  1.9T  1.3T  578G  69% /etc/hosts
+tmpfs            61G     0   61G   0% /proc/acpi
+tmpfs            61G     0   61G   0% /proc/asound
+tmpfs            61G     0   61G   0% /proc/scsi
+tmpfs            61G     0   61G   0% /sys/devices/virtual/powercap
+tmpfs            61G     0   61G   0% /sys/firmware
+root@93525de64552:/app# cat /proc/mounts | grep -E 'overlay|btrfs'
+overlay / overlay rw,seclabel,relatime,lowerdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/17258/fs:/var/lib/containerd/io.containerd.
+snapshotter.v1.overlayfs/snapshots/17257/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/17256/fs:/var/lib/containerd/io.containerd.snap
+shotter.v1.overlayfs/snapshots/17255/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/17246/fs:/var/lib/containerd/io.containerd.snapshot
+ter.v1.overlayfs/snapshots/17214/fs,upperdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/17259/fs,workdir=/var/lib/containerd/io.contai
+nerd.snapshotter.v1.overlayfs/snapshots/17259/work 0 0
+/dev/nvme0n1p3 /etc/resolv.conf btrfs rw,seclabel,relatime,compress=zstd:1,ssd,discard=async,space_cache=v2,subvolid=256,subvol=/root 0 0
+/dev/nvme0n1p3 /etc/hostname btrfs rw,seclabel,relatime,compress=zstd:1,ssd,discard=async,space_cache=v2,subvolid=256,subvol=/root 0 0
+/dev/nvme0n1p3 /etc/hosts btrfs rw,seclabel,relatime,compress=zstd:1,ssd,discard=async,space_cache=v2,subvolid=256,subvol=/root 0 0
+root@93525de64552:/app#

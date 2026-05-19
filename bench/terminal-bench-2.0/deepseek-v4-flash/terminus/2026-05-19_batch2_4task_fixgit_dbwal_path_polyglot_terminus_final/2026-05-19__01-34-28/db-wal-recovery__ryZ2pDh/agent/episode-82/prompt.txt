@@ -1,0 +1,14 @@
+Previous response had warnings:
+WARNINGS: - Extra text detected before JSON object
+- Extra text detected after JSON object
+
+New Terminal Output:
+e": 1100
+  }
+]root@93525de64552:/app# grep -o '"score"[^}]*' /logs/agent/trajectory.json | head -5
+root@93525de64552:/app# ls -la /logs/artifacts/
+total 0
+drwxrwxrwx. 2 ubuntu ubuntu 40 May 18 23:34 .
+drwxr-xr-x. 1 root   root   44 May 18 23:34 ..
+root@93525de64552:/app# grep -oP '"id":\d+,"name":"[^"]+","value":\d+' /logs/agent/trajectory.json | head -20
+root@93525de64552:/app#

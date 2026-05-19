@@ -1,0 +1,13 @@
+```json
+{
+  "analysis": "The terminal is in interactive sqlite3 shell. Need to exit and run queries non-interactively.",
+  "plan": "Send Ctrl+C to kill interactive session, then use sqlite3 with command-line arguments.",
+  "commands": [
+    {
+      "keystrokes": "C-c",
+      "duration": 0.2
+    }
+  ],
+  "task_complete": false
+}
+```

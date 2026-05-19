@@ -1,0 +1,17 @@
+Previous response had warnings:
+WARNINGS: - Extra text detected before JSON object
+- Extra text detected after JSON object
+
+New Terminal Output:
+
+root@93525de64552:/app# sqlite3 main.db "SELECT * FROM items;"
+1|apple|100
+2|banana|200
+3|cherry|300
+4|date|400
+5|elderberry|500
+root@93525de64552:/app# xxd main.db-wal | head -100
+xxd: main.db-wal: No such file or directory
+root@93525de64552:/app# file main.db-wal
+bash: file: command not found
+root@93525de64552:/app#

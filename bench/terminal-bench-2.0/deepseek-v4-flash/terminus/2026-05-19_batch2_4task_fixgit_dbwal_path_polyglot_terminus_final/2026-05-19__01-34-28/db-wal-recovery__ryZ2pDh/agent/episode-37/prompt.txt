@@ -1,0 +1,10 @@
+Previous response had warnings:
+WARNINGS: - Extra text detected before JSON object
+- Extra text detected after JSON object
+
+New Terminal Output:
+
+root@93525de64552:/app# sqlite3 main.db "CREATE VIRTUAL TABLE stats USING dbstat; SELECT * FROM stats;" 2>&1
+sqlite_schema|/|1|leaf|2|182|3798|122|0|4096
+items|/|2|leaf|5|60|4008|16|4096|4096
+root@93525de64552:/app# sqlite3 main.db at bytes 4096-8192) where records are stored, to see if there's space for or evidence of deleted records.

@@ -1,0 +1,39 @@
+New Terminal Output:
+
+root@c454cc25e7a1:/app# strings orig | head -30
+/lib64/ld-linux-x86-64.so.2
+_ITM_deregisterTMCloneTable
+__gmon_start__
+_ITM_registerTMCloneTable
+floor
+sqrt
+fmax
+fmin
+__stack_chk_fail
+free
+fopen
+malloc
+__libc_start_main
+stderr
+fprintf
+__cxa_finalize
+fclose
+fwrite
+libm.so.6
+libc.so.6
+GLIBC_2.2.5
+GLIBC_2.4
+GLIBC_2.34
+PTE1
+u+UH
+Error: Could not open file %s for writing
+%d %d
+%d %d %d
+Wrote image to %s
+Creating high-resolution image: %dx%d
+root@c454cc25e7a1:/app# ./orig 2>&1 || echo 'exited'
+Creating high-resolution image: 2400x1800
+This will be downsampled with ffmpeg after rendering
+Rendering high-resolution image...
+Progress: 20.9%sed -n '4p; 2404p; 4804p; 7204p' image.ppm
+Progress: 30.3%

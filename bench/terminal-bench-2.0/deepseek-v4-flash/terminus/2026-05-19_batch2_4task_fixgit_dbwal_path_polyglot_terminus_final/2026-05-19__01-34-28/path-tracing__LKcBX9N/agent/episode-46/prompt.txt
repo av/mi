@@ -1,0 +1,162 @@
+Previous response had warnings:
+WARNINGS: - Extra text detected before JSON object
+- Extra text detected after JSON object
+- Command 1 should end with newline when followed by another command. Otherwise the two commands will be concatenated together on the same line.
+
+New Terminal Output:
+
+root@c454cc25e7a1:/app# objdump -t x1objdump -d orig --start-address=0x1b4d --stop-address=0x1c8d 2>&1
+objdump: 'x1objdump': No such file
+
+orig:     file format elf64-x86-64
+
+SYMBOL TABLE:
+0000000000000000 l    df *ABS*  0000000000000000              Scrt1.o
+000000000000038c l     O .note.ABI-tag  0000000000000020              __abi_tag
+0000000000000000 l    df *ABS*  0000000000000000              crtstuff.c
+00000000000011d0 l     F .text  0000000000000000              deregister_tm_clones
+0000000000001200 l     F .text  0000000000000000              register_tm_clones
+0000000000001240 l     F .text  0000000000000000              __do_global_dtors_aux
+0000000000005028 l     O .bss   0000000000000001              completed.0
+0000000000004d60 l     O .fini_array    0000000000000000              __do_global_dtors_aux_fini_array_entry
+0000000000001280 l     F .text  0000000000000000              frame_dummy
+0000000000004d58 l     O .init_array    0000000000000000              __frame_dummy_init_array_entry
+0000000000000000 l    df *ABS*  0000000000000000              orig.c
+0000000000000000 l    df *ABS*  0000000000000000              crtstuff.c
+0000000000003540 l     O .eh_frame      0000000000000000              __FRAME_END__
+0000000000000000 l    df *ABS*  0000000000000000
+0000000000004d68 l     O .dynamic       0000000000000000              _DYNAMIC
+00000000000031b0 l       .eh_frame_hdr  0000000000000000              __GNU_EH_FRAME_HDR
+0000000000004f68 l     O .got   0000000000000000              _GLOBAL_OFFSET_TABLE_
+0000000000000000       F *UND*  0000000000000000              free@GLIBC_2.2.5
+0000000000001532 g     F .text  000000000000008c              vector_normalize
+0000000000000000       F *UND*  0000000000000000              __libc_start_main@GLIBC_2.34
+0000000000000000  w      *UND*  0000000000000000              _ITM_deregisterTMCloneTable
+0000000000005000  w      .data  0000000000000000              data_start
+0000000000000000       F *UND*  0000000000000000              fmax@GLIBC_2.2.5
+0000000000001c8d g     F .text  00000000000000cf              is_in_shadow
+00000000000015be g     F .text  0000000000000085              ray_create
+00000000000024da g     F .text  0000000000000056              free_image
+0000000000001289 g     F .text  0000000000000056              vector_create
+0000000000005010 g       .data  0000000000000000              _edata
+000000000000147a g     F .text  000000000000005e              vector_dot
+0000000000000000       F *UND*  0000000000000000              fclose@GLIBC_2.2.5
+0000000000002c30 g     F .fini  0000000000000000              .hidden _fini
+0000000000000000       F *UND*  0000000000000000              __stack_chk_fail@GLIBC_2.4
+00000000000014d8 g     F .text  000000000000005a              vector_length
+0000000000005000 g       .data  0000000000000000              __data_start
+0000000000000000       F *UND*  0000000000000000              fprintf@GLIBC_2.2.5
+0000000000000000  w      *UND*  0000000000000000              __gmon_start__
+0000000000005008 g     O .data  0000000000000000              .hidden __dso_handle
+0000000000003000 g     O .rodata        0000000000000004              _IO_stdin_used
+0000000000000000       F *UND*  0000000000000000              fmin@GLIBC_2.2.5
+0000000000000000       F *UND*  0000000000000000              malloc@GLIBC_2.2.5
+0000000000005030 g       .bss   0000000000000000              _end
+00000000000011a0 g     F .text  0000000000000026              _start
+0000000000001371 g     F .text  0000000000000092              vector_subtract
+0000000000001643 g     F .text  0000000000000081              ray_at
+0000000000005020 g       .bss   0000000000000000              __bss_start
+0000000000002530 g     F .text  00000000000006fd              main
+0000000000002203 g     F .text  000000000000025a              write_image
+0000000000000000       F *UND*  0000000000000000              fopen@GLIBC_2.2.5
+00000000000012df g     F .text  0000000000000092              vector_add
+0000000000001d5c g     F .text  00000000000004a7              trace
+0000000000000000       F *UND*  0000000000000000              floor@GLIBC_2.2.5
+0000000000000000       F *UND*  0000000000000000              fwrite@GLIBC_2.2.5
+0000000000005010 g     O .data  0000000000000000              .hidden __TMC_END__
+0000000000000000  w      *UND*  0000000000000000              _ITM_registerTMCloneTable
+0000000000000000       F *UND*  0000000000000000              sqrt@GLIBC_2.2.5
+00000000000019e5 g     F .text  0000000000000168              plane_intersect
+0000000000001403 g     F .text  0000000000000077              vector_multiply
+00000000000016c4 g     F .text  0000000000000321              sphere_intersect
+000000000000245d g     F .text  000000000000007d              allocate_image
+0000000000001b4d g     F .text  0000000000000140              sky_color
+0000000000000000  w    F *UND*  0000000000000000              __cxa_finalize@GLIBC_2.2.5
+0000000000001000 
+[... output limited to 10000 bytes; 68 interior bytes omitted ...]
+00000000000              .hidden _init
+0000000000005020 g     O .bss   0000000000000008              stderr@GLIBC_2.2.5
+
+
+
+Disassembly of section .text:
+
+0000000000001b4d <sky_color>:
+    1b4d:       f3 0f 1e fa             endbr64
+    1b51:       55                      push   %rbp
+    1b52:       48 89 e5                mov    %rsp,%rbp
+    1b55:       48 83 ec 60             sub    $0x60,%rsp
+    1b59:       48 8b 45 1c             mov    0x1c(%rbp),%rax
+    1b5d:       48 89 45 b8             mov    %rax,-0x48(%rbp)
+    1b61:       8b 45 24                mov    0x24(%rbp),%eax
+    1b64:       89 45 c0                mov    %eax,-0x40(%rbp)
+    1b67:       f3 0f 10 4d bc          movss  -0x44(%rbp),%xmm1
+    1b6c:       f3 0f 10 05 00 16 00    movss  0x1600(%rip),%xmm0        # 3174 <_IO_stdin_used+0x174>
+    1b73:       00
+    1b74:       f3 0f 58 c8             addss  %xmm0,%xmm1
+    1b78:       f3 0f 10 05 f8 15 00    movss  0x15f8(%rip),%xmm0        # 3178 <_IO_stdin_used+0x178>
+    1b7f:       00
+    1b80:       f3 0f 59 c1             mulss  %xmm1,%xmm0
+    1b84:       f3 0f 11 45 b4          movss  %xmm0,-0x4c(%rbp)
+    1b89:       f3 0f 10 15 e3 15 00    movss  0x15e3(%rip),%xmm2        # 3174 <_IO_stdin_used+0x174>
+    1b90:       00
+    1b91:       f3 0f 10 0d db 15 00    movss  0x15db(%rip),%xmm1        # 3174 <_IO_stdin_used+0x174>
+    1b98:       00
+    1b99:       8b 05 d5 15 00 00       mov    0x15d5(%rip),%eax        # 3174 <_IO_stdin_used+0x174>
+    1b9f:       66 0f 6e c0             movd   %eax,%xmm0
+    1ba3:       e8 e1 f6 ff ff          call   1289 <vector_create>
+    1ba8:       66 48 0f 7e c0          movq   %xmm0,%rax
+    1bad:       0f 28 c1                movaps %xmm1,%xmm0
+    1bb0:       48 89 45 c4             mov    %rax,-0x3c(%rbp)
+    1bb4:       f3 0f 11 45 cc          movss  %xmm0,-0x34(%rbp)
+    1bb9:       f3 0f 10 15 b3 15 00    movss  0x15b3(%rip),%xmm2        # 3174 <_IO_stdin_used+0x174>
+    1bc0:       00
+    1bc1:       f3 0f 10 0d b3 15 00    movss  0x15b3(%rip),%xmm1        # 317c <_IO_stdin_used+0x17c>
+    1bc8:       00
+    1bc9:       8b 05 a9 15 00 00       mov    0x15a9(%rip),%eax        # 3178 <_IO_stdin_used+0x178>
+    1bcf:       66 0f 6e c0             movd   %eax,%xmm0
+    1bd3:       e8 b1 f6 ff ff          call   1289 <vector_create>
+    1bd8:       66 48 0f 7e c0          movq   %xmm0,%rax
+    1bdd:       0f 28 c1                movaps %xmm1,%xmm0
+    1be0:       48 89 45 d0             mov    %rax,-0x30(%rbp)
+    1be4:       f3 0f 11 45 d8          movss  %xmm0,-0x28(%rbp)
+    1be9:       f3 0f 10 45 b4          movss  -0x4c(%rbp),%xmm0
+    1bee:       48 8b 45 d0             mov    -0x30(%rbp),%rax
+    1bf2:       f3 0f 10 4d d8          movss  -0x28(%rbp),%xmm1
+    1bf7:       0f 28 d0                movaps %xmm0,%xmm2
+    1bfa:       66 48 0f 6e c0          movq   %rax,%xmm0
+    1bff:       e8 ff f7 ff ff          call   1403 <vector_multiply>
+    1c04:       66 48 0f 7e c0          movq   %xmm0,%rax
+    1c09:       0f 28 c1                movaps %xmm1,%xmm0
+    1c0c:       48 89 45 e8             mov    %rax,-0x18(%rbp)
+    1c10:       f3 0f 11 45 f0          movss  %xmm0,-0x10(%rbp)
+    1c15:       f3 0f 10 05 57 15 00    movss  0x1557(%rip),%xmm0        # 3174 <_IO_stdin_used+0x174>
+    1c1c:       00
+    1c1d:       f3 0f 5c 45 b4          subss  -0x4c(%rbp),%xmm0
+    1c22:       48 8b 45 c4             mov    -0x3c(%rbp),%rax
+    1c26:       f3 0f 10 4d cc          movss  -0x34(%rbp),%xmm1
+    1c2b:       0f 28 d0                movaps %xmm0,%xmm2
+    1c2e:       66 48 0f 6e c0          movq   %rax,%xmm0
+    1c33:       e8 cb f7 ff ff          call   1403 <vector_multiply>
+    1c38:       66 48 0f 7e c0          movq   %xmm0,%rax
+    1c3d:       0f 28 c1                movaps %xmm1,%xmm0
+    1c40:       48 89 45 f4             mov    %rax,-0xc(%rbp)
+    1c44:       f3 0f 11 45 fc          movss  %xmm0,-0x4(%rbp)
+    1c49:       f3 0f 7e 55 e8          movq   -0x18(%rbp),%xmm2
+    1c4e:       f3 0f 10 45 f0          movss  -0x10(%rbp),%xmm0
+    1c53:       48 8b 45 f4             mov    -0xc(%rbp),%rax
+    1c57:       f3 0f 10 4d fc          movss  -0x4(%rbp),%xmm1
+    1c5c:       0f 28 d8                movaps %xmm0,%xmm3
+    1c5f:       66 48 0f 6e c0          movq   %rax,%xmm0
+    1c64:       e8 76 f6 ff ff          call   12df <vector_add>
+    1c69:       66 48 0f 7e c0          movq   %xmm0,%rax
+    1c6e:       0f 28 c1                movaps %xmm1,%xmm0
+    1c71:       48 89 45 dc             mov    %rax,-0x24(%rbp)
+    1c75:       f3 0f 11 45 e4          movss  %xmm0,-0x1c(%rbp)
+    1c7a:       48 8b 45 dc             mov    -0x24(%rbp),%rax
+    1c7e:       f3 0f 10 45 e4          movss  -0x1c(%rbp),%xmm0
+    1c83:       0f 28 c8                movaps %xmm0,%xmm1
+    1c86:       66 48 0f 6e c0          movq   %rax,%xmm0
+    1c8b:       c9                      leave
+    1c8c:       c3                      ret
+root@c454cc25e7a1:/app#

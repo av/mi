@@ -1,0 +1,6 @@
+Previous response had parsing errors:
+ERROR: Invalid JSON: Expecting ',' delimiter: line 6 column 38 (char 2451) | Content preview: '{\n  "analysis": "I see there\'s a script in /tmp but it\'s for asciinema timestamps. The mount info sh'...
+WARNINGS: - Extra text detected before JSON object
+- Extra text detected after JSON object
+
+Please fix these issues and provide a proper JSON response.

@@ -1,0 +1,19 @@
+Previous response had warnings:
+WARNINGS: - AUTO-CORRECTED: Extracted JSON from mixed content - please fix this in future responses
+
+New Terminal Output:
+| head -20
+root@93525de64552:/app# which btrfs || which btrfsck || which btrfsck || echo 'no btrfs'
+no btrfs
+root@93525de64552:/app# lsblk -o NAME,FSTYPE,SIZE,MOUNTPOINT
+NAME        FSTYPE  SIZE MOUNTPOINT
+zram0                 8G [SWAP]
+nvme0n1             1.8T
+├─nvme0n1p1         600M
+├─nvme0n1p2           2G
+└─nvme0n1p3         1.8T /etc/hosts
+root@93525de64552:/app# debugfs -R 'ls -l /app/' /dev/nvme0n1p3 2>&1 | head -20
+debugfs 1.47.0 (5-Feb-2023)
+debugfs: No such file or directory while trying to open /dev/nvme0n1p3
+ls: Filesystem not open
+root@93525de64552:/app#

@@ -1,0 +1,112 @@
+{
+    "id": "f3af47cc-dbc9-4143-abe1-72659b2a2a5f",
+    "task_name": "crack-7z-hash",
+    "trial_name": "crack-7z-hash__5RW5oQA",
+    "trial_uri": "file:///tmp/mi-30-eval-iter1/mi/2026-05-19__01-30-34/crack-7z-hash__5RW5oQA",
+    "task_id": {
+        "git_url": "https://github.com/laude-institute/terminal-bench-2.git",
+        "git_commit_id": "69671fbaac6d67a7ef0dfec016cc38a64ef7a77c",
+        "path": "crack-7z-hash"
+    },
+    "source": "terminal-bench",
+    "task_checksum": "6557afcd0ab96deef7a8292019ea507be18f91433df61618b622866a293525a8",
+    "config": {
+        "task": {
+            "path": "crack-7z-hash",
+            "git_url": "https://github.com/laude-institute/terminal-bench-2.git",
+            "git_commit_id": "69671fbaac6d67a7ef0dfec016cc38a64ef7a77c",
+            "name": null,
+            "ref": null,
+            "overwrite": false,
+            "download_dir": null,
+            "source": "terminal-bench"
+        },
+        "trial_name": "crack-7z-hash__5RW5oQA",
+        "trials_dir": "/tmp/mi-30-eval-iter1/mi/2026-05-19__01-30-34",
+        "timeout_multiplier": 1.0,
+        "agent_timeout_multiplier": null,
+        "verifier_timeout_multiplier": null,
+        "agent_setup_timeout_multiplier": null,
+        "environment_build_timeout_multiplier": null,
+        "agent": {
+            "name": null,
+            "import_path": "mi_harbor.mi_agent:MiAgent",
+            "model_name": "openai/deepseek/deepseek-v4-flash",
+            "skills": [],
+            "override_timeout_sec": null,
+            "override_setup_timeout_sec": null,
+            "max_timeout_sec": null,
+            "kwargs": {},
+            "env": {},
+            "mcp_servers": []
+        },
+        "environment": {
+            "type": "docker",
+            "import_path": null,
+            "force_build": false,
+            "delete": true,
+            "override_cpus": null,
+            "override_memory_mb": null,
+            "override_storage_mb": null,
+            "override_gpus": null,
+            "suppress_override_warnings": false,
+            "mounts": null,
+            "extra_docker_compose": [],
+            "env": {},
+            "kwargs": {}
+        },
+        "verifier": {
+            "override_timeout_sec": null,
+            "max_timeout_sec": null,
+            "env": {},
+            "disable": false
+        },
+        "artifacts": [],
+        "extra_instruction_paths": [],
+        "job_id": "7031d312-290f-4768-b525-651fe18ac172"
+    },
+    "agent_info": {
+        "name": "mi",
+        "version": "mi 1.9.0",
+        "model_info": {
+            "name": "deepseek/deepseek-v4-flash",
+            "provider": "openai"
+        }
+    },
+    "agent_result": {
+        "n_input_tokens": null,
+        "n_cache_tokens": null,
+        "n_output_tokens": 770,
+        "cost_usd": null,
+        "rollout_details": null,
+        "metadata": {
+            "timing_raw": "start=1779149053.790621248\nend=1779149268.515764498\nexit_code=0\nend=1779149268.678946463\nexit_code=0",
+            "diagnostics": "[2026-05-19T00:04:13+00:00] === MI AGENT START ===\n[2026-05-19T00:04:13+00:00] LLM endpoint: https://openrouter.ai/api/v1 (normalized: https://openrouter.ai/api/v1/models)\n[2026-05-19T00:04:13+00:00] Model: deepseek/deepseek-v4-flash\n[2026-05-19T00:04:13+00:00] Pre-flight LLM connectivity check...\n[2026-05-19T00:04:13+00:00] Pre-flight completed: HTTP 200 in 0.148019s\n[2026-05-19T00:04:13+00:00] Starting mi agent...\n[2026-05-19T00:07:48+00:00] MI agent finished with exit code 0 after 214.889309226s\n[2026-05-19T00:07:48+00:00] === MI AGENT END ===\n[2026-05-19T00:07:48+00:00] === SIGNAL/EXIT CLEANUP (code=0) ===\n[2026-05-19T00:07:48+00:00] Output lines: 97\n[2026-05-19T00:07:48+00:00] Last output timestamp: none\n[2026-05-19T00:07:48+00:00] Post-mortem LLM status: HTTP 200\n[2026-05-19T00:07:48+00:00] Post-mortem ping gateway: 64 bytes from 172.17.0.1: icmp_seq=1 ttl=64 time=0.063 ms\n[2026-05-19T00:07:48+00:00] === CLEANUP COMPLETE ===\n"
+        }
+    },
+    "verifier_result": {
+        "rewards": {
+            "reward": 1.0
+        }
+    },
+    "exception_info": null,
+    "started_at": "2026-05-19T00:03:12.400752Z",
+    "finished_at": "2026-05-19T00:08:07.866750Z",
+    "environment_setup": {
+        "started_at": "2026-05-19T00:03:12.401297Z",
+        "finished_at": "2026-05-19T00:03:24.060399Z"
+    },
+    "agent_setup": {
+        "started_at": "2026-05-19T00:03:24.060444Z",
+        "finished_at": "2026-05-19T00:04:13.491158Z"
+    },
+    "agent_execution": {
+        "started_at": "2026-05-19T00:04:13.491238Z",
+        "finished_at": "2026-05-19T00:07:48.685381Z"
+    },
+    "verifier": {
+        "started_at": "2026-05-19T00:07:48.912489Z",
+        "finished_at": "2026-05-19T00:07:55.848857Z"
+    },
+    "step_results": null
+}

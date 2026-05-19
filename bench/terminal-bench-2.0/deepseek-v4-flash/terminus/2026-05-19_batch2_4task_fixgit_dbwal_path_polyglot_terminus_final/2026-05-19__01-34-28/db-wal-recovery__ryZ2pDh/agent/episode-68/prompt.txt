@@ -1,0 +1,14 @@
+Previous response had warnings:
+WARNINGS: - Extra text detected before JSON object
+- Extra text detected after JSON object
+
+New Terminal Output:
+20
+root@93525de64552:/app# cat /proc/mounts | grep btrfs
+/dev/nvme0n1p3 /etc/resolv.conf btrfs rw,seclabel,relatime,compress=zstd:1,ssd,discard=async,space_cache=v2,subvolid=256,subvol=/root 0 0
+/dev/nvme0n1p3 /etc/hostname btrfs rw,seclabel,relatime,compress=zstd:1,ssd,discard=async,space_cache=v2,subvolid=256,subvol=/root 0 0
+/dev/nvme0n1p3 /etc/hosts btrfs rw,seclabel,relatime,compress=zstd:1,ssd,discard=async,space_cache=v2,subvolid=256,subvol=/root 0 0
+root@93525de64552:/app# ls -la /var/lib/containerd/ 2>/dev/null
+root@93525de64552:/app# btrfs subvolume list - / 2>/dev/null || echo 'btrfs not available'
+btrfs not available
+root@93525de64552:/app#

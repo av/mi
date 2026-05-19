@@ -1,0 +1,7 @@
+Previous response had warnings:
+WARNINGS: - Extra text detected after JSON object
+
+New Terminal Output:
+
+> ^C
+root@c454cc25e7a1:/app#

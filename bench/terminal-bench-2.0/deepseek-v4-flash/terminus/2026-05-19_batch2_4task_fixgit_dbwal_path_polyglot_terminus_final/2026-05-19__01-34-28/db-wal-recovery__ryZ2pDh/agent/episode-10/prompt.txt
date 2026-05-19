@@ -1,0 +1,20 @@
+Previous response had warnings:
+WARNINGS: - Extra text detected before JSON object
+- Extra text detected after JSON object
+
+New Terminal Output:
+
+root@93525de64552:/app# sqlite3 main.db ".tables"
+items
+root@93525de64552:/app# sqlite3 main.db "SELECT count(*) FROM data;"
+Error: in prepare, no such table: data
+root@93525de64552:/app#
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,19 @@
+New Terminal Output:
+
+root@c454cc25e7a1:/app# file orig
+bash: file: command not found
+root@c454cc25e7a1:/app# sed -n '4,10p' image.ppm | head -1
+159 197 255
+root@c454cc25e7a1:/app# sed -n '4p; 100p; 1000p; 10000p; 100000p; 500000p; 1000000p; 2000000p; 3000000p; 4000000p; 4320000p' image.ppm | head -20
+159 197 255
+157 197 255
+147 190 255
+153 194 255
+149 192 255
+155 195 255
+163 200 255
+187 215 255
+67 67 67
+152 152 152
+67 67 67
+root@c454cc25e7a1:/app#

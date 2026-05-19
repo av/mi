@@ -1,0 +1,26 @@
+# FINAL RESULT - 2026-05-19 batch2 4-task (fix-git, db-wal-recovery, path-tracing, polyglot-c-py) - terminus-2
+
+Harness: terminus-2 (official Terminal-Bench reference)
+Model: deepseek/deepseek-v4-flash (OpenRouter)
+Benchmark: terminal-bench@2.0 (batch 2 of 30-task for mi vs terminus-2)
+
+=== SCORE (final at ~02:08, 4/4 completed) ===
+Pass rate: 1 / 4  (25%)
+Mean reward: 0.25
+
+Passed (verified by reward.txt=1):
+- fix-git
+
+Failed (3):
+- db-wal-recovery (0)
+- path-tracing (0)
+- polyglot-c-py (0)
+
+Duration: ~34 minutes (launched ~01:34, finished ~02:08 per result; path-tracing took longest ~45min+ sim)
+
+Job dir: 2026-05-19__01-34-28
+n_total: 4
+Finished: True
+
+This matches mi batch2 exactly (also 1/4 pass on fix-git only). Common success on SWE/git task "fix-git" (both harnesses). Term used n-conc=2 for faster completion vs mi n=1.
+Complements mi batch2 final/partial snapshots and term early 2/4 state.

@@ -1,0 +1,5 @@
+Parser warnings: - Extra text detected before JSON object
+- Extra text detected after JSON object
+Trajectory dumped to /tmp/mi-30-eval-iter2/terminus/2026-05-19__01-34-28/polyglot-c-py__B5NgQuH/agent/trajectory.json
+Parser warnings: - No valid JSON object found
+Trajectory dumped to /tmp/mi-30-eval-iter2/terminus/2026-05-19__01-34-28/polyglot-c-py__B5NgQuH/agent/trajectory.json

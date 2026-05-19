@@ -1,0 +1,91 @@
+Previous response had warnings:
+WARNINGS: - Extra text detected before JSON object
+- Extra text detected after JSON object
+
+New Terminal Output:
+
+root@93525de64552:/app# ls -la /var/backups /var/lib /var/spool 2>/dev/null
+/var/backups:
+total 0
+drwxr-xr-x. 1 root root  0 Apr 22  2024 .
+drwxr-xr-x. 1 root root 22 Oct  1  2025 ..
+
+/var/lib:
+total 12
+drwxr-xr-x. 1 root root  38 May 18 23:34 .
+drwxr-xr-x. 1 root root  22 Oct  1  2025 ..
+drwxr-xr-x. 1 root root  40 May 18 23:34 apt
+drwxr-xr-x. 1 root root 104 May 18 23:34 dpkg
+drwxr-xr-x. 1 root root   0 Apr 22  2024 misc
+drwxr-xr-x. 1 root root 104 Oct  1  2025 pam
+drwxr-xr-x. 1 root root  40 Oct 31  2025 python
+-rw-r--r--. 1 root root  98 May 18 23:34 shells.state
+drwxr-xr-x. 1 root root  62 Oct 31  2025 systemd
+
+/var/spool:
+total 4
+drwxr-xr-x. 1 root root  8 Oct  1  2025 .
+drwxr-xr-x. 1 root root 22 Oct  1  2025 ..
+lrwxrwxrwx. 1 root root  7 Oct  1  2025 mail -> ../mail
+root@93525de64552:/app# sqlite3 main.db ".help" 2>&1 | grep -i recover
+.recover                 Recover as much data as possible from corrupt db.
+root@93525de64552:/app# sqlite3 :memory: "PRAGMA compile_options;" 2>/dev/null
+ATOMIC_INTRINSICS=1
+COMPILER=gcc-13.3.0
+DEFAULT_AUTOVACUUM
+DEFAULT_CACHE_SIZE=-2000
+DEFAULT_FILE_FORMAT=4
+DEFAULT_JOURNAL_SIZE_LIMIT=-1
+DEFAULT_MMAP_SIZE=0
+DEFAULT_PAGE_SIZE=4096
+DEFAULT_PCACHE_INITSZ=20
+DEFAULT_RECURSIVE_TRIGGERS
+DEFAULT_SECTOR_SIZE=4096
+DEFAULT_SYNCHRONOUS=2
+DEFAULT_WAL_AUTOCHECKPOINT=1000
+DEFAULT_WAL_SYNCHRONOUS=2
+DEFAULT_WORKER_THREADS=0
+DIRECT_OVERFLOW_READ
+ENABLE_COLUMN_METADATA
+ENABLE_DBSTAT_VTAB
+ENABLE_FTS3
+ENABLE_FTS3_PARENTHESIS
+ENABLE_FTS3_TOKENIZER
+ENABLE_FTS4
+ENABLE_FTS5
+ENABLE_LOAD_EXTENSION
+ENABLE_MATH_FUNCTIONS
+ENABLE_PREUPDATE_HOOK
+ENABLE_RTREE
+ENABLE_SESSION
+ENABLE_STMTVTAB
+ENABLE_UNLOCK_NOTIFY
+ENABLE_UPDATE_DELETE_LIMIT
+HAVE_ISNAN
+LIKE_DOESNT_MATCH_BLOBS
+MALLOC_SOFT_LIMIT=1024
+MAX_ATTACHED=10
+MAX_COLUMN=2000
+MAX_COMPOUND_SELECT=500
+MAX_DEFAULT_PAGE_SIZE=32768
+MAX_EXPR_DEPTH=1000
+MAX_FUNCTION_ARG=127
+MAX_LENGTH=1000000000
+MAX_LIKE_PATTERN_LENGTH=50000
+MAX_MMAP_SIZE=0x7fff0000
+MAX_PAGE_COUNT=0xfffffffe
+MAX_PAGE_SIZE=65536
+MAX_SCHEMA_RETRY=25
+MAX_SQL_LENGTH=1000000000
+MAX_TRIGGER_DEPTH=1000
+MAX_VARIABLE_NUMBER=250000
+MAX_VDBE_OP=250000000
+MAX_WORKER_THREADS=8
+MUTEX_PTHREADS
+SECURE_DELETE
+SOUNDEX
+SYSTEM_MALLOC
+TEMP_STORE=1
+THREADSAFE=1
+USE_URI
+root@93525de64552:/app#

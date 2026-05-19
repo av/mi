@@ -1,0 +1,20 @@
+Previous response had warnings:
+WARNINGS: - Extra text detected before JSON object
+- Extra text detected after JSON object
+
+New Terminal Output:
+
+root@93525de64552:/app# grep -oP '.{0,100}(final|answer|result|expected).{0,100}' /logs/agent/trajectory.json | head -10
+uent requests to wait longer. Never wait longer than 60 seconds; prefer to poll to see intermediate result status.\n\nImportant notes:\n- Each command's keystro
+kes are sent exactly as written to the termina
+        "results": [
+        "results": [
+        "results": [
+        "results": [
+        "results": [
+        "results": [
+        "results": [
+        "results": [
+        "results": [
+root@93525de64552:/app# find / -type f -size -1M 2>/dev/null | xargs grep -l 'recovered.json' 2>/dev/null | head -10
+

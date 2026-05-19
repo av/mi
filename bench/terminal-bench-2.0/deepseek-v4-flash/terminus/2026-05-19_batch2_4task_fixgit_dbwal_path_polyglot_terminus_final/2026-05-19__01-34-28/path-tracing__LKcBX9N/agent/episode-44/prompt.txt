@@ -1,0 +1,196 @@
+New Terminal Output:
+
+root@c454cc25e7a1:/app# objdump -d orig 2>&1 | head -500
+
+orig:     file format elf64-x86-64
+
+
+Disassembly of section .init:
+
+0000000000001000 <_init>:
+    1000:       f3 0f 1e fa             endbr64
+    1004:       48 83 ec 08             sub    $0x8,%rsp
+    1008:       48 8b 05 d9 3f 00 00    mov    0x3fd9(%rip),%rax        # 4fe8 <__gmon_start__@Base>
+    100f:       48 85 c0                test   %rax,%rax
+    1012:       74 02                   je     1016 <_init+0x16>
+    1014:       ff d0                   call   *%rax
+    1016:       48 83 c4 08             add    $0x8,%rsp
+    101a:       c3                      ret
+
+Disassembly of section .plt:
+
+0000000000001020 <.plt>:
+    1020:       ff 35 4a 3f 00 00       push   0x3f4a(%rip)        # 4f70 <_GLOBAL_OFFSET_TABLE_+0x8>
+    1026:       ff 25 4c 3f 00 00       jmp    *0x3f4c(%rip)        # 4f78 <_GLOBAL_OFFSET_TABLE_+0x10>
+    102c:       0f 1f 40 00             nopl   0x0(%rax)
+    1030:       f3 0f 1e fa             endbr64
+    1034:       68 00 00 00 00          push   $0x0
+    1039:       e9 e2 ff ff ff          jmp    1020 <_init+0x20>
+    103e:       66 90                   xchg   %ax,%ax
+    1040:       f3 0f 1e fa             endbr64
+    1044:       68 01 00 00 00          push   $0x1
+    1049:       e9 d2 ff ff ff          jmp    1020 <_init+0x20>
+    104e:       66 90                   xchg   %ax,%ax
+    1050:       f3 0f 1e fa             endbr64
+    1054:       68 02 00 00 00          push   $0x2
+    1059:       e9 c2 ff ff ff          jmp    1020 <_init+0x20>
+    105e:       66 90                   xchg   %ax,%ax
+    1060:       f3 0f 1e fa             endbr64
+    1064:       68 03 00 00 00          push   $0x3
+    1069:       e9 b2 ff ff ff          jmp    1020 <_init+0x20>
+    106e:       66 90                   xchg   %ax,%ax
+    1070:       f3 0f 1e fa             endbr64
+    1074:       68 04 00 00 00          push   $0x4
+    1079:       e9 a2 ff ff ff          jmp    1020 <_init+0x20>
+    107e:       66 90                   xchg   %ax,%ax
+    1080:       f3 0f 1e fa             endbr64
+    1084:       68 05 00 00 00          push   $0x5
+    1089:       e9 92 ff ff ff          jmp    1020 <_init+0x20>
+    108e:       66 90                   xchg   %ax,%ax
+    1090:       f3 0f 1e fa             endbr64
+    1094:       68 06 00 00 00          push   $0x6
+    1099:       e9 82 ff ff ff          jmp    1020 <_init+0x20>
+    109e:       66 90                   xchg   %ax,%ax
+    10a0:       f3 0f 1e fa             endbr64
+    10a4:       68 07 00 00 00          push   $0x7
+    10a9:       e9 72 ff ff ff          jmp    1020 <_init+0x20>
+    10ae:       66 90                   xchg   %ax,%ax
+    10b0:       f3 0f 1e fa             endbr64
+    10b4:       68 08 00 00 00          push   $0x8
+    10b9:       e9 62 ff ff ff          jmp    1020 <_init+0x20>
+    10be:       66 90                   xchg   %ax,%ax
+    10c0:       f3 0f 1e fa             endbr64
+    10c4:       68 09 00 00 00          push   $0x9
+    10c9:       e9 52 ff ff ff          jmp    1020 <_init+0x20>
+    10ce:       66 90                   xchg   %ax,%ax
+    10d0:       f3 0f 1e fa             endbr64
+    10d4:       68 0a 00 00 00          push   $0xa
+    10d9:       e9 42 ff ff ff          jmp    1020 <_init+0x20>
+    10de:       66 90                   xchg   %ax,%ax
+
+Disassembly of section .plt.got:
+
+00000000000010e0 <__cxa_finalize@plt>:
+    10e0:       f3 0f 1e fa             endbr64
+    10e4:       ff 25 0e 3f 00 00       jmp    *0x3f0e(%rip)        # 4ff8 <__cxa_finalize@GLIBC_2.2.5>
+    10ea:       66 0f 1f 44 00 00       nopw   0x0(%rax,%rax,1)
+
+Disassembly of section .plt.sec:
+
+00000000000010f0 <free@plt>:
+    10f0:       f3 0f 1e fa             endbr64
+    10f4:       ff 25 86 3e 00 00       jmp    *0x3e86(%rip)        # 4f80 <free@GLIBC_2.2.5>
+    10fa:       66 0f 1f 44 00 00       nopw   0x0(%rax,%rax,1)
+
+0000000000001100 <fmax@plt>:
+    1100:       f3 0f 1e fa             endbr64
+    1104:       ff 25 7e 3e 00 00       jmp    *0x3e7e(%rip)        # 4f88 <fmax@GLIBC_2.2.5>
+    110a:       66 0f 1f 44 00 00       nopw   0x0(%rax,%rax,1)
+
+0000000000001110 <fclose@plt>:
+    1110:       f3 0f 1e fa             endbr64
+    1114:       ff 25 76 3e 00 00       jmp    *0x3e76(%rip)        # 4f90 <fclose@GLIBC_2.2.5>
+    111a:       66 0f 1f 44 00 00       nopw   0x0(%rax,%rax,1)
+
+0000000000001120 <__stack_chk_fail@plt>:
+    1120:       f3 0f 1e fa             endbr64
+    1124:       ff 25 6e 3e 00 00       jmp    *0x3e6e(%rip)        # 4f98 <__stack_chk_fail@GLIBC_2.4>
+    112a:       66 0f 1f 44 00 00       nopw   0x0(%rax,%rax,1)
+
+0000000000001130 <fprintf@plt>:
+    1130:       f3 0f 1e fa             endbr64
+    1134:       ff 25 66 3e 00 00       jmp    *0x3e66(%rip)        # 4fa0 <fprintf@GLIBC_2.2.5>
+    113a:       66 0f 1f 44 00 00       nopw   0x0(%rax,%rax,1)
+
+0000000000001140 <fmin@plt>:
+    1140:       f3 0f 1e fa            
+[... output limited to 10000 bytes; 71 interior bytes omitted ...]
+        movd   %xmm0,%eax
+    1591:       66 0f 6e c0             movd   %eax,%xmm0
+    1595:       e8 ef fc ff ff          call   1289 <vector_create>
+    159a:       66 48 0f 7e c0          movq   %xmm0,%rax
+    159f:       0f 28 c1                movaps %xmm1,%xmm0
+    15a2:       48 89 45 f4             mov    %rax,-0xc(%rbp)
+    15a6:       f3 0f 11 45 fc          movss  %xmm0,-0x4(%rbp)
+    15ab:       48 8b 45 f4             mov    -0xc(%rbp),%rax
+    15af:       f3 0f 10 45 fc          movss  -0x4(%rbp),%xmm0
+    15b4:       0f 28 c8                movaps %xmm0,%xmm1
+    15b7:       66 48 0f 6e c0          movq   %rax,%xmm0
+    15bc:       c9                      leave
+    15bd:       c3                      ret
+
+00000000000015be <ray_create>:
+    15be:       f3 0f 1e fa             endbr64
+    15c2:       55                      push   %rbp
+    15c3:       48 89 e5                mov    %rsp,%rbp
+    15c6:       48 83 ec 50             sub    $0x50,%rsp
+    15ca:       48 89 7d d8             mov    %rdi,-0x28(%rbp)
+    15ce:       66 48 0f 7e c0          movq   %xmm0,%rax
+    15d3:       0f 28 e1                movaps %xmm1,%xmm4
+    15d6:       66 0f 6f ca             movdqa %xmm2,%xmm1
+    15da:       0f 28 c3                movaps %xmm3,%xmm0
+    15dd:       48 89 45 c8             mov    %rax,-0x38(%rbp)
+    15e1:       f3 0f 11 65 d0          movss  %xmm4,-0x30(%rbp)
+    15e6:       66 0f d6 4d b8          movq   %xmm1,-0x48(%rbp)
+    15eb:       f3 0f 11 45 c0          movss  %xmm0,-0x40(%rbp)
+    15f0:       48 8b 45 c8             mov    -0x38(%rbp),%rax
+    15f4:       48 89 45 e0             mov    %rax,-0x20(%rbp)
+    15f8:       8b 45 d0                mov    -0x30(%rbp),%eax
+    15fb:       89 45 e8                mov    %eax,-0x18(%rbp)
+    15fe:       48 8b 45 b8             mov    -0x48(%rbp),%rax
+    1602:       f3 0f 10 4d c0          movss  -0x40(%rbp),%xmm1
+    1607:       66 48 0f 6e c0          movq   %rax,%xmm0
+    160c:       e8 21 ff ff ff          call   1532 <vector_normalize>
+    1611:       66 48 0f 7e c0          movq   %xmm0,%rax
+    1616:       0f 28 c1                movaps %xmm1,%xmm0
+    1619:       48 89 45 ec             mov    %rax,-0x14(%rbp)
+    161d:       f3 0f 11 45 f4          movss  %xmm0,-0xc(%rbp)
+    1622:       48 8b 4d d8             mov    -0x28(%rbp),%rcx
+    1626:       48 8b 45 e0             mov    -0x20(%rbp),%rax
+    162a:       48 8b 55 e8             mov    -0x18(%rbp),%rdx
+    162e:       48 89 01                mov    %rax,(%rcx)
+    1631:       48 89 51 08             mov    %rdx,0x8(%rcx)
+    1635:       48 8b 45 f0             mov    -0x10(%rbp),%rax
+    1639:       48 89 41 10             mov    %rax,0x10(%rcx)
+    163d:       48 8b 45 d8             mov    -0x28(%rbp),%rax
+    1641:       c9                      leave
+    1642:       c3                      ret
+
+0000000000001643 <ray_at>:
+    1643:       f3 0f 1e fa             endbr64
+    1647:       55                      push   %rbp
+    1648:       48 89 e5                mov    %rsp,%rbp
+    164b:       48 83 ec 40             sub    $0x40,%rsp
+    164f:       f3 0f 11 45 dc          movss  %xmm0,-0x24(%rbp)
+    1654:       f3 0f 10 45 dc          movss  -0x24(%rbp),%xmm0
+    1659:       48 8b 45 1c             mov    0x1c(%rbp),%rax
+    165d:       f3 0f 10 4d 24          movss  0x24(%rbp),%xmm1
+    1662:       0f 28 d0                movaps %xmm0,%xmm2
+    1665:       66 48 0f 6e c0          movq   %rax,%xmm0
+    166a:       e8 94 fd ff ff          call   1403 <vector_multiply>
+    166f:       66 48 0f 7e c0          movq   %xmm0,%rax
+    1674:       0f 28 c1                movaps %xmm1,%xmm0
+    1677:       48 89 45 f4             mov    %rax,-0xc(%rbp)
+    167b:       f3 0f 11 45 fc          movss  %xmm0,-0x4(%rbp)
+    1680:       f3 0f 7e 55 f4          movq   -0xc(%rbp),%xmm2
+    1685:       f3 0f 10 45 fc          movss  -0x4(%rbp),%xmm0
+    168a:       48 8b 45 10             mov    0x10(%rbp),%rax
+    168e:       f3 0f 10 4d 18          movss  0x18(%rbp),%xmm1
+    1693:       0f 28 d8                movaps %xmm0,%xmm3
+    1696:       66 48 0f 6e c0          movq   %rax,%xmm0
+    169b:       e8 3f fc ff ff          call   12df <vector_add>
+    16a0:       66 48 0f 7e c0          movq   %xmm0,%rax
+    16a5:       0f 28 c1                movaps %xmm1,%xmm0
+    16a8:       48 89 45 e8             mov    %rax,-0x18(%rbp)
+    16ac:       f3 0f 11 45 f0          movss  %xmm0,-0x10(%rbp)
+    16b1:       48 8b 45 e8             mov    -0x18(%rbp),%rax
+    16b5:       f3 0f 10 45 f0          movss  -0x10(%rbp),%xmm0
+    16ba:       0f 28 c8                movaps %xmm0,%xmm1
+    16bd:       66 48 0f 6e c0          movq   %rax,%xmm0
+    16c2:       c9                      leave
+    16c3:       c3                      ret
+
+00000000000016c4 <sphere_intersect>:
+    16c4:       f3 0f 1e fa             endbr64
+    16c8:       55                      push   %rbp
+root@c454cc25e7a1:/app#

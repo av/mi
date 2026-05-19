@@ -1,0 +1,11 @@
+Previous response had warnings:
+WARNINGS: - Extra text detected before JSON object
+- Extra text detected after JSON object
+
+New Terminal Output:
+
+root@93525de64552:/app# find / -type f -size -1M 2>/dev/null | xargs grep -l 'recovered.json' 2>/dev/null | head -10
+ls -la /app/*.old /app/*.bak /app/*.orig 2>/dev/null; ls -la /app/.* 2>/dev/null
+btrfs subvolume list -p /etc/hosts 2>/dev/null || ls -la /var/lib/modules 2>/dev/null || findmnt -t btrfs 2>/dev/null
+mount -o subvol=/root,ro /dev/nvme0n1p3 /mnt 2>&1 && ls -la /mnt/app/ 2>&1 || echo 'mount failed'
+

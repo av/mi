@@ -1,0 +1,182 @@
+Previous response had warnings:
+WARNINGS: - Extra text detected before JSON object
+- Extra text detected after JSON object
+
+New Terminal Output:
+
+root@c454cc25e7a1:/app# objdump -d orig --start-address=0x2530 --stop-address=0x2c30 2>&1
+
+orig:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+0000000000002530 <main>:
+    2530:       f3 0f 1e fa             endbr64
+    2534:       55                      push   %rbp
+    2535:       48 89 e5                mov    %rsp,%rbp
+    2538:       53                      push   %rbx
+    2539:       48 81 ec 28 01 00 00    sub    $0x128,%rsp
+    2540:       64 48 8b 04 25 28 00    mov    %fs:0x28,%rax
+    2547:       00 00
+    2549:       48 89 45 e8             mov    %rax,-0x18(%rbp)
+    254d:       31 c0                   xor    %eax,%eax
+    254f:       c7 85 dc fe ff ff 60    movl   $0x960,-0x124(%rbp)
+    2556:       09 00 00
+    2559:       c7 85 e0 fe ff ff 08    movl   $0x708,-0x120(%rbp)
+    2560:       07 00 00
+    2563:       48 8b 05 b6 2a 00 00    mov    0x2ab6(%rip),%rax        # 5020 <stderr@GLIBC_2.2.5>
+    256a:       8b 8d e0 fe ff ff       mov    -0x120(%rbp),%ecx
+    2570:       8b 95 dc fe ff ff       mov    -0x124(%rbp),%edx
+    2576:       48 8d 35 f3 0a 00 00    lea    0xaf3(%rip),%rsi        # 3070 <_IO_stdin_used+0x70>
+    257d:       48 89 c7                mov    %rax,%rdi
+    2580:       b8 00 00 00 00          mov    $0x0,%eax
+    2585:       e8 a6 eb ff ff          call   1130 <fprintf@plt>
+    258a:       48 8b 05 8f 2a 00 00    mov    0x2a8f(%rip),%rax        # 5020 <stderr@GLIBC_2.2.5>
+    2591:       48 89 c1                mov    %rax,%rcx
+    2594:       ba 35 00 00 00          mov    $0x35,%edx
+    2599:       be 01 00 00 00          mov    $0x1,%esi
+    259e:       48 8d 05 f3 0a 00 00    lea    0xaf3(%rip),%rax        # 3098 <_IO_stdin_used+0x98>
+    25a5:       48 89 c7                mov    %rax,%rdi
+    25a8:       e8 d3 eb ff ff          call   1180 <fwrite@plt>
+    25ad:       66 0f ef d2             pxor   %xmm2,%xmm2
+    25b1:       66 0f ef c9             pxor   %xmm1,%xmm1
+    25b5:       8b 05 75 0b 00 00       mov    0xb75(%rip),%eax        # 3130 <_IO_stdin_used+0x130>
+    25bb:       66 0f 6e c0             movd   %eax,%xmm0
+    25bf:       e8 c5 ec ff ff          call   1289 <vector_create>
+    25c4:       66 48 0f 7e c0          movq   %xmm0,%rax
+    25c9:       0f 28 c1                movaps %xmm1,%xmm0
+    25cc:       48 89 85 00 ff ff ff    mov    %rax,-0x100(%rbp)
+    25d3:       f3 0f 11 85 08 ff ff    movss  %xmm0,-0xf8(%rbp)
+    25da:       ff
+    25db:       f3 0f 10 05 b9 0b 00    movss  0xbb9(%rip),%xmm0        # 319c <_IO_stdin_used+0x19c>
+    25e2:       00
+    25e3:       f3 0f 11 85 e4 fe ff    movss  %xmm0,-0x11c(%rbp)
+    25ea:       ff
+    25eb:       66 0f ef c0             pxor   %xmm0,%xmm0
+    25ef:       f3 0f 2a 85 dc fe ff    cvtsi2ssl -0x124(%rbp),%xmm0
+    25f6:       ff
+    25f7:       66 0f ef c9             pxor   %xmm1,%xmm1
+    25fb:       f3 0f 2a 8d e0 fe ff    cvtsi2ssl -0x120(%rbp),%xmm1
+    2602:       ff
+    2603:       f3 0f 5e c1             divss  %xmm1,%xmm0
+    2607:       f3 0f 10 8d e4 fe ff    movss  -0x11c(%rbp),%xmm1
+    260e:       ff
+    260f:       f3 0f 59 c1             mulss  %xmm1,%xmm0
+    2613:       f3 0f 11 85 e8 fe ff    movss  %xmm0,-0x118(%rbp)
+    261a:       ff
+    261b:       f3 0f 10 05 51 0b 00    movss  0xb51(%rip),%xmm0        # 3174 <_IO_stdin_used+0x174>
+    2622:       00
+    2623:       f3 0f 11 85 ec fe ff    movss  %xmm0,-0x114(%rbp)
+    262a:       ff
+    262b:       8b 85 e8 fe ff ff       mov    -0x118(%rbp),%eax
+    2631:       66 0f ef d2             pxor   %xmm2,%xmm2
+    2635:       66 0f ef c9             pxor   %xmm1,%xmm1
+    2639:       66 0f 6e c0             movd   %eax,%xmm0
+    263d:       e8 47 ec ff ff          call   1289 <vector_create>
+    2642:       66 48 0f 7e c0          movq   %xmm0,%rax
+    2647:       0f 28 c1                movaps %xmm1,%xmm0
+    264a:       48 89 85 0c ff ff ff    mov    %rax,-0xf4(%rbp)
+    2651:       f3 0f 11 85 14 ff ff    movss  %xmm0,-0xec(%rbp)
+    2658:       ff
+    2659:       f3 0f 10 85 e4 fe ff    movss  -0x11c(%rbp),%xmm0
+    2660:       ff
+    2661:       66 0f ef d2             pxor   %xmm2,%xmm2
+    2665:       0f 28 c8                movaps %xmm0,%xmm1
+    2668:       8b 05 c2 0a 00 00       mov    0xac2(%rip),%eax        # 3130 <_IO_stdin_used+0x130>
+    266e:       66 0f 6e c0             movd   %eax,%xmm0
+    2672:       e8 12 ec ff ff          call   1289 <vector_create>
+    2677:       66 48 0f 7e c0          movq   %xmm0,%rax
+    267c:       0f 28 c1                movaps %xmm1,%xmm0
+    267f:       48 89 85 18 ff ff ff    mov    %rax,-0xe8(%rbp)
+    2686:       f3 0f 11 85 20 ff ff    movss  %xmm0,-0xe0(%rbp)
+    268d:       ff
+    268e:       f3 0f 10 85 ec fe ff    movss  -0x114(%rbp),%xmm0
+    2695:       ff
+    2696:       0f 28 d0                movaps %xmm0,%xmm2
+    2699:       66 0f ef c9             pxor   %xmm1,%xmm1
+    269d:       8b 05 8d 0a 00 00       mov    0xa8d(%rip
+[... output limited to 10000 bytes; 71 interior bytes omitted ...]
+2abf:       48 8b 95 00 ff ff ff    mov    -0x100(%rbp),%rdx
+    2ac6:       f3 0f 10 8d 08 ff ff    movss  -0xf8(%rbp),%xmm1
+    2acd:       ff
+    2ace:       0f 28 d8                movaps %xmm0,%xmm3
+    2ad1:       66 48 0f 6e c2          movq   %rdx,%xmm0
+    2ad6:       48 89 c7                mov    %rax,%rdi
+    2ad9:       e8 e0 ea ff ff          call   15be <ray_create>
+    2ade:       8b 85 d4 fe ff ff       mov    -0x12c(%rbp),%eax
+    2ae4:       48 98                   cltq
+    2ae6:       48 8d 14 c5 00 00 00    lea    0x0(,%rax,8),%rdx
+    2aed:       00
+    2aee:       48 8b 85 f8 fe ff ff    mov    -0x108(%rbp),%rax
+    2af5:       48 01 d0                add    %rdx,%rax
+    2af8:       48 8b 08                mov    (%rax),%rcx
+    2afb:       8b 85 d8 fe ff ff       mov    -0x128(%rbp),%eax
+    2b01:       48 63 d0                movslq %eax,%rdx
+    2b04:       48 89 d0                mov    %rdx,%rax
+    2b07:       48 01 c0                add    %rax,%rax
+    2b0a:       48 01 d0                add    %rdx,%rax
+    2b0d:       48 c1 e0 02             shl    $0x2,%rax
+    2b11:       48 8d 1c 01             lea    (%rcx,%rax,1),%rbx
+    2b15:       f3 0f 7e 95 30 ff ff    movq   -0xd0(%rbp),%xmm2
+    2b1c:       ff
+    2b1d:       f3 0f 10 85 38 ff ff    movss  -0xc8(%rbp),%xmm0
+    2b24:       ff
+    2b25:       48 8b 75 c0             mov    -0x40(%rbp),%rsi
+    2b29:       f3 0f 7e 4d c8          movq   -0x38(%rbp),%xmm1
+    2b2e:       48 83 ec 08             sub    $0x8,%rsp
+    2b32:       48 83 ec 18             sub    $0x18,%rsp
+    2b36:       48 89 e1                mov    %rsp,%rcx
+    2b39:       48 8b 45 d0             mov    -0x30(%rbp),%rax
+    2b3d:       48 8b 55 d8             mov    -0x28(%rbp),%rdx
+    2b41:       48 89 01                mov    %rax,(%rcx)
+    2b44:       48 89 51 08             mov    %rdx,0x8(%rcx)
+    2b48:       48 8b 45 e0             mov    -0x20(%rbp),%rax
+    2b4c:       48 89 41 10             mov    %rax,0x10(%rcx)
+    2b50:       0f 28 d8                movaps %xmm0,%xmm3
+    2b53:       66 48 0f 6e c6          movq   %rsi,%xmm0
+    2b58:       e8 ff f1 ff ff          call   1d5c <trace>
+    2b5d:       48 83 c4 20             add    $0x20,%rsp
+    2b61:       66 48 0f 7e c0          movq   %xmm0,%rax
+    2b66:       0f 28 c1                movaps %xmm1,%xmm0
+    2b69:       48 89 03                mov    %rax,(%rbx)
+    2b6c:       f3 0f 11 43 08          movss  %xmm0,0x8(%rbx)
+    2b71:       83 85 d8 fe ff ff 01    addl   $0x1,-0x128(%rbp)
+    2b78:       8b 85 d8 fe ff ff       mov    -0x128(%rbp),%eax
+    2b7e:       3b 85 dc fe ff ff       cmp    -0x124(%rbp),%eax
+    2b84:       0f 8c b8 fd ff ff       jl     2942 <main+0x412>
+    2b8a:       83 85 d4 fe ff ff 01    addl   $0x1,-0x12c(%rbp)
+    2b91:       8b 85 d4 fe ff ff       mov    -0x12c(%rbp),%eax
+    2b97:       3b 85 e0 fe ff ff       cmp    -0x120(%rbp),%eax
+    2b9d:       0f 8c 38 fd ff ff       jl     28db <main+0x3ab>
+    2ba3:       48 8b 05 76 24 00 00    mov    0x2476(%rip),%rax        # 5020 <stderr@GLIBC_2.2.5>
+    2baa:       48 89 c1                mov    %rax,%rcx
+    2bad:       ba 14 00 00 00          mov    $0x14,%edx
+    2bb2:       be 01 00 00 00          mov    $0x1,%esi
+    2bb7:       48 8d 05 48 05 00 00    lea    0x548(%rip),%rax        # 3106 <_IO_stdin_used+0x106>
+    2bbe:       48 89 c7                mov    %rax,%rdi
+    2bc1:       e8 ba e5 ff ff          call   1180 <fwrite@plt>
+    2bc6:       8b 8d e0 fe ff ff       mov    -0x120(%rbp),%ecx
+    2bcc:       8b 95 dc fe ff ff       mov    -0x124(%rbp),%edx
+    2bd2:       48 8b 85 f8 fe ff ff    mov    -0x108(%rbp),%rax
+    2bd9:       48 89 c6                mov    %rax,%rsi
+    2bdc:       48 8d 05 38 05 00 00    lea    0x538(%rip),%rax        # 311b <_IO_stdin_used+0x11b>
+    2be3:       48 89 c7                mov    %rax,%rdi
+    2be6:       e8 18 f6 ff ff          call   2203 <write_image>
+    2beb:       48 8b 05 2e 24 00 00    mov    0x242e(%rip),%rax        # 5020 <stderr@GLIBC_2.2.5>
+    2bf2:       48 89 c1                mov    %rax,%rcx
+    2bf5:       ba 06 00 00 00          mov    $0x6,%edx
+    2bfa:       be 01 00 00 00          mov    $0x1,%esi
+    2bff:       48 8d 05 1f 05 00 00    lea    0x51f(%rip),%rax        # 3125 <_IO_stdin_used+0x125>
+    2c06:       48 89 c7                mov    %rax,%rdi
+    2c09:       e8 72 e5 ff ff          call   1180 <fwrite@plt>
+    2c0e:       b8 00 00 00 00          mov    $0x0,%eax
+    2c13:       48 8b 55 e8             mov    -0x18(%rbp),%rdx
+    2c17:       64 48 2b 14 25 28 00    sub    %fs:0x28,%rdx
+    2c1e:       00 00
+    2c20:       74 05                   je     2c27 <main+0x6f7>
+    2c22:       e8 f9 e4 ff ff          call   1120 <__stack_chk_fail@plt>
+    2c27:       48 8b 5d f8             mov    -0x8(%rbp),%rbx
+    2c2b:       c9                      leave
+    2c2c:       c3                      ret
+root@c454cc25e7a1:/app#

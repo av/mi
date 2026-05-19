@@ -1,0 +1,5 @@
+Previous response had parsing errors:
+ERROR: Invalid JSON: Expecting ':' delimiter: line 3 column 623 (char 1681) | Content preview: '{\n  "analysis": "I extracted floating-point constants from the orig binary. Some interesting values:'...
+WARNINGS: - Extra text detected before JSON object
+
+Please fix these issues and provide a proper JSON response.

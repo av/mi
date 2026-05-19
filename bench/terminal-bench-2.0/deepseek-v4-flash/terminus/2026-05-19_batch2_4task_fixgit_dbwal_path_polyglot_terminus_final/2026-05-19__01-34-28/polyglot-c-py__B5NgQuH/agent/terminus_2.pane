@@ -1,0 +1,9 @@
+[?2004hroot@279141645ba3:/app# asciinema rec --stdin /logs/agent/recording.cast
+[?2004l[0;32masciinema: recording asciicast to /logs/agent/recording.cast[0m
+[0;32masciinema: press <ctrl-d> or type "exit" when you're done[0m
+[?2004hroot@279141645ba3:/app# clear
+[?2004l[H[J[3J[?2004hroot@279141645ba3:/app# ls -la /app
+[?2004ltotal 0
+drwxr-xr-x. 1 root root  0 Oct 22  2025 [0m[01;34m.[0m
+drwxr-xr-x. 1 root root 40 May 18 23:51 [01;34m..[0m
+[?2004hroot@279141645ba3:/app# 

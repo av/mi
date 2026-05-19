@@ -1,0 +1,7 @@
+New Terminal Output:
+
+root@049ad556a07f:/app/personal-site# git merge 650dba4
+Auto-merging _includes/about.md
+CONFLICT (content): Merge conflict in _includes/about.md
+Automatic merge failed; fix conflicts and then commit the result.
+root@049ad556a07f:/app/personal-site#

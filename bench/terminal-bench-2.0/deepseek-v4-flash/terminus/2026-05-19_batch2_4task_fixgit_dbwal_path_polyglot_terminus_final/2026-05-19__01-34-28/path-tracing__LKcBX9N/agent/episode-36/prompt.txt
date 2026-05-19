@@ -1,0 +1,10 @@
+Previous response had warnings:
+WARNINGS: - Extra text detected after JSON object
+
+New Terminal Output:
+
+> which objdump || echo 'not found'
+> which gdb || echo 'not found'
+> which ltrace || echo 'not found'
+> which strace || echo 'not found'
+>

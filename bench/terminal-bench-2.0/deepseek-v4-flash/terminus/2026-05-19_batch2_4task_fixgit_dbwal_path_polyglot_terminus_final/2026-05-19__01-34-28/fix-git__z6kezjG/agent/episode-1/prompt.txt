@@ -1,0 +1,4 @@
+Previous response had parsing errors:
+ERROR: Invalid JSON: Expecting ',' delimiter: line 23 column 22 (char 879) | Content preview: '{\n  "analysis": "The terminal shows a root shell at /app/personal-site. The user says they made chan'...
+
+Please fix these issues and provide a proper JSON response.

@@ -1,0 +1,113 @@
+{
+    "schema_version": 1,
+    "created_at": "2026-05-18T23:30:37.719889Z",
+    "harbor": {
+        "version": "0.7.1",
+        "is_editable": false
+    },
+    "invocation": [
+        "/home/everlier/.cache/uv/archive-v0/kk6uRRevclPkoIGG-xkff/bin/harbor",
+        "run",
+        "--dataset",
+        "terminal-bench@2.0",
+        "--agent-import-path",
+        "mi_harbor.mi_agent:MiAgent",
+        "--model",
+        "openai/deepseek/deepseek-v4-flash",
+        "--n-concurrent",
+        "1",
+        "--n-tasks",
+        "2",
+        "--yes",
+        "--include-task-name",
+        "regex-chess",
+        "--include-task-name",
+        "crack-7z-hash",
+        "--jobs-dir",
+        "/tmp/mi-30-eval-iter1/mi"
+    ],
+    "n_concurrent_trials": 1,
+    "retry": {
+        "max_retries": 0,
+        "exclude_exceptions": [
+            "AgentTimeoutError",
+            "RewardFileNotFoundError",
+            "VerifierTimeoutError",
+            "RewardFileEmptyError",
+            "VerifierOutputParseError"
+        ],
+        "wait_multiplier": 1.0,
+        "min_wait_sec": 1.0,
+        "max_wait_sec": 60.0
+    },
+    "trials": [
+        {
+            "task": {
+                "name": "regex-chess",
+                "type": "git",
+                "digest": "sha256:18a2f8de79b9a1c70148b7431ad2eb906d2298cdc9ac6c33aba950fd401b4fcf",
+                "source": "terminal-bench",
+                "path": "regex-chess",
+                "git_url": "https://github.com/laude-institute/terminal-bench-2.git",
+                "git_commit_id": "69671fbaac6d67a7ef0dfec016cc38a64ef7a77c"
+            },
+            "timeout_multiplier": 1.0,
+            "agent": {
+                "import_path": "mi_harbor.mi_agent:MiAgent",
+                "model_name": "openai/deepseek/deepseek-v4-flash",
+                "skills": [],
+                "kwargs": {},
+                "env": {},
+                "mcp_servers": []
+            },
+            "skills": [],
+            "environment": {
+                "type": "docker",
+                "force_build": false,
+                "delete": true,
+                "suppress_override_warnings": false,
+                "extra_docker_compose": [],
+                "env": {},
+                "kwargs": {}
+            },
+            "verifier": {
+                "env": {},
+                "disable": false
+            }
+        },
+        {
+            "task": {
+                "name": "crack-7z-hash",
+                "type": "git",
+                "digest": "sha256:317142160a33ebffd38c6d0b2697797cb0e109a6c9d1e3b9a83eb745f524d0c9",
+                "source": "terminal-bench",
+                "path": "crack-7z-hash",
+                "git_url": "https://github.com/laude-institute/terminal-bench-2.git",
+                "git_commit_id": "69671fbaac6d67a7ef0dfec016cc38a64ef7a77c"
+            },
+            "timeout_multiplier": 1.0,
+            "agent": {
+                "import_path": "mi_harbor.mi_agent:MiAgent",
+                "model_name": "openai/deepseek/deepseek-v4-flash",
+                "skills": [],
+                "kwargs": {},
+                "env": {},
+                "mcp_servers": []
+            },
+            "skills": [],
+            "environment": {
+                "type": "docker",
+                "force_build": false,
+                "delete": true,
+                "suppress_override_warnings": false,
+                "extra_docker_compose": [],
+                "env": {},
+                "kwargs": {}
+            },
+            "verifier": {
+                "env": {},
+                "disable": false
+            }
+        }
+    ]
+}

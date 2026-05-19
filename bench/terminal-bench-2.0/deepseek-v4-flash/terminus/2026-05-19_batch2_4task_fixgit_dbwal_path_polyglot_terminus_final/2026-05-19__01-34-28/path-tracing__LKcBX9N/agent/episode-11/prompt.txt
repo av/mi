@@ -1,0 +1,8 @@
+New Terminal Output:
+
+root@c454cc25e7a1:/app# sed -n '4p; 1204p; 2403p' image.ppm
+159 197 255
+146 190 255
+159 197 255
+root@c454cc25e7a1:/app# sed -n '100p= image.ppm | head -c 50000 | xxd -p | fold -w 6 | head -100
+>

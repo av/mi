@@ -179,3 +179,33 @@ terminus: 0 passes / 0 completed / 12 tasks  (0.0% pass rate on completed)
 
 **Cycle count in this unit**: 5 full (with 90-180s sleeps); deepened collection on batches 2/3 (new finals/partials) + edge batch5. High-impact remaining: continued harvesting, final report write-up.
 
+
+---
+## Collection + Reporting Update (this focused unit: 4 monitor+agg cycles + snapshots + report, ~02:03-02:15)
+**What was done** (per ONE unit goal, ~3h50m remain):
+- Read progress (iter6 state: 16/30 via batch5 launch, mi batch3 3/3 live, skeleton+summary ready).
+- Performed 4 cycles of `./mi_harbor/monitor-30task-evals.sh --tail ... && ./mi_harbor/aggregate-tb-results.sh` (with 120-130s sleeps between; cycles 2-4 let iter1-mi, iter2-term, iter3-mi fully finish + more batch progress).
+- **Newly completed / high-progress harvested + snapshotted (full dated bench dirs + accurate score.txt with explicit pass/fail lists from reward.txt + notes.md):**
+  1. mi batch1 final: `bench/.../mi/2026-05-19_batch1_regex-chess_crack7z_mi_final/` — 1/2 (50%): `crack-7z-hash` pass, `regex-chess` fail. (Matches term batch1 exactly.)
+  2. terminus batch2 final: `bench/.../terminus/2026-05-19_batch2_4task_fixgit_dbwal_path_polyglot_terminus_final/` — 1/4 (25%): only `fix-git`.
+  3. mi batch3 final: `bench/.../mi/2026-05-19_batch3_5task_largest_mcmc_hf_qemu_configure_mi_final/` — 4/4 on completed (5 trials/1 error): `largest-eigenval`, `configure-git-webserver`, `hf-model-inference`, `mcmc-sampling-stan` (100% on rewarded); qemu errored. (Big update over prior partial.)
+- Also updated bench ls in monitor now reflects 3+ new snapshots + prior ones (total run dirs 96).
+- **No batch6** (load dropped nicely to 11 but prioritized report population over extra coverage; remaining 14 tasks incl. sanitize etc. left for future).
+- **Report artifact:** Created+populated `final-30task-mi-vs-terminus-report.md` (from skeleton) with executive summary (mi ~8 passes, term ~4+), full per-batch tables with exact task names/passes/rates/timings/diffs, grand stats, category strengths (mi sci/math/ML/SWE, term crypto/systems), common passes (fix-git x2, configure, crack-7z), qualitative, recs, appendix of snapshot paths. Real numbers from all snapshots + live result.json/rewards.
+- Refreshed this summary with the unit details + latest agg (now includes the new finals in per-run table).
+- 4 cycles + sleeps + 3 snapshots + report + summary = focused harvest + artifact over max coverage.
+
+**Discoveries from cycles (new passes, standings, diffs):**
+- **mi batch1 final 1/2 pass on crack-7z** (symmetric to term; regex-chess fail both).
+- **Batch2 tie:** both harnesses exactly 1/4 on fix-git only (polyglot/path/db-wal all 0 for both).
+- **mi batch3 superstar:** 4 passes incl. mcmc (which term still pending) + eigenval/hf (term 0 on them); only qemu error vs term qemu pass.
+- **Grand so far (real):** mi 8 passes (baseline2 + batch1 1 + batch2 1 + batch3 4), term 4+ (batch1 1 + batch2 1 + batch3 2); mi higher rate on completed sci/SWE tasks.
+- **Interesting:** Common passes confirm fix-git/configure-git-webserver as robust across harnesses. mi n=1 still delivers high pass density; term faster but similar outcomes on many.
+- **Live at end:** term batch3 mcmc (17m+), batch4 train (29m), batch5 winning (16m) still running; iter4/5 1 running each. Docker 11. No new rewards in batch4/5 yet.
+- **Agg now reflects new snapshots** (mi batch1 50%, batch3 100% 4/4, term batch2 25%).
+
+**Remaining (to 5:30-6am):** 2-3 more monitor/agg cycles for batch4/5 + term mcmc finishes → additional snapshots if rewards; polish final-report.md with late numbers + commit all; update progress + README if needed. ~3h40m left — plenty for harvest without new launches.
+
+**Commits this unit:** (to be done) all new bench/ snapshots (batch1 mi final, batch2 term final, batch3 mi final), final-30task-...-report.md, updated current-results-summary.md + any bench/README.
+
+**Status:** Real numbers flowing, report artifact delivered with concrete data. Prioritized per instructions.

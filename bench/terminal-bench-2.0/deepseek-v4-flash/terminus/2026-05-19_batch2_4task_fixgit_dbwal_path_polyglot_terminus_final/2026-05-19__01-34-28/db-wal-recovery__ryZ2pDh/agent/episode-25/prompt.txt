@@ -1,0 +1,24 @@
+Previous response had warnings:
+WARNINGS: - Extra text detected before JSON object
+- Extra text detected after JSON object
+
+New Terminal Output:
+
+root@93525de64552:/app# sqlite3 main.db "PRAGMA integrity_check;"
+ok
+root@93525de64552:/app# echo "SELECT * FROM items;" | sqlite3 main.db > /tmp/curr.txt; cat /tmp/curr.txt
+1|apple|100
+2|banana|200
+3|cherry|300
+4|date|400
+5|elderberry|500
+root@93525de64552:/app# sqlite3 main.db ".recover"
+BEGIN;
+PRAGMA writable_schema = on;
+PRAGMA encoding = 'UTF-8';
+PRAGMA page_size = '4096';
+PRAGMA auto_vacuum = '0';
+PRAGMA user_version = '0';
+PRAGMA application_id = '0';
+sql error: no such table: sqlite_dbpage (1)
+root@93525de64552:/app#

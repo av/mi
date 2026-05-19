@@ -1,0 +1,105 @@
+[   31.07s] [90m⟡ bash({"command":"ls -la /app/"})[0m
+[   31.07s] [90mtotal 8
+[   31.08s] drwxr-xr-x. 1 root root   16 Oct 28  2025 .
+[   31.08s] drwxr-xr-x. 1 root root   76 May 18 23:30 ..
+[   31.08s] -rw-r--r--. 1 root root 4412 Oct 26  2025 check.py
+[   31.08s] [0m
+[   33.52s] [90m⟡ read({"file":"/app/check.py"})[0m
+[   36.08s] [90m⟡ bash({"command":"cat /app/check.py"})[0m
+[   36.08s] [90mimport random
+[   36.08s] import unittest
+[   36.08s] import chess
+[   36.08s] import chess.pgn
+[   36.08s] import io
+[   36.08s] import json
+[   36.08s] import re
+[   36.09s] 
+[   36.09s] 
+[   36.09s] def run_solution(fen):
+[   36.09s]     for pattern, repl in json.load(open("/app/re.json")):
+[   36.09s]         fen = re.sub(patt…[0m
+[  218.83s] Let me examine the check.py and think about this problem.
+[  218.83s] 
+[  219.54s] 
+[  219.54s] [90m⟡ bash({"command":"cat /app/check.py"})[0m
+[  219.54s] [90mimport random
+[  219.55s] import unittest
+[  219.55s] import chess
+[  219.55s] import chess.pgn
+[  219.55s] import io
+[  219.55s] import json
+[  219.55s] import re
+[  219.55s] 
+[  219.55s] 
+[  219.55s] def run_solution(fen):
+[  219.56s]     for pattern, repl in json.load(open("/app/re.json")):
+[  219.56s]         fen = re.sub(patt…[0m
+[  367.58s] This is a complex problem — I need to implement a legal chess move generator using only regex substitutions. Let me start by understanding the task and then build a generator script
+[  367.58s] [90m⟡ bash({"command":"pip3 list 2>/dev/null | grep -i chess; python3 -c \"import chess; print(chess.__version__)\" 2>&1"})[0m
+[  367.76s] [90mchess   1.11.2
+[  367.76s] 1.11.2
+[  367.76s] [0m
+[  542.76s] This is a fascinating problem — implementing a legal chess move generator using only regex substitutions. Let me explore the check logic first and then build a code generator.
+[  542.76s] 
+[  544.96s] 
+[  544.96s] [90m⟡ bash({"command":"python3 -c \"\nimport json, re\n\n# Let's examine the example\nfen = 'rnb1k1nr/p2p1ppp/3B4/1p1NPN1P/6P1/3P1Q2/P1P5/q4Kb1 w kq - 0 1'\nexpected = 'rnb1k1nr/p2p1ppp/3B4/1p1NPN1P/6P1/3P1Q2/P1P1K3/q5b1 b kq - 0 0\\nrnb1k1nr/p2p1ppp/3B4/1p1NPN1P/6P1/3P1Q2/P1P3K1/q5b1 b kq - 0 0\\nrnb1k1nr/p2p1ppp/3B4/1p1NPN1P/6P1/3P4/P1P5/q2Q1Kb1 b kq - 0 0'\nfor e in expected.split('\\n'):\n    print(repr(e))\n\""})[0m
+[  544.98s] [90m'rnb1k1nr/p2p1ppp/3B4/1p1NPN1P/6P1/3P1Q2/P1P1K3/q5b1 b kq - 0 0'
+[  544.98s] 'rnb1k1nr/p2p1ppp/3B4/1p1NPN1P/6P1/3P1Q2/P1P3K1/q5b1 b kq - 0 0'
+[  544.98s] 'rnb1k1nr/p2p1ppp/3B4/1p1NPN1P/6P1/3P4/P1P5/q2Q1Kb1 b kq - 0 0'
+[  544.98s] [0m
+[  762.66s] Let me think through this carefully. I need to generate regex patterns that transform a FEN into multiple FENs for all legal next positions.
+[  762.66s] 
+[  764.23s] 
+[  764.23s] [90m⟡ bash({"command":"python3 -c \"\n# Let me understand the exploded format approach\nimport re\n\nfen = 'rnb1k1nr/p2p1ppp/3B4/1p1NPN1P/6P1/3P1Q2/P1P5/q4Kb1 w kq - 0 1'\nprint('Input:', fen)\n\n# Let me think about how to explode digits with regex\n# Using sequential replacements for each digit\ntest = 'rnb1k1nr/p2p1ppp/3B4/1p1NPN1P/6P1/3P1Q2/P1P5/q4Kb1'\nfor d in range(8, 0, -1):\n    test = re.sub(str(d), '.' * d, test)\nprint('Exploded:', test)\n\n# Now split into rows\nrows = test.split('/')\nprint('Rows:', rows)\n\""})[0m
+[  764.24s] [90mInput: rnb1k1nr/p2p1ppp/3B4/1p1NPN1P/6P1/3P1Q2/P1P5/q4Kb1 w kq - 0 1
+[  764.24s] Exploded: rnb.k.nr/p..p.ppp/...B..../.p.NPN.P/......P./...P.Q../P.P...../q....Kb.
+[  764.24s] Rows: ['rnb.k.nr', 'p..p.ppp', '...B....', '.p.NP…[0m
+[  901.01s] Let me study the problem and write a generator script. This is a complex regex-only chess move generator.
+[  901.02s] 
+[  902.27s] 
+[  902.27s] [90m⟡ bash({"command":"python3 << 'PYEOF'\nimport chess\n\n# Let me understand the example properly\nfen = \"rnb1k1nr/p2p1ppp/3B4/1p1NPN1P/6P1/3P1Q2/P1P5/q4Kb1 w kq - 0 1\"\nboard = chess.Board(fen)\n\nprint(\"Legal moves (excluding underpromotion):\")\nfor move in board.legal_moves:\n    if move.promotion and move.promotion != chess.QUEEN:\n        continue\n    board_copy = board.copy()\n    board_copy.push(move)\n    result_fen = \" \".join(board_copy.fen().split(\" \")[:-2])\n    print(f\"  {move.uci()} -> {result_fen}\")\n\nprint()\nprint(\"Board exploded:\")\nfor row in fen.split(\" \")[0].split(\"/\"):\n    exploded = \"\"\n    for c in row:\n        if c.isdigit():\n            exploded += \".\" * int(c)\n        else:\n            exploded += c\n    print(f\"  {exploded}\")\nPYEOF"})[0m
+[  902.31s] [90mLegal moves (excluding underpromotion):
+[  902.32s]   f1g2 -> rnb1k1nr/p2p1ppp/3B4/1p1NPN1P/6P1/3P1Q2/P1P3K1/q5b1 b kq -
+[  902.32s]   f1e2 -> rnb1k1nr/p2p1ppp/3B4/1p1NPN1P/6P1/3P1Q2/P1P1K3/q5b1 b kq -
+[  902.32s]   f3d1 -> rnb1k1nr/p2p…[0m
+[ 1010.28s] Now I understand the problem. Let me write a generator script that produces `re.json`.
+[ 1010.28s] 
+[ 1022.86s] 
+[ 1022.86s] [90m⟡ bash({"command":"python3 << 'PYEOF'\nimport re, json, itertools, chess\n\n# Phase 1: generate all regex patterns for all legal moves\n\npatterns = []\n\ndef add(pattern, repl):\n    patterns.append([pattern, repl])\n\ndef explode(fen):\n    \"\"\"Replace digits with dots in the board part\"\"\"\n    parts = fen.split(\" \")\n    board = parts[0]\n    for d in range(8, 0, -1):\n        board = board.replace(str(d), \".\" * d)\n    parts[0] = board\n    return \" \".join(parts)\n\ndef implode(fen):\n    \"\"\"Replace runs of dots with digits\"\"\"\n    parts = fen.split(\" \")\n    if len(parts) >= 1:\n        for length in range(8, 1, -1):\n            parts[0] = parts[0].replace(\".\" * length, str(length))\n    return \" \".join(parts)\n\n# Step 1: Explode digits to dots\n# Replace digits 1-8 with dots\nfor d in range(1, 9):\n    # Match digit d in the board part (before the first space)\n    add(str(d), \".\" * d)\n\n# Now work with expanded format: rnb.k.nr/p..p.ppp/...B..../.p.NPN.P/......P./...P.Q../P.P...../q....Kb. w kq - 0 1\n\n# Helper to build regex for a piece move\n# The board has format: row0/row1/.../row7 metadata\n# Each row is exactly 8 chars\n\ndef make_pawn_move_pattern(r, c, r2, c2, is_capture=False, is_promotion=False, is_double=False):\n    \"\"\"Create regex for pawn moving from (r,c) to (r2,c2)\"\"\"\n    white_pieces = 'PNBRQK'\n    black_pieces = 'pnbrqk'\n    \n    # Ensure rows are in order\n    r_min = min(r, r2)\n    r_max = max(r, r2)\n    \n    # Build the regex parts\n    parts = [\"^\"]\n    row_strs = []\n    for i in range(8):\n        row_strs.append(f\"row{i}\")\n    \n    # We need to match the specific rows\n    for i in range(8):\n        if i == r:\n            # Source row: capture left part, P, right part\n            parts.append(f\"(.{{{c}}})(P)(.{{{7-c}}})\")\n        elif i == r2:\n            # Destination row: capture left part, dest char, right part\n            dest_re = '.'  # any single char\n            parts.append(f\"(.{{{c2}}})({dest_re})(.{{{7-c2}}})\")\n        else:\n            # Any other row: capture whole row\n            parts.append(f\"(.{{8}})\")\n        if i < 7:\n            parts.append(\"/\")\n    \n    # Metadata capture (after board)\n    parts.append(r\" (\\S+) (\\S+) (\\S+) (\\S+) (\\S+)\")\n    parts.append(\"$\")\n    \n    pattern = \"\".join(parts)\n    \n    # Build replacement\n    repl_parts = []\n    for i in range(8):\n        row_idx = i * 3  # Each row contributes 3 groups: left, mid, right (except others)\n        \n    # This is getting complex. Let me use a different approach.\n    \n    return pattern, None\n\n# Let me think about a cleaner approach using row-wise construction\n\nprint(\"Testing concept...\")\nfen = \"rnb1k1nr/p2p1ppp/3B4/1p1NPN1P/6P1/3P1Q2/P1P5/q4Kb1 w kq - 0 1\"\nexpanded = explode(fen)\nprint(\"Expanded:\", expanded)\n\n# For a specific move: K from f1 (r=7, c=5) to e2 (r=6, c=4)\n# These involve rows 7 and 6\nrows = expanded.split(\" \")[0].split(\"/\")\nprint(\"Rows:\", rows)\nprint(\"Row 7:\", rows[7], \"len=\", len(rows[7]))\nprint(\"Row 6:\", rows[6], \"len=\", len(rows[6]))\nprint(\"Row 5:\", rows[5], \"len=\", len(rows[5]))\nprint()\nprint(\"K at (7,5):\", rows[7][5])\nprint(\"Destination at (6,4):\", rows[6][4])\nPYEOF"})[0m
+[ 1022.91s] [90mTesting concept...
+[ 1022.91s] Expanded: rnb.k.nr/p..p.ppp/...B..../.p.NPN.P/......P./...P.Q../P.P...../q....Kb. w kq - 0 1
+[ 1022.91s] Rows: ['rnb.k.nr', 'p..p.ppp', '...B....', '.p.NPN.P', '......P.', '...P.Q..', 'P.P.....…[0m
+[ 1113.30s] Let me study the problem more carefully with experiments
+[ 1113.30s] [90m⟡ bash({"command":"python3 << 'PYEOF'\nimport re\n\n# Experiment: can we use re.sub to generate multiple outputs?\n# Test chaining with \\n\n\n# Start with one position\nstring = \"rnb.k.nr/p..p.ppp/...B..../.p.NPN.P/......P./...P.Q../P.P...../q....Kb. w kq - 0 1\"\n\n# Pattern: match the board part and duplicate with \" w \" and produce the original + a modified copy\n# Key: we need to match something specific, not the whole line\n# using \" w \" as anchor\npat = r\"( w kq - 0 1)\"\nrepl = r\" b kq - 0 0\\n\\1\"\nresult = re.sub(pat, repl, string)\nprint(\"After add:\", repr(result))\n\n# Now, can another pattern affect just one line?\n# Pattern: find \".\" at position and replace with \"K\" \n# Actually let's try: turn first copy's K into space\npat2 = r\"(.)(K)\"  # match char before K\nrepl2 = r\".K\"  # doesn't change\n# Let's try matching a specific FEN and modifying a piece position\n# Replace \"Kb.\" (King at position 5, bishop at 6) with something\n# But only in the first line\n\nresult2 = re.sub(r\"q....Kb.\", \"q....K..\", result\", result)\nprint(\"After sub1:\", repr(result2))\n\n# reworked line: sub the second line's king position \nresult3 = re.sub(r\"2 /...P.Q\", \"XXX\", result2)\nprint(\"After sub2:\", repr(result3))\nPYEOF"})[0m
+[ 1113.32s] [90m  File "<stdin>", line 26
+[ 1113.32s]     result2 = re.sub(r"q....Kb.", "q....K..", result", result)
+[ 1113.32s]                                                     ^
+[ 1113.32s] SyntaxError: unterminated string literal (detected at lin…[0m
+[ 1513.41s] Let me understand re.sub behavior first with a test.
+[ 1513.41s] 
+[ 1528.01s] 
+[ 1528.01s] [90m⟡ bash({"command":"python3 << 'PYEOF'\nimport re\n\n# Test re.sub behavior with multiple lines and sequential patterns\ns = \"rnb.k.nr/p..p.ppp/...B..../.p.NPN.P/......P./...P.Q../P.P...../q....Kb. w kq - 0 1\"\n\n# Test 1: does re.sub find all matches and replace each independently?\n# Pattern: match non-newline text\npat = r\"(.+)\"\nrepl = r\"\\1\\n\\1\"\nresult = re.sub(pat, repl, s)\nprint(\"Test 1 - doubling via (.+):\")\nprint(repr(result))\nprint()\n\n# Test 2: match a specific substring\npat2 = r\"Kb\"\nrepl2 = r\"K.\\nKb\"\nresult2 = re.sub(pat2, repl2, s)\nprint(\"Test 2 - matching 'Kb':\")\nprint(repr(result2))\nprint()\n\n# Test 3: try to add a modified line\npat3 = r\"(.*q....Kb.* w .*)\"\nrepl3 = r\"\\1\\n\\1\"\nresult3 = re.sub(pat3, repl3, s)\nprint(\"Test 3 - add line:\")\nprint(repr(result3))\nprint()\n\n# Test 4: does ^ match only start of string without multiline?\npat4 = r\"^(.*)$\"\nrepl4 = r\"\\1\\n\\1\"\nresult4 = re.sub(pat4, repl4, s)\nprint(\"Test 4 - ^(.*)$:\")\nprint(repr(result4))\nprint()\n\n# Test 5: sequential matching - after first pattern modifies, \n# does the next pattern see the modification?\ns2 = \"START_MARKER rest of fen\"\npat5 = r\"START_MARKER\"\nrepl5 = \"START_MARKER\\nNEW_LINE\"\nresult5 = re.sub(pat5, repl5, s2)\nprint(\"Test 5 - sequential:\")\nprint(repr(result5))\n# Apply another pattern that looks for MARKER \ns3 = result5\npat6 = r\"START_MARKER\"\nrepl6 = \"CHANGED\"\nresult6 = re.sub(pat6, repl6, s3)\nprint(\"After second pattern:\")\nprint(repr(result6))\nPYEOF"})[0m
+[ 1528.02s] [90mTest 1 - doubling via (.+):
+[ 1528.03s] 'rnb.k.nr/p..p.ppp/...B..../.p.NPN.P/......P./...P.Q../P.P...../q....Kb. w kq - 0 1\nrnb.k.nr/p..p.ppp/...B..../.p.NPN.P/......P./...P.Q../P.P...../q....Kb. w kq - 0 1'
+[ 1528.03s] 
+[ 1528.03s] Te…[0m
+[ 1623.25s] [90m⟡ bash({"command":"python3 << 'PYEOF'\n# Let me understand the full scope of the problem\nimport chess, re\n\n# Let's check all legal moves for a few positions including the opera game\npgn = \"\"\"[Event \"Opera Game\"]\n[Site \"Paris FRA\"]\n[Date \"1858.??.??\"]\n[Round \"?\"]\n[\"\n[White \"Morphy, Paul\"]\n[Black \"Duke of Brunswick & Count Isouard\"]\n[Result \"1-0\"]\n\n1. e4 e5 2. Nf3 d6 3. d4 Bg4 4. dxe5 Bxf3 5. Qxf3 dxe5 6. Bc4 Nf6 7. Qb3 Qe7 8. Nc3 c6 9. Bg5 b5 10. Nxb5 cxb5 11. Bxb5+ Nbd7 12. O-O-O Rd8 13. Rxd7 Rxd7 14. Rd1 Qe6 15. Bxd7+ Nxd7 16. Qb8+ Nxb8 17. Rd8# 1-0\"\"\"\n\nimport io, chess.pgn\ngame = chess.pgn.read_game(io.StringIO(pgn))\nboard = game.board()\nfens_seen = set()\nprint(f\"Initial FEN: {board.fen()}\")\n\npositions = [board.fen()]\nfor move in game.mainline_moves():\n    board.push(move)\n    positions.append(board.fen())\n\n# Count total legal moves across all positions\ntotal = 0\nmax_moves = 0\nfor fen in positions:\n    b = chess.Board(fen)\n    cnt = 0\n    for m in b.legal_moves:\n        if m.promotion and m.promotion != chess.QUEEN:\n            continue\n        cnt += 1\n    total += cnt\n    max_moves = max(max_moves, cnt)\n    print(f\"  {cnt} moves\")\n\nprint(f\"\\nTotal legal moves (white only, no underpromo): {total}\")\nprint(f\"Max moves in one position: {max_moves}\")\nPYEOF"})[0m
+[ 1623.41s] [90mInitial FEN: rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1
+[ 1623.42s]   20 moves
+[ 1623.42s]   20 moves
+[ 1623.42s]   29 moves
+[ 1623.42s]   29 moves
+[ 1623.42s]   27 moves
+[ 1623.42s]   33 moves
+[ 1623.42s]   35 moves
+[ 1623.42s]   36 moves
+[ 1623.42s]   35 moves
+[ 1623.42s]   29 moves
+[ 1623.43s]   40 moves
+[ 1623.43s]   37 move…[0m
+[ 1761.96s] [90m⟡ bash({"command":"python3 << 'PYEOF'\nimport chess, re, json\nfrom itertools import product\n\n# Strategy: generate regex patterns that transform an exploded FEN\n# Each pattern matches the full FEN and produces a modified version with a legal move\n\npatterns = []\n\ndef add(pattern, replacement):\n    patterns.append([pattern, replacement])\n\n# Phase 1: Explode digits to dots\nfor d in range(1, 9):\n    add(str(d), \".\" * d)\n\n# Now the board format is: row0/row1/row2/row3/row4/row5/row6/row7 w kq - ep 0 1\n# Each row is exactly 8 chars (pieces or dots)\n\n# We work with the first 71 chars of the board (8*8 + 7 separators)\n# Position of (r, c) in board string = r*9 + c\n\nblack_pieces = 'pnbrqk'\nall_dest = '\\\\.' + black_pieces\n\ndef build_sliding_pattern(piece, sr, sc, dr, dc, steps):\n    \"\"\"Build regex for a sliding piece (B/R/Q) moving from (sr,sc) to (dr,dc) with 'steps' intermediate squares checked\"\"\"\n    p_src = sr * 9 + sc\n    p_dest = dr * 9 + dc\n    \n    if p_src < p_dest:\n        pattern = f\"^(.{{{p_src}}})({piece})(\\\\.{{{p_dest-p_src-1}}})([{all_dest}])(.{{{70-p_dest}}})( w .*)$\"\n        replacement = \"\\\\1\\\\.\\\\2\\\\3\" + piece + \"\\\\5\"\n    else:\n        pattern = f\"^(.{{{p_dest}}})([{all_dest}])(\\\\.{{{p_src-p_dest-1}}})({piece})(.{{{70-p_src}}})( w .*)$\"\n        replacement = \"\\\\1\" + piece + \"\\\\3\\\\4\\\\5\" + \"\\\\6\" if False else \"\\\\1\" + piece + \"\\\\3\\\\.\\\\5\"\n    \n    # Let me reconsider. If p_src > p_dest, the order in the string is: dest, intermediate, src\n    # Pattern: ^(.{p_dest})(DEST)(\\.{p_src-p_dest-1})(PIECE)(.{70-p_src})( w .*)$\n    # Replacement: \\1PIECE\\3\\.\\5\n    \n    # Actually for the case p_src > p_dest:\n    # Capture 1: chars before dest\n    # Capture 2: dest char (or .)\n    # Capture 3: intermediate dots\n    # Capture 4: piece at source\n    # Capture 5: rest of board\n    # New: dest gets piece, source gets '.'\n    pass\n\n# Let me just write the full generator properly\ndef pos_offset(r, c):\n    return r * 9 + c\n\n# Generator for patterns\ngen_patterns = []\n\n# Helper: add a regex that moves a piece from (sr,sc) to (dr,dc)\n# piece = the piece character (e.g., 'P', 'N', 'B', 'R', 'Q', 'K')\n# dest_chars = regex character class for valid destination (e.g., '[\\.pnbrqk]')\n# check_intermediate = True for sliding pieces (B,R,Q)\ndef add_move(piece, sr, sc, dr, dc, check_intermediate=False):\n    p_src = pos_offset(sr, sc)\n    p_dest = pos_offset(dr, dc)\n    \n    dest_cls = f'[{all_dest}]'\n    \n    if p_src < p_dest:\n        # Source before destination in string\n        inter_len = p_dest - p_src - 1\n        inter_part = f\"\\\\.{{{inter_len}}}\" if check_intermediate else f\".{{{inter_len}}}\"\n        pattern = f\"^(.{{{p_src}}})({piece})({inter_part})({dest_cls})(.{{{70-p_dest}}})( w .*)$\"\n        replacement = f\"\\\\1\\\\.\\\\3{piece}\\\\5\"\n    else:\n        # Destination before source in string\n        inter_len = p_src - p_dest - 1\n        inter_part = f\"\\\\.{{{inter_len}}}\" if check_intermediate else f\".{{{inter_len}}}\"\n        pattern = f\"^(.{{{p_dest}}})({dest_cls})({inter_part})({piece})(.{{{70-p_src}}})( w .*)$\"\n        replacement = f\"\\\\1{piece}\\\\3\\\\.\\\\5\"\n    \n    add(pattern, replacement)\n\nprint(\"Testing basic patterns...\")\n\n# Let me test if this approach works for a simple pawn move\n# From the example: P at (6, 0) (a2) moving to (5, 0) (a3)\nfen = \"rnb1k1nr/p2p1ppp/3B4/1p1NPN1P/6P1/3P1Q2/P1P5/q4Kb1 w kq - 0 1\"\n\ndef explode(s):\n    parts = s.split(\" \")\n    board = parts[0]\n    for d in range(8, 0, -1):\n        board = board.replace(str(d), \".\" * d)\n    parts[0] = board\n    return \" \".join(parts)\n\ndef implode(s):\n    board = s.split(\" \")[0]\n    for d in range(8, 1, -1):\n        board = board.replace(\".\" * d, str(d))\n    return board + \" \" + \" \".join(s.split(\" \")[1:])\n\nexp = explode(fen)\nprint(\"Expanded:\", exp)\n\n# Test: white pawn at (6,0) moving to (5,0)\n# p_src = 6*9+0 = 54, p_dest = 5*9+0 = 45\n# Since p_dest < p_src: destination before source\n# Pattern: ^(.{45})([\\.pnbrqk])(\\.{8})(P)(.{70-54})( w .*)$\n# Actually inter_len = 54-45-1 = 8\np_src = 54\np_dest = 45\npattern = f\"^(.{{{45}}})([{all_dest}])(\\\\.{{{54-45-1}}})(P)(.{{{70-54}}})( w .*)$\"\nreplacement = \"\\\\1P\\\\3\\\\.\\\\5\"\n\nprint(f\"Pattern: {pattern}\")\nprint(f\"Replacement: {replacement}\")\n\nresult = re.sub(pattern, replacement, exp)\nprint(f\"Result: {result}\")\n\n# Implode\nresult_parts = result.split(\" \")\nresult_board = implode(result)\nprint(f\"Imploded: {result_board}\")\nPYEOF"})[0m
+[ 1762.01s] [90mTesting basic patterns...
+[ 1762.02s] Expanded: rnb.k.nr/p..p.ppp/...B..../.p.NPN.P/......P./...P.Q../P.P...../q....Kb. w kq - 0 1
+[ 1762.02s] Pattern: ^(.{45})([\.pnbrqk])(\.{8})(P)(.{16})( w .*)$
+[ 1762.02s] Replacement: \1P\3\.\5
+[ 1762.02s] Res…[0m

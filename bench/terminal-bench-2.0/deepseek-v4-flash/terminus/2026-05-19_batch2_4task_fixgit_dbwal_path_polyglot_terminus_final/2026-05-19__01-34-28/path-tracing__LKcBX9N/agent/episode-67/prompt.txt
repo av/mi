@@ -1,0 +1,24 @@
+Previous response had warnings:
+WARNINGS: - Extra text detected after JSON object
+
+New Terminal Output:
+
+root@c454cc25e7a1:/app# python3 -c "
+> import struct
+> with open('orig', 'rb') as f:
+>     data = f.read()
+> print('Float constants from 0x3000 to 0x3200:')
+> for addr in range(0x3000, 0x3200, 4):
+>     b = data[addr:addr+4]
+>     if len(b) == 4:
+>         # skip printable strings
+>         if not all(32b c < 127 for c in b if c != 0):
+>             val = struct.unpack('<f', b)[0]
+>             if abs(val) < 1000 and abs(val) > 0.0001:
+>                 print(f'0x{addr:04x}: {val:.6f}')
+> "
+  File "<string>", line 10
+    if not all(32b c < 127 for c in b if c != 0):
+                ^
+SyntaxError: invalid decimal literal
+root@c454cc25e7a1:/app#

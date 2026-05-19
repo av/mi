@@ -1,0 +1,5 @@
+Previous response had parsing errors:
+ERROR: Invalid JSON: Expecting ',' delimiter: line 2 column 25 (char 26) | Content preview: '{\n  "analysis": "analysis": "I need to get back on track. Let me write a simple script to extract th'...
+WARNINGS: - Extra text detected after JSON object
+
+Please fix these issues and provide a proper JSON response.

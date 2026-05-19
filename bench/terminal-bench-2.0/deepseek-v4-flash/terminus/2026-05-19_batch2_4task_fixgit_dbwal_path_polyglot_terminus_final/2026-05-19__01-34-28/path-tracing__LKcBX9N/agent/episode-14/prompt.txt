@@ -1,0 +1,5 @@
+New Terminal Output:
+
+> strings orig | awk -F ' ' 'NR>3 { n=NR-4; if (n%100000==0) print n, $0 }' image.ppm
+bash: syntax error near unexpected token `print'
+root@c454cc25e7a1:/app#

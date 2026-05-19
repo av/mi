@@ -1,0 +1,65 @@
+Previous response had warnings:
+WARNINGS: - Extra text detected after JSON object
+
+New Terminal Output:
+# ^C
+root@c454cc25e7a1:/app# python3 -c "
+> import struct
+> with open('orig', 'rb') as f:
+>     data = f.read()
+>
+> # Decode key addresses
+> keys = {
+>     0x3130: 'Camera/vector1',
+>     0x3134: 'Camera/vector2',
+>     0x3138: 'Camera/vector3',
+>     0x313c: 'Camera/vector4',
+>     0x3170: 'sky_const1',
+>     0x3174: '1.0',
+>     0x3178: '0.5',
+>     0x317c: '0.7',
+>     0x3180: 'plane_param',
+>     0x3184: 'plane_param2',
+>     0x3188: 'plane_param3',
+>     0x318c: 'plane_param4',
+>     0x3190: 'sky_top_r?',
+>     0x3194: 'sky_top_g?',
+>     0x3198: 'sky_top_b?',
+>     0x319c: 'camera_focal?',
+>     0x31a0: 'camera_param?',
+>     0x31a4: 'camera_param?',
+>     0x31a8: 'camera_param?',
+>     0x31ac: 'camera_param?',
+> }
+>
+> print('Key constants decoded:')
+> for addr, desc in sorted(keys.items()):
+>     if addr + 4 <= len(data):
+>         b = data[addr:addr+4]
+>         val = struct.unpack('<f', b)[0]
+>         print(f'  0x{addr:04x}: {val:12.6f}  # {desc}')
+>     else:
+>         print(f'  0x{addr:04x}: out of range  # {desc}')
+> "
+Key constants decoded:
+  0x3130:     0.000000  # Camera/vector1
+  0x3134:     0.000000  # Camera/vector2
+  0x3138:     0.000000  # Camera/vector3
+  0x313c:     0.000000  # Camera/vector4
+  0x3170:     0.000100  # sky_const1
+  0x3174:     1.000000  # 1.0
+  0x3178:     0.500000  # 0.5
+  0x317c:     0.700000  # 0.7
+  0x3180:    -1.500000  # plane_param
+  0x3184:     0.200000  # plane_param2
+  0x3188:     0.900000  # plane_param3
+  0x318c:     0.400000  # plane_param4
+  0x3190:     0.000000  # sky_top_r?
+  0x3194:     1.875000  # sky_top_g?
+  0x3198:   255.990005  # sky_top_b?
+  0x319c:     2.000000  # camera_focal?
+  0x31a0:    -5.000000  # camera_param?
+  0x31a4:    -0.500000  # camera_param?
+  0x31a8:    -1.000000  # camera_param?
+  0x31ac:   100.000000  # camera_param?
+root@c454cc25e7a1:/app#

@@ -1,0 +1,7 @@
+Previous response had warnings:
+WARNINGS: - Extra text detected after JSON object
+
+New Terminal Output:
+
+> awk 'NR>3 { print $0 }' image.ppm | sort -u | wc -l
+>

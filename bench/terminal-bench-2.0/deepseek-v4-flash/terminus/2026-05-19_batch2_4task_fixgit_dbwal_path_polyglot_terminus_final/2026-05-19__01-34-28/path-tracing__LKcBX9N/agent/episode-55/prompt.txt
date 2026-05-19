@@ -1,0 +1,122 @@
+Previous response had warnings:
+WARNINGS: - Extra text detected after JSON object
+
+New Terminal Output:
+
+root@c454cc25e7a1:/app# objdump -d orig --start-address=0x1d5c --stop-address=0x1f00 2>&1
+
+orig:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+0000000000001d5c <trace>:
+    1d5c:       f3 0f 1e fa             endbr64
+    1d60:       55                      push   %rbp
+    1d61:       48 89 e5                mov    %rsp,%rbp
+    1d64:       48 81 ec 00 01 00 00    sub    $0x100,%rsp
+    1d6b:       66 48 0f 7e c0          movq   %xmm0,%rax
+    1d70:       66 0f 6f e1             movdqa %xmm1,%xmm4
+    1d74:       66 0f 6f ca             movdqa %xmm2,%xmm1
+    1d78:       0f 28 c3                movaps %xmm3,%xmm0
+    1d7b:       48 89 85 30 ff ff ff    mov    %rax,-0xd0(%rbp)
+    1d82:       66 0f d6 a5 38 ff ff    movq   %xmm4,-0xc8(%rbp)
+    1d89:       ff
+    1d8a:       66 0f d6 8d 20 ff ff    movq   %xmm1,-0xe0(%rbp)
+    1d91:       ff
+    1d92:       f3 0f 11 85 28 ff ff    movss  %xmm0,-0xd8(%rbp)
+    1d99:       ff
+    1d9a:       64 48 8b 04 25 28 00    mov    %fs:0x28,%rax
+    1da1:       00 00
+    1da3:       48 89 45 f8             mov    %rax,-0x8(%rbp)
+    1da7:       31 c0                   xor    %eax,%eax
+    1da9:       48 8d 75 90             lea    -0x70(%rbp),%rsi
+    1dad:       48 8b bd 30 ff ff ff    mov    -0xd0(%rbp),%rdi
+    1db4:       f3 0f 7e 8d 38 ff ff    movq   -0xc8(%rbp),%xmm1
+    1dbb:       ff
+    1dbc:       48 83 ec 08             sub    $0x8,%rsp
+    1dc0:       48 83 ec 18             sub    $0x18,%rsp
+    1dc4:       48 89 e1                mov    %rsp,%rcx
+    1dc7:       48 8b 45 10             mov    0x10(%rbp),%rax
+    1dcb:       48 8b 55 18             mov    0x18(%rbp),%rdx
+    1dcf:       48 89 01                mov    %rax,(%rcx)
+    1dd2:       48 89 51 08             mov    %rdx,0x8(%rcx)
+    1dd6:       48 8b 45 20             mov    0x20(%rbp),%rax
+    1dda:       48 89 41 10             mov    %rax,0x10(%rcx)
+    1dde:       66 48 0f 6e c7          movq   %rdi,%xmm0
+    1de3:       48 89 f7                mov    %rsi,%rdi
+    1de6:       e8 d9 f8 ff ff          call   16c4 <sphere_intersect>
+    1deb:       48 83 c4 20             add    $0x20,%rsp
+    1def:       48 8d 75 b0             lea    -0x50(%rbp),%rsi
+    1df3:       48 83 ec 08             sub    $0x8,%rsp
+    1df7:       48 83 ec 18             sub    $0x18,%rsp
+    1dfb:       48 89 e1                mov    %rsp,%rcx
+    1dfe:       48 8b 45 10             mov    0x10(%rbp),%rax
+    1e02:       48 8b 55 18             mov    0x18(%rbp),%rdx
+    1e06:       48 89 01                mov    %rax,(%rcx)
+    1e09:       48 89 51 08             mov    %rdx,0x8(%rcx)
+    1e0d:       48 8b 45 20             mov    0x20(%rbp),%rax
+    1e11:       48 89 41 10             mov    %rax,0x10(%rcx)
+    1e15:       8b 05 65 13 00 00       mov    0x1365(%rip),%eax        # 3180 <_IO_stdin_used+0x180>
+    1e1b:       66 0f 6e c0             movd   %eax,%xmm0
+    1e1f:       48 89 f7                mov    %rsi,%rdi
+    1e22:       e8 be fb ff ff          call   19e5 <plane_intersect>
+    1e27:       48 83 c4 20             add    $0x20,%rsp
+    1e2b:       66 0f ef c0             pxor   %xmm0,%xmm0
+    1e2f:       0f 29 45 d0             movaps %xmm0,-0x30(%rbp)
+    1e33:       0f 29 45 e0             movaps %xmm0,-0x20(%rbp)
+    1e37:       c7 85 4c ff ff ff 00    movl   $0x0,-0xb4(%rbp)
+    1e3e:       00 00 00
+    1e41:       8b 45 ac                mov    -0x54(%rbp),%eax
+    1e44:       85 c0                   test   %eax,%eax
+    1e46:       74 42                   je     1e8a <trace+0x12e>
+    1e48:       8b 45 cc                mov    -0x34(%rbp),%eax
+    1e4b:       85 c0                   test   %eax,%eax
+    1e4d:       74 0f                   je     1e5e <trace+0x102>
+    1e4f:       f3 0f 10 4d 90          movss  -0x70(%rbp),%xmm1
+    1e54:       f3 0f 10 45 b0          movss  -0x50(%rbp),%xmm0
+    1e59:       0f 2f c1                comiss %xmm1,%xmm0
+    1e5c:       76 2c                   jbe    1e8a <trace+0x12e>
+    1e5e:       48 8b 45 90             mov    -0x70(%rbp),%rax
+    1e62:       48 8b 55 98             mov    -0x68(%rbp),%rdx
+    1e66:       48 89 45 d0             mov    %rax,-0x30(%rbp)
+    1e6a:       48 89 55 d8             mov    %rdx,-0x28(%rbp)
+    1e6e:       48 8b 45 a0             mov    -0x60(%rbp),%rax
+    1e72:       48 8b 55 a8             mov    -0x58(%rbp),%rdx
+    1e76:       48 89 45 e0             mov    %rax,-0x20(%rbp)
+    1e7a:       48 89 55 e8             mov    %rdx,-0x18(%rbp)
+    1e7e:       c7 85 4c ff ff ff 01    movl   $0x1,-0xb4(%rbp)
+    1e85:       00 00 00
+    1e88:       eb 7a                   jmp    1f04 <trace+0x1a8>
+    1e8a:       8b 45 cc                mov    -0x34(%rbp),%eax
+    1e8d:       85 c0                   test   %eax,%eax
+    1e8f:       74 2c                   je     1ebd <trace+0x161>
+    1e91:       48 8b 45 b0             mov    -0x50(%rbp),%rax
+    1e95:       48 8b 55 b8             mov    -0x48(%rbp),%rdx
+    1e99:       48 89 45 d0             mov    %rax,-0x30(%rbp)
+    1e9d:       48 89 55 d8             mov    %rdx,-0x28(%rbp)
+    1ea1:       48 8b 45 c0             mov    -0x40(%rbp),%rax
+    1ea5:       48 8b 55 c8             mov    -0x38(%rbp),%rdx
+    1ea9:       48 89 45 e0             mov    %rax,-0x20(%rbp)
+    1ead:       48 89 55 e8             mov    %rdx,-0x18(%rbp)
+    1eb1:       c7 85 4c ff ff ff 00    movl   $0x0,-0xb4(%rbp)
+    1eb8:       00 00 00
+    1ebb:       eb 47                   jmp    1f04 <trace+0x1a8>
+    1ebd:       48 83 ec 08             sub    $0x8,%rsp
+    1ec1:       48 83 ec 18             sub    $0x18,%rsp
+    1ec5:       48 89 e1                mov    %rsp,%rcx
+    1ec8:       48 8b 45 10             mov    0x10(%rbp),%rax
+    1ecc:       48 8b 55 18             mov    0x18(%rbp),%rdx
+    1ed0:       48 89 01                mov    %rax,(%rcx)
+    1ed3:       48 89 51 08             mov    %rdx,0x8(%rcx)
+    1ed7:       48 8b 45 20             mov    0x20(%rbp),%rax
+    1edb:       48 89 41 10             mov    %rax,0x10(%rcx)
+    1edf:       e8 69 fc ff ff          call   1b4d <sky_color>
+    1ee4:       48 83 c4 20             add    $0x20,%rsp
+    1ee8:       66 48 0f 7e c0          movq   %xmm0,%rax
+    1eed:       0f 28 c1                movaps %xmm1,%xmm0
+    1ef0:       48 89 85 6c ff ff ff    mov    %rax,-0x94(%rbp)
+    1ef7:       f3 0f 11 85 74 ff ff    movss  %xmm0,-0x8c(%rbp)
+    1efe:       ff
+    1eff:       e9                      .byte 0xe9
+root@c454cc25e7a1:/app#

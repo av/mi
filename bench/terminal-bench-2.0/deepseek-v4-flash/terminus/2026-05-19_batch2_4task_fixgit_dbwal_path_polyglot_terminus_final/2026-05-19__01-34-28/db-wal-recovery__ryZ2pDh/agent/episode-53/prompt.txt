@@ -1,0 +1,25 @@
+Previous response had warnings:
+WARNINGS: - Extra text detected before JSON object
+- Extra text detected after JSON object
+
+New Terminal Output:
+
+root@93525de64552:/app# ls -la /tmp /tmp/tmux-0/
+/tmp:
+total 8
+drwxrwxrwt. 1 root   root    80 May 18 23:37 .
+drwxr-xr-x. 1 root   root    46 May 18 23:34 ..
+-rw-r--r--. 1 root   root    66 May 18 23:37 curr.txt
+-rw-r--r--. 1 ubuntu ubuntu 923 May 18 23:27 get-asciinema-timestamp.sh
+drwx------. 1 root   root    14 May 18 23:34 tmux-0
+
+/tmp/tmux-0/:
+total 0
+drwx------. 1 root root 14 May 18 23:34 .
+drwxrwxrwt. 1 root root 80 May 18 23:37 ..
+srw-rw----. 1 root root  0 May 18 23:34 default
+root@93525de64552:/app# sqlite3 main.db "PRAGMA page_count; PRAGMA page_size;"
+2
+4096
+root@93525de64552:/app# sqlite3 main.db "CREATE VIRTUAL TABLE dbpage USING sqlite_dbpage; SELECT * FROM dbpage WHERE pgno=2;" 2;" 2>&1
+>

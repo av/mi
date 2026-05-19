@@ -1,0 +1,18 @@
+Previous response had warnings:
+WARNINGS: - Extra text detected before JSON object
+- Extra text detected after JSON object
+
+New Terminal Output:
+00
+root@93525de64552:/app# python3 -c "
+> import json
+> with open('/logs/agent/trajectory.json', 'r') as f:
+>     content = f.read()
+>     # search for array of objects with id, name, value
+>     import re
+>     matches = re.findall(r'\[\{"id":\d+,"name":"[^"]+","value":\d+\},?.*?\]', content, re.DOTALL)
+>     for m in matches[:5]:
+>         print(m[:500])
+> "
+> grep -oP '\[{"id":\d+,"name":"[^"]+","value":\d+}[^\]]*\]' /logs/agent/trajectory.json | head -5
+>

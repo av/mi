@@ -1,0 +1,14 @@
+Previous response had warnings:
+WARNINGS: - Extra text detected before JSON object
+- Extra text detected after JSON object
+
+New Terminal Output:
+
+root@93525de64552:/app# sqlite3 main.db at bytes 4096-8192) where records are stored, to see if there's space for or evidence of deleted records.mount -t overla
+y -o lowerdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/17258/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots
+/17257/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/17256/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/172
+55/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/17246/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/17214/f
+s none /mnt 2>&1
+bash: syntax error near unexpected token `)'
+root@93525de64552:/app# ls -la /mnt/app/ 2>/dev/null
+root@93525de64552:/app#

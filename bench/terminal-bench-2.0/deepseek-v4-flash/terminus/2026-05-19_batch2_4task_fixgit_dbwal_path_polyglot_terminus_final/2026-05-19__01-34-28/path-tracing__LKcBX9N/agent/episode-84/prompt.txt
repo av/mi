@@ -1,0 +1,10 @@
+Previous response had warnings:
+WARNINGS: - Extra text detected after JSON object
+
+New Terminal Output:
+se {
+                double diff = f  Point (950,700): target (178, 209, 255), my (15, 3, 3), diff^2=132509
+  Point (900,750): target (182, 211, 255), my (15, 3, 3), diff^2=134657
+  Point (900,800): target (185, 213, 255), my (15, 3, 3), diff^2=136504
+  Point (900,850): target (188, 215, 255), my (15, 3, 3), diff^2=138377
+

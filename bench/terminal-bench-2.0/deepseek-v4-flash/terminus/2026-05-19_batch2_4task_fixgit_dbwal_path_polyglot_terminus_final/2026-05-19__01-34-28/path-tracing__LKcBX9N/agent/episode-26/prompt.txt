@@ -1,0 +1,4 @@
+Previous response had parsing errors:
+ERROR: Invalid JSON: Expecting ',' delimiter: line 8 column 3 (char 3099) | Content preview: '{\n  "analysis": "I keep making syntax errors in the Python code. Let me write a clean script file to'...
+
+Please fix these issues and provide a proper JSON response.

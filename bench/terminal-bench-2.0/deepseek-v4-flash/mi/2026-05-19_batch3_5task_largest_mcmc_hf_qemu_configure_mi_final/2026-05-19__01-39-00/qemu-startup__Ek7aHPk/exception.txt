@@ -1,0 +1,40 @@
+Traceback (most recent call last):
+  File "/home/everlier/.cache/uv/archive-v0/bs-Xde0XyqE_1FMsha3xU/lib/python3.12/site-packages/harbor/trial/trial.py", line 160, in run
+    await self._prepare()
+  File "/home/everlier/.cache/uv/archive-v0/bs-Xde0XyqE_1FMsha3xU/lib/python3.12/site-packages/harbor/trial/trial.py", line 191, in _prepare
+    await self._setup_agent()
+  File "/home/everlier/.cache/uv/archive-v0/bs-Xde0XyqE_1FMsha3xU/lib/python3.12/site-packages/harbor/trial/trial.py", line 647, in _setup_agent
+    await asyncio.wait_for(
+  File "/home/everlier/.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/lib/python3.12/asyncio/tasks.py", line 520, in wait_for
+    return await fut
+           ^^^^^^^^^
+  File "/home/everlier/.cache/uv/archive-v0/bs-Xde0XyqE_1FMsha3xU/lib/python3.12/site-packages/harbor/agents/installed/base.py", line 380, in setup
+    await self.install(environment)
+  File "/home/everlier/code/mi/mi_harbor/mi_agent.py", line 153, in install
+    await self.exec_as_agent(
+  File "/home/everlier/.cache/uv/archive-v0/bs-Xde0XyqE_1FMsha3xU/lib/python3.12/site-packages/harbor/agents/installed/base.py", line 354, in exec_as_agent
+    return await self._exec(
+           ^^^^^^^^^^^^^^^^^
+  File "/home/everlier/.cache/uv/archive-v0/bs-Xde0XyqE_1FMsha3xU/lib/python3.12/site-packages/harbor/agents/installed/base.py", line 317, in _exec
+    raise NonZeroAgentExitCodeError(
+harbor.agents.installed.base.NonZeroAgentExitCodeError: Command failed (exit 1): npm install -g @avcodes/mi && npx @avcodes/mi -h
+stdout: 
+added 1 package, and audited 2 packages in 519ms
+
+found 0 vulnerabilities
+npm WARN exec The following package was not found and will be installed: @avcodes/mi
+file:///root/.npm/_npx/1881ef6509ea52a8/node_modules/@avcodes/mi/index.mjs:10
+const MI_HOME = process.env.MI_HOME || `${homedir()}/.mi`, rc = `${MI_HOME}/config.json`; if (existsSync(rc)) Object.entries(JSON.parse(readFileSync(rc, 'utf8'))).forEach(([k, v]) => process.env[k] ||= v);
+                                                                                                                                                                                                        ^
+
+SyntaxError: Unexpected token '='
+    at Loader.moduleStrategy (internal/modules/esm/translators.js:133:18)
+    at async link (internal/modules/esm/module_job.js:42:21)
+npm ERR! code 1
+npm ERR! path /app
+npm ERR! command failed
+npm ERR! command sh -c mi "-h"
+
+npm ERR! A complete log of this run can be found in:
+npm ERR!     /root/.npm/_logs/2026-05-18 ... [truncated]
+stderr: None

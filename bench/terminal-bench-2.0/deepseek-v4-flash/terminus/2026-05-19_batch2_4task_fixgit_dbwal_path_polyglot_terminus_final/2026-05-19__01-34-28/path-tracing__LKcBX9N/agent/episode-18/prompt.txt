@@ -1,0 +1,37 @@
+New Terminal Output:
+
+(0, 899) mid-left: 191 217 255
+(1199, 899) center: 51 10 10
+(2399, 899) mid-right: 191 217 255
+(0, 1799) bottom-left: 152 152 152
+(1199, 1799) bottom-mid: 67 67 67
+Traceback (most recent call last):
+  File "<stdin>", line 23, in <module>
+ValueError: too many values to unpack (expected 3)
+root@c454cc25e7a1:/app# strings orig | grep -i 'iter\|max\|colou?r\|julia\|mandel\|escape\|radius\|threshold' | head -30
+fmax
+fmax@GLIBC_2.2.5
+root@c454cc25e7a1:/app# python3 -c "
+> import subprocess
+>
+> def pixel(x, y):
+>     ln = 4 + y*2400 + x
+>     r = subprocess.run(['sed', f'{ln}p', '-n', 'image.ppm'], capture_output=True, text=True)
+>     parts = r.stdout.strip().split()
+>     return tuple(map(int, parts)) if len(parts)==3 else None
+>
+> # Sample along horizontal line at various y
+> print('y=0 (top):')
+> for x in [0, 300, 600, 900, 1199, 1500, 1800, 2100, 2399]:
+>     print(f' x={x}: {pixel(x, 0)}')
+> print()
+> print('y=900 (mid):')
+> for x in [0, 300, 600, 900, 1199, 1500, 1800, 2100, 2399]:
+>     print(f' x={x}: {pixel(x, 900, 0)}')
+> "
+y=0 (top):
+ x=0: (159, 197, 255)
+ x=300: (155, 195, 255)
+ x=600: (151, 193, 255)
+ x=900: (147, 191, 255)
+

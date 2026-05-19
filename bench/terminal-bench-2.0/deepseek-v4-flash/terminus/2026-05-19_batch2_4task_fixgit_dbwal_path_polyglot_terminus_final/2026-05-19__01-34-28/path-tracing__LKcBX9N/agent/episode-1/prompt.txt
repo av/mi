@@ -1,0 +1,41 @@
+New Terminal Output:
+root@c454cc25e7a1:/app# ls -la
+total 47156
+drwxr-xr-x. 1 root root       12 Oct 28  2025 .
+drwxr-xr-x. 1 root root       40 May 18 23:34 ..
+-rw-r--r--. 1 root root 48262737 Oct 28  2025 image.ppm
+-rwxr-xr-x. 1 root root    21152 Oct 28  2025 orig
+root@c454cc25e7a1:/app# file image.ppm
+bash: file: command not found
+root@c454cc25e7a1:/app# head -c 200 image.ppm | xxd
+bash: xxd: command not found
+root@c454cc25e7a1:/app#
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

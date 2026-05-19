@@ -1,0 +1,5 @@
+Previous response had parsing errors:
+ERROR: Invalid JSON: Expecting ',' delimiter: line 7 column 18 (char 1825) | Content preview: '{\n  "analysis": "I need to carefully analyze the image to understand the algorithm. The previous err'...
+WARNINGS: - Extra text detected before JSON object
+
+Please fix these issues and provide a proper JSON response.

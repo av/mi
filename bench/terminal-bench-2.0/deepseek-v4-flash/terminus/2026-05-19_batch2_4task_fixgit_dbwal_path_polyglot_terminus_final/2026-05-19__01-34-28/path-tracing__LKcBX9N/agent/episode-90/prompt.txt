@@ -1,0 +1,14 @@
+Previous response had warnings:
+WARNINGS: - Extra text detected after JSON object
+
+New Terminal Output:
+
+root@c454cc25e7a1:/app# cat image.c | gzip | wc -c
+1583
+root@c454cc25e7a1:/app# ./image 2>&1 &
+[1] 5721
+root@c454cc25e7a1:/app# sleep 1
+[1]+  Done                    ./image 2>&1
+root@c454cc25e7a1:/app# ls -la reconstructed.ppm
+-rw-r--r--. 1 root root 40817518 May 19 00:04 reconstructed.ppm
+root@c454cc25e7a1:/app#

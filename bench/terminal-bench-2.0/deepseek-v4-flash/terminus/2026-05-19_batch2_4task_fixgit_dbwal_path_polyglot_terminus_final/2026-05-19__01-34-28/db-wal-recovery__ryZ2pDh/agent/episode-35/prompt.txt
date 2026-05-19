@@ -1,0 +1,10 @@
+Previous response had warnings:
+WARNINGS: - Extra text detected before JSON object
+- Extra text detected after JSON object
+
+New Terminal Output:
+
+root@93525de64552:/app# ls -la /var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/*/fs/app/ 2>/dev/null
+root@93525de64552:/app# cat /var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/17256/fs/app/main.db-wal 2>/dev/null | wc -c
+0
+root@93525de64552:/app#

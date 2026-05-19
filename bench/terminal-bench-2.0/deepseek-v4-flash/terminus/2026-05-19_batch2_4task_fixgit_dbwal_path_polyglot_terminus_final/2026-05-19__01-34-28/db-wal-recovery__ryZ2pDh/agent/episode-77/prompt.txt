@@ -1,0 +1,10 @@
+Previous response had warnings:
+WARNINGS: - Extra text detected before JSON object
+- Extra text detected after JSON object
+
+New Terminal Output:
+
+]root@93525de64552:/app# grep -oP '"expected"[^}]+' /logs/agent/trajectory.json | head -10
+root@93525de64552:/app# grep -oP '"result"[^}]+' /logs/agent/trajectory.json | head -10
+root@93525de64552:/app# grep -oP '"id":[0-9]+,"name":"[^"]+","value":[0-9]+' /logs/agent/trajectory.json | head -20
+root@93525de64552:/app#

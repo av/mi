@@ -1,0 +1,23 @@
+Previous response had warnings:
+WARNINGS: - Extra text detected before JSON object
+- Extra text detected after JSON object
+
+New Terminal Output:
+es
+root@93525de64552:/app# echo '.recover' | sqlite3 main.db 2>&1 | head -50
+sql error: no such table: sqlite_dbpage (1)
+BEGIN;
+PRAGMA writable_schema = on;
+PRAGMA encoding = 'UTF-8';
+PRAGMA page_size = '4096';
+PRAGMA auto_vacuum = '0';
+PRAGMA user_version = '0';
+PRAGMA application_id = '0';
+root@93525de64552:/app# sqlite3 main.db "PRAGMA writable_schema=ON; SELECT * FROM sqlite_master WHERE name='items';"
+table|items|items|2|CREATE TABLE items (
+        id INTEGER PRIMARY KEY,
+        name TEXT,
+        value INTEGER
+    )
+root@93525de64552:/app# sqlite3 main.db "SELECT rowid, * FROM items WHERE rowid > 5;"
+root@93525de64552:/app#

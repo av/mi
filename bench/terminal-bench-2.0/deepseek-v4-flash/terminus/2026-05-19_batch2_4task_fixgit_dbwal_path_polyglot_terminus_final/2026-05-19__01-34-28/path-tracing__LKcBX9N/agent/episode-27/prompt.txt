@@ -1,0 +1,66 @@
+New Terminal Output:
+
+root@c454cc25e7a1:/app# cat > /tmp/find_floats.py << 'ENDPY'
+> import struct
+>
+> with open('orig', 'rb') as f:
+>     data = f.read()
+>
+> floats = []
+> for i in range(0, len(data)-4, 4):
+>     try:
+>         val = struct.unpack('f', data[i:i+4])[0]
+>         if 0.001 < abs(val) < 100 and abs(val - round(val)) > 0.00001:
+>             floats.append(round(val, 6))
+>     except:
+>         pass
+>
+> from collections import Counter
+> counter = Counter(floats)
+> print("Most common non-integer floats:")
+> for val, cnt in counter.most_common(40):
+>     print(f"  {val:10.6f}: {cnt} occurrences")
+> ENDPY
+root@c454cc25e7a1:/app# timeout 10 python3 /tmp/find_floats.py
+Most common non-integer floats:
+  -10.503845: 17 occurrences
+   -3.969683: 15 occurrences
+   -3.719683: 12 occurrences
+   50.324490: 7 occurrences
+   -3.407223: 5 occurrences
+   -3.719690: 3 occurrences
+  -13.753894: 3 occurrences
+   -0.012028: 2 occurrences
+   -7.470630: 2 occurrences
+   17.160217: 2 occurrences
+   -2.007813: 1 occurrences
+    0.789886: 1 occurrences
+    0.555267: 1 occurrences
+    0.262009: 1 occurrences
+    0.248192: 1 occurrences
+    0.240379: 1 occurrences
+    0.232567: 1 occurrences
+    0.224754: 1 occurrences
+    0.216942: 1 occurrences
+    0.209129: 1 occurrences
+    0.201317: 1 occurrences
+    0.193504: 1 occurrences
+    0.185692: 1 occurrences
+    0.177879: 1 occurrences
+    0.173849: 1 occurrences
+    0.120128: 1 occurrences
+    0.127157: 1 occurrences
+    1.865273: 1 occurrences
+    0.108027: 1 occurrences
+    0.081172: 1 occurrences
+    0.088390: 1 occurrences
+  -54.265575: 1 occurrences
+   -3.079166: 1 occurrences
+   17.160614: 1 occurrences
+   -3.208561: 1 occurrences
+   -3.375973: 1 occurrences
+  -13.628893: 1 occurrences
+  -10.941162: 1 occurrences
+   17.160629: 1 occurrences
+   -0.012516: 1 occurrences
+root@c454cc25e7a1:/app#
