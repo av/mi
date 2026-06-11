@@ -154,6 +154,16 @@ test('basic text response', async () => {
   assert.match(result.stdout, /hi there/);
 });
 
+test('OPENAI_BASE_URL may already include /v1', async () => {
+  requestHandler = (req, res, body) => {
+    assert.strictEqual(req.url, '/v1/chat/completions');
+    sse(res, { role: 'assistant', content: 'normalized' });
+  };
+  const result = await runMi(['-p', 'hello'], { OPENAI_BASE_URL: `${serverUrl}/v1` });
+  assert.strictEqual(result.status, 0);
+  assert.match(result.stdout, /normalized/);
+});
+
 test('bash tool', async () => {
   let callCount = 0;
   requestHandler = (req, res, body) => {
@@ -1997,4 +2007,32 @@ test('MI_API_PARAMS with invalid JSON gives clean error', async () => {
   assert.match(result.stderr, /MI_API_PARAMS|JSON/i, 'Should mention config or JSON issue');
   assert.doesNotMatch(result.stderr, /at JSON\.parse|at run \(|\.mjs:\d+:\d+/,
     'Should not show raw stack trace');
+});
+
+test('Harbor diagnostic wrapper normalizes health URL', async () => {
+  const adapter = readFileSync(join(__dirname, '../mi_harbor/mi_agent.py'), 'utf8');
+  assert.match(adapter, /HEALTH_URL="\$API_BASE\/v1\/models"/);
+  assert.doesNotMatch(adapter, /\$\{OPENAI_BASE_URL:-https:\/\/api\.openai\.com\}\/v1\/models/);
+});
+
+test('Harbor adapter uses local package and padded timestamp diagnostics', async () => {
+  const adapter = readFileSync(join(__dirname, '../mi_harbor/mi_agent.py'), 'utf8');
+  assert.match(adapter, /tar -xzf - -C \/opt\/mi/);
+  assert.match(adapter, /\.mi_package_hash/);
+  assert.match(adapter, /node \/opt\/mi\/index\.mjs/);
+  assert.match(adapter, /test -f \/opt\/mi\/index\.mjs \|\| command -v npm/);
+  assert.match(adapter, /\[\[:space:\]\]\*\[0-9\.\]\+s/);
+  assert.match(adapter, /else:\n\s+version_spec =/);
+});
+
+test('Harbor cached Docker environment derives task images', async () => {
+  const env = readFileSync(join(__dirname, '../mi_harbor/cached_docker_environment.py'), 'utf8');
+  const smoke = readFileSync(join(__dirname, '../mi_harbor/run-smoke.sh'), 'utf8');
+  assert.match(env, /class MiCachedDockerEnvironment\(DockerEnvironment\)/);
+  assert.match(env, /FROM \{base_image\}/);
+  assert.match(env, /base_image.*digest/);
+  assert.match(env, /mi-eval-cache:\{image_key\[:16\]\}/);
+  assert.match(env, /self\.task_env_config\.docker_image = cached/);
+  assert.match(env, /\["down", "--volumes", "--remove-orphans"\]/);
+  assert.match(smoke, /--environment-import-path mi_harbor\.cached_docker_environment:MiCachedDockerEnvironment/);
 });

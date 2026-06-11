@@ -18,6 +18,7 @@ uv tool install harbor
 
 **Quick validation (3 tasks):**
 ```bash
+./run-smoke.sh                     # 1 short task
 ./run-subset.sh
 ```
 
@@ -121,6 +122,14 @@ The adapter captures diagnostic information to debug failure modes:
 - `mi-stderr.txt` — Timestamped stderr
 - `timing.txt` — Start/end timestamps and exit code
 - `diagnostics.txt` — Pre-flight LLM check, post-mortem network diagnostics
+
+## Install/cache behavior
+
+The committed run scripts use `mi_harbor.cached_docker_environment:MiCachedDockerEnvironment`. This preserves the Terminal-Bench task image as the base image, then builds a local derived image tagged `mi-eval-cache:<hash>` with Node/runtime diagnostics and the current `mi` package under `/opt/mi`. The cache key includes both the task image and local `mi` package, so Docker reuses the image across matching trials without crossing task image boundaries. Trial cleanup removes containers and volumes but leaves the derived cache image in Docker.
+
+When `mi_harbor` is run from this repository checkout without the cached environment, the adapter still packages the local `index.mjs`, `tools/`, `skills/`, `package.json`, and `README.md` into the task container at `/opt/mi` and runs `node /opt/mi/index.mjs`. This avoids a per-trial `npm install -g @avcodes/mi` and makes evals exercise the current checkout.
+
+If the local checkout is not available, the adapter falls back to installing `@avcodes/mi` from npm.
 
 **Example diagnostic output:**
 ```

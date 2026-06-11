@@ -7,13 +7,15 @@ Includes diagnostics to debug failure modes:
 - Network diagnostics on failure
 """
 
-import os
+import base64
 import shlex
 from pathlib import Path
 
 from harbor.agents.installed.base import BaseInstalledAgent, with_prompt_template
 from harbor.environments.base import BaseEnvironment
 from harbor.models.agent.context import AgentContext
+
+from mi_harbor.package import local_package_archive
 
 
 # Wrapper script that adds timestamps and captures diagnostics
@@ -25,6 +27,11 @@ STDOUT_LOG="$LOG_DIR/mi-output.txt"
 STDERR_LOG="$LOG_DIR/mi-stderr.txt"
 TIMING_LOG="$LOG_DIR/timing.txt"
 DIAG_LOG="$LOG_DIR/diagnostics.txt"
+API_BASE="${OPENAI_BASE_URL:-https://api.openai.com}"
+API_BASE="${API_BASE%/}"
+API_BASE="${API_BASE%/v1}"
+HEALTH_URL="$API_BASE/v1/models"
+TIMING_FINALIZED=0
 
 mkdir -p "$LOG_DIR"
 
@@ -37,11 +44,11 @@ cleanup() {
     local exit_code=$?
     log_diag "=== SIGNAL/EXIT CLEANUP (code=$exit_code) ==="
     log_diag "Output lines: $(wc -l < "$STDOUT_LOG" 2>/dev/null || echo 0)"
-    log_diag "Last output timestamp: $(tail -1 "$STDOUT_LOG" 2>/dev/null | grep -oE '^\[[0-9.]+s\]' || echo 'none')"
+    log_diag "Last output timestamp: $(tail -1 "$STDOUT_LOG" 2>/dev/null | grep -oE '^\[[[:space:]]*[0-9.]+s\]' || echo 'none')"
 
     # Post-mortem LLM check
     POST_CODE=$(curl -s -m 5 -o /dev/null -w "%{http_code}" \
-        "${OPENAI_BASE_URL:-https://api.openai.com}/v1/models" \
+        "$HEALTH_URL" \
         -H "Authorization: Bearer $OPENAI_API_KEY" 2>/dev/null || echo "failed")
     log_diag "Post-mortem LLM status: HTTP $POST_CODE"
 
@@ -49,8 +56,10 @@ cleanup() {
     PING_RESULT=$(ping -c 1 -W 2 172.17.0.1 2>&1 | grep -E 'time=|unreachable' || echo 'failed')
     log_diag "Post-mortem ping gateway: $PING_RESULT"
 
-    echo "end=$(date +%s.%N)" >> "$TIMING_LOG"
-    echo "exit_code=$exit_code" >> "$TIMING_LOG"
+    if [[ "$TIMING_FINALIZED" != "1" ]]; then
+        echo "end=$(date +%s.%N)" >> "$TIMING_LOG"
+        echo "exit_code=$exit_code" >> "$TIMING_LOG"
+    fi
     log_diag "=== CLEANUP COMPLETE ==="
 }
 trap cleanup EXIT TERM INT
@@ -59,13 +68,14 @@ trap cleanup EXIT TERM INT
 START_TIME=$(date +%s.%N)
 log_diag "=== MI AGENT START ==="
 log_diag "LLM endpoint: ${OPENAI_BASE_URL:-https://api.openai.com}"
+log_diag "LLM health URL: $HEALTH_URL"
 log_diag "Model: ${MODEL:-gpt-5.4}"
 
 # Pre-flight: test LLM connectivity
 log_diag "Pre-flight LLM connectivity check..."
 PREFLIGHT_START=$(date +%s.%N)
 HEALTH_RESPONSE=$(curl -s -m 10 -w "\n%{http_code}\n%{time_total}" \
-    "${OPENAI_BASE_URL:-https://api.openai.com}/v1/models" \
+    "$HEALTH_URL" \
     -H "Authorization: Bearer $OPENAI_API_KEY" 2>&1)
 PREFLIGHT_END=$(date +%s.%N)
 HTTP_CODE=$(echo "$HEALTH_RESPONSE" | tail -2 | head -1)
@@ -88,14 +98,21 @@ timestamp_output() {
 log_diag "Starting mi agent..."
 echo "start=$(date +%s.%N)" > "$TIMING_LOG"
 
+if [[ -f /opt/mi/index.mjs ]]; then
+    MI_RUNNER=(node /opt/mi/index.mjs)
+else
+    MI_RUNNER=(npx @avcodes/mi)
+fi
+
 # Run mi with timestamped output, separate stderr
-npx @avcodes/mi -p "$1" \
+"${MI_RUNNER[@]}" -p "$1" \
     > >(timestamp_output | tee "$STDOUT_LOG") \
     2> >(timestamp_output | tee "$STDERR_LOG" >&2)
 EXIT_CODE=$?
 
 echo "end=$(date +%s.%N)" >> "$TIMING_LOG"
 echo "exit_code=$EXIT_CODE" >> "$TIMING_LOG"
+TIMING_FINALIZED=1
 
 END_TIME=$(date +%s.%N)
 TOTAL_TIME=$(echo "$END_TIME - $START_TIME" | bc)
@@ -124,16 +141,19 @@ class MiAgent(BaseInstalledAgent):
         return "mi"
 
     def get_version_command(self) -> str | None:
-        return "npx @avcodes/mi -h 2>&1 | head -1 || echo unknown"
+        return "if test -f /opt/mi/index.mjs; then node /opt/mi/index.mjs -h; else npx @avcodes/mi -h; fi 2>&1 | head -1 || echo unknown"
 
     def parse_version(self, stdout: str) -> str:
         return stdout.strip() or "unknown"
 
     async def install(self, environment: BaseEnvironment) -> None:
-        # Install Node.js and bc (for timestamp math) if not present
+        # Install runtime dependencies only when the task image does not already have them.
         await self.exec_as_root(
             environment,
             command=(
+                "if command -v node >/dev/null 2>&1 && command -v bc >/dev/null 2>&1"
+                " && command -v curl >/dev/null 2>&1 && command -v ping >/dev/null 2>&1"
+                " && { test -f /opt/mi/index.mjs || command -v npm >/dev/null 2>&1; }; then exit 0; fi;"
                 "if command -v apk &> /dev/null; then"
                 "  apk add --no-cache nodejs npm bc curl iputils;"
                 " elif command -v apt-get &> /dev/null; then"
@@ -145,26 +165,36 @@ class MiAgent(BaseInstalledAgent):
             env={"DEBIAN_FRONTEND": "noninteractive"},
         )
 
-        # Install mi globally, then patch with local index.mjs if available
-        version_spec = f"@{self._version}" if self._version else ""
-        await self.exec_as_agent(
-            environment,
-            command=f"npm install -g @avcodes/mi{version_spec} && npx @avcodes/mi -h",
-        )
-
-        # Overlay local index.mjs if running from repo (picks up unreleased fixes)
-        local_index = Path(__file__).parent.parent / "index.mjs"
-        if local_index.exists():
-            import base64
-            b64 = base64.b64encode(
-                local_index.read_text(encoding="utf-8").encode()
-            ).decode()
+        # Prefer the local checkout. This avoids npm network install per trial and
+        # ensures evals exercise exactly the repo under test.
+        package = local_package_archive()
+        if package:
+            archive, digest = package
+            probe = await self.exec_as_agent(
+                environment,
+                command=(
+                    f"if test \"$(cat /opt/mi/.mi_package_hash 2>/dev/null)\" = '{digest}'"
+                    " && node /opt/mi/index.mjs -h >/dev/null 2>&1;"
+                    " then echo MI_PACKAGE_READY; else echo MI_PACKAGE_MISSING; fi"
+                ),
+            )
+            if "MI_PACKAGE_READY" in (probe.stdout or ""):
+                return
+            b64 = base64.b64encode(archive).decode()
             await self.exec_as_agent(
                 environment,
                 command=(
-                    "MI_DIR=$(npm root -g)/@avcodes/mi"
-                    f" && echo '{b64}' | base64 -d > \"$MI_DIR/index.mjs\""
+                    "rm -rf /opt/mi && mkdir -p /opt/mi"
+                    f" && echo '{b64}' | base64 -d | tar -xzf - -C /opt/mi"
+                    f" && echo '{digest}' > /opt/mi/.mi_package_hash"
+                    " && node /opt/mi/index.mjs -h"
                 ),
+            )
+        else:
+            version_spec = f"@{self._version}" if self._version else ""
+            await self.exec_as_agent(
+                environment,
+                command=f"npm install -g @avcodes/mi{version_spec} && npx @avcodes/mi -h",
             )
 
     def populate_context_post_run(self, context: AgentContext) -> None:

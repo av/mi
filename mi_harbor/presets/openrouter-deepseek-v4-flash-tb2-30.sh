@@ -141,6 +141,7 @@ done
 exec uvx --from harbor harbor run \
     --dataset terminal-bench@2.0 \
     --agent-import-path mi_harbor.mi_agent:MiAgent \
+    --environment-import-path mi_harbor.cached_docker_environment:MiCachedDockerEnvironment \
     --model "openai/$MODEL" \
     --n-concurrent 1 \
     --n-tasks 30 \

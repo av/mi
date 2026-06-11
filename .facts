@@ -33,8 +33,8 @@
 - Node builtins exposed globally for tool modules: spawn, readFileSync, existsSync, readdirSync, homedir
 
 # tools
-- label: exactly two tools: bash (shell execution) and skill (skill discovery/loading)
-  command: test $(ls tools/*.mjs | wc -l) -eq 2 && test -f tools/bash.mjs && test -f tools/skill.mjs
+- label: bundled tools include bash, delegate, goal, and skill
+  command: test $(ls tools/*.mjs | wc -l) -eq 4 && test -f tools/bash.mjs && test -f tools/delegate.mjs && test -f tools/goal.mjs && test -f tools/skill.mjs
 - label: bash tool runs commands in detached process groups for clean signal handling
   command: grep -q 'detached.*true' tools/bash.mjs
 - label: bash tool supports timeout (ms) and background (bg) modes
@@ -80,6 +80,8 @@
 - label: MI_API_PARAMS is optional JSON merged into chat completion payload
   command: grep -q 'MI_API_PARAMS.*JSON.parse' index.mjs
 - MI_DIR and MI_PATH set in process.env for tools/skills to locate package assets
+- label: OPENAI_BASE_URL accepts provider roots with or without trailing /v1
+  command: grep -q 'api = p =>' index.mjs && grep -q 'HEALTH_URL="$API_BASE/v1/models"' mi_harbor/mi_agent.py
 
 # skills
 - label: 11 bundled skills: debug, delegate, explore, new-skill, plan, refactor, review, self, tasks, tdd, verify
@@ -112,3 +114,23 @@
 - harbor adapter includes diagnostic instrumentation: pre-flight LLM check, timestamped output, network diagnostics
 - label: harbor is dev/eval infrastructure only — excluded from npm package
   command: grep -q 'mi_harbor' .npmignore
+- label: Terminal-Bench 2.0 reference leaderboard snapshot is stored under docs
+  command: test -f docs/terminal-bench-2.0-reference.md && test -f docs/terminal-bench-2.0-reference.csv && grep -q 'https://www.tbench.ai/leaderboard/terminal-bench/2.0' docs/terminal-bench-2.0-reference.md
+- label: DeepSeek-V4-Flash Terminal-Bench reference snapshot is stored under docs
+  command: test -f docs/deepseek-v4-flash-terminal-bench.csv && grep -q 'V4-Flash Max,56.9' docs/deepseek-v4-flash-terminal-bench.csv && grep -q 'DeepSeek-V4-Flash Specific References' docs/terminal-bench-2.0-reference.md
+- label: harbor adapter copies the local mi package into eval containers instead of npm-installing it when running from a checkout
+  command: grep -q 'tar -xzf - -C /opt/mi' mi_harbor/mi_agent.py && grep -q 'node /opt/mi/index.mjs' mi_harbor/mi_agent.py
+- label: harbor diagnostics capture padded mi output timestamps
+  command: grep -Fq '[[[:space:]]*[0-9.]+s' mi_harbor/mi_agent.py
+- label: harbor timing diagnostics write one end and exit_code pair on normal completion
+  command: grep -q 'TIMING_FINALIZED=1' mi_harbor/mi_agent.py && grep -q 'TIMING_FINALIZED.*!= "1"' mi_harbor/mi_agent.py
+- label: harbor smoke eval script runs one Terminal-Bench task through the cached Docker environment
+  command: test -x mi_harbor/run-smoke.sh && grep -q 'MiCachedDockerEnvironment' mi_harbor/run-smoke.sh && grep -q 'fix-git' mi_harbor/run-smoke.sh
+- label: cached Docker environment builds mi-eval-cache images from Terminal-Bench task images
+  command: test -f mi_harbor/cached_docker_environment.py && grep -q 'FROM {base_image}' mi_harbor/cached_docker_environment.py && grep -q 'mi-eval-cache' mi_harbor/cached_docker_environment.py
+- label: harbor local package archive is deterministic for stable Docker cache keys
+  command: python3 -c 'from mi_harbor.package import local_package_archive; a=local_package_archive()[1]; b=local_package_archive()[1]; raise SystemExit(0 if a==b else 1)'
+- label: 2026-05-24 harness comparison snapshot is stored under docs
+  command: test -f docs/harness-comparison-2026-05-24.md && grep -q 'mi-eval-cache:7f709b1c6fda50c1' docs/harness-comparison-2026-05-24.md && grep -q 'terminus-2' docs/harness-comparison-2026-05-24.md
+- label: AGENTS.md documents Harbor eval launch commands
+  command: grep -q 'Harbor eval launch commands' AGENTS.md && grep -q './mi_harbor/run-smoke.sh' AGENTS.md && grep -q -- '--agent terminus-2' AGENTS.md

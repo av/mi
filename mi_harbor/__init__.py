@@ -1,5 +1,11 @@
 """Harbor agent adapter for mi."""
 
-from .mi_agent import MiAgent
-
 __all__ = ["MiAgent"]
+
+
+def __getattr__(name):
+    if name == "MiAgent":
+        from .mi_agent import MiAgent
+
+        return MiAgent
+    raise AttributeError(name)

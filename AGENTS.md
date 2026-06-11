@@ -44,6 +44,70 @@ The test suite is real and should be kept green. It covers CLI modes, streaming 
 It is development/evaluation infrastructure, not part of the published npm CLI.
 See `mi_harbor/README.md` for setup and commands.
 
+## Harbor eval launch commands
+
+All committed Harbor run scripts use `mi_harbor.cached_docker_environment:MiCachedDockerEnvironment`, which derives persistent `mi-eval-cache:<hash>` images from Terminal-Bench task images and installs the current checkout under `/opt/mi`.
+
+For a fast OpenRouter + DeepSeek-V4-Flash smoke run:
+
+```sh
+./mi_harbor/run-smoke.sh
+```
+
+The smoke defaults to `TASK=fix-git`, `MODEL=deepseek/deepseek-v4-flash`, and `OPENAI_BASE_URL=https://openrouter.ai/api/v1`. It reads `OPENAI_API_KEY` from the environment or `OPENROUTER_API_KEY` in `~/.hermes/.env`.
+
+For a local OpenAI-compatible server:
+
+```sh
+OPENAI_BASE_URL=http://localhost:33831 \
+MODEL='unsloth/Qwen3.6-35B-A3B-GGUF:Q4_K_XL' \
+OPENAI_API_KEY=dummy \
+./mi_harbor/run-subset.sh
+```
+
+To run one explicit `mi` task through Harbor:
+
+```sh
+export PYTHONPATH="$PWD"
+export OPENAI_API_KEY="${OPENAI_API_KEY:-$(grep '^OPENROUTER_API_KEY=' ~/.hermes/.env | cut -d= -f2-)}"
+export OPENAI_BASE_URL=https://openrouter.ai/api/v1
+export MODEL=deepseek/deepseek-v4-flash
+
+uvx --from harbor harbor run \
+  --dataset terminal-bench@2.0 \
+  --agent-import-path mi_harbor.mi_agent:MiAgent \
+  --environment-import-path mi_harbor.cached_docker_environment:MiCachedDockerEnvironment \
+  --model openai/deepseek/deepseek-v4-flash \
+  --agent-timeout-multiplier 0.25 \
+  --n-concurrent 1 \
+  --n-tasks 1 \
+  --include-task-name fix-git \
+  --jobs-dir jobs/mi-single-fix-git-$(date +%Y%m%d-%H%M%S) \
+  --yes
+```
+
+To compare against Harbor's built-in `terminus-2` harness on the same task/image path:
+
+```sh
+export PYTHONPATH="$PWD"
+export OPENAI_API_KEY="${OPENAI_API_KEY:-$(grep '^OPENROUTER_API_KEY=' ~/.hermes/.env | cut -d= -f2-)}"
+
+uvx --from harbor harbor run \
+  --dataset terminal-bench@2.0 \
+  --agent terminus-2 \
+  --environment-import-path mi_harbor.cached_docker_environment:MiCachedDockerEnvironment \
+  --model openai/deepseek/deepseek-v4-flash \
+  --agent-kwarg api_base=https://openrouter.ai/api/v1 \
+  --agent-timeout-multiplier 0.25 \
+  --n-concurrent 1 \
+  --n-tasks 1 \
+  --include-task-name fix-git \
+  --jobs-dir jobs/terminus-single-fix-git-$(date +%Y%m%d-%H%M%S) \
+  --yes
+```
+
+Use `docs/harness-comparison-2026-05-24.md` as the current small apples-to-apples comparison snapshot. It uses `fix-git`, `merge-diff-arc-agi-task`, and `openssl-selfsigned-cert` with DeepSeek-V4-Flash, `--n-concurrent 1`, and `--agent-timeout-multiplier 0.25`.
+
 ## Publishing
 
 Triggered by creating a GitHub Release, or manually through the `workflow_dispatch` publish workflow.
