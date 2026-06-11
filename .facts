@@ -39,8 +39,14 @@
   command: grep -q 'detached.*true' tools/bash.mjs
 - label: bash tool supports timeout (ms) and background (bg) modes
   command: grep -q 'timeout' tools/bash.mjs && grep -q 'bg' tools/bash.mjs
+- label: bash tool recovers provider-emitted nested arguments JSON payloads
+  command: grep -q 'args.arguments' tools/bash.mjs && grep -q 'JSON.parse(args.arguments)' tools/bash.mjs
 - label: background bash writes output to /tmp/mi-{timestamp}.log, returns pid and log path
   command: grep -q '/tmp/mi-' tools/bash.mjs
+- label: goal worker iterations receive only the goal and prior feedback, not judge criteria
+  command: grep -q 'previous judge feedback' tools/goal.mjs && grep -q 'one noninteractive bash script' tools/goal.mjs && ! grep -q 'judge criteria: ${check}' tools/goal.mjs && ! grep -q '# Judge criteria' tools/goal.mjs && ! grep -q 'read the progress file for prior NACK feedback' tools/goal.mjs
+- label: goal judges must not invent criteria beyond the goal and check
+  command: grep -q 'do not invent criteria' tools/goal.mjs
 - skill tool without name lists all available skills; with name returns SKILL.md body
 - label: skill frontmatter parsed via regex (^name: and ^description: with multiline flag)
   command: grep -q '/m' tools/skill.mjs
@@ -54,7 +60,7 @@
 - unknown tool calls return error listing available tools instead of crashing
 
 # cli
-- four CLI modes: interactive REPL, one-shot (-p), stdin pipe, and file context (-f)
+- four CLI modes: interactive REPL, one-shot (-p), stdin pipe, and goal loop (-g)
 - /reset command splices history to keep only system prompt
 - REPL error recovery pops failed user message so model never sees it
 - version banner prints '◰ mi/<version>' in orange and gray ANSI
@@ -74,7 +80,7 @@
   command: grep -q 'gpt-5.4' index.mjs
 - label: default API base is https://api.openai.com (OPENAI_BASE_URL env var)
   command: grep -q 'api.openai.com' index.mjs
-- OPENAI_API_KEY required for all modes except -h
+- OPENAI_API_KEY required for all modes except help/version (-h, --help, -v, --version)
 - label: REASONING_EFFORT is optional and omitted from API requests when unset
   command: grep -q 'reasoning_effort.*REASONING_EFFORT' index.mjs
 - label: MI_API_PARAMS is optional JSON merged into chat completion payload
@@ -124,6 +130,8 @@
   command: grep -Fq '[[[:space:]]*[0-9.]+s' mi_harbor/mi_agent.py
 - label: harbor timing diagnostics write one end and exit_code pair on normal completion
   command: grep -q 'TIMING_FINALIZED=1' mi_harbor/mi_agent.py && grep -q 'TIMING_FINALIZED.*!= "1"' mi_harbor/mi_agent.py
+- label: harbor adapter routes Terminal-Bench tasks through mi goal mode
+  command: grep -q 'TERMINAL_BENCH_CHECK' mi_harbor/mi_agent.py && grep -q -- '-g "$1" -c "$MI_GOAL_CHECK"' mi_harbor/mi_agent.py
 - label: harbor smoke eval script runs one Terminal-Bench task through the cached Docker environment
   command: test -x mi_harbor/run-smoke.sh && grep -q 'MiCachedDockerEnvironment' mi_harbor/run-smoke.sh && grep -q 'fix-git' mi_harbor/run-smoke.sh
 - label: cached Docker environment builds mi-eval-cache images from Terminal-Bench task images

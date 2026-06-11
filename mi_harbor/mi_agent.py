@@ -18,6 +18,13 @@ from harbor.models.agent.context import AgentContext
 from mi_harbor.package import local_package_archive
 
 
+TERMINAL_BENCH_CHECK = (
+    "Inspect the actual task state under /app, including nested workdirs. "
+    "Run available tests or direct checks that would fail if the task is incomplete. "
+    "End with ACK only when the requested task is fully complete; otherwise end with NACK."
+)
+
+
 # Wrapper script that adds timestamps and captures diagnostics
 DIAGNOSTIC_WRAPPER = r'''#!/bin/bash
 set -o pipefail
@@ -104,8 +111,19 @@ else
     MI_RUNNER=(npx @avcodes/mi)
 fi
 
-# Run mi with timestamped output, separate stderr
-"${MI_RUNNER[@]}" -p "$1" \
+WORKDIR="/app"
+if [[ ! -d "$WORKDIR/.git" ]]; then
+    GIT_DIRS=$(find "$WORKDIR" -mindepth 2 -maxdepth 2 -type d -name .git -printf '%h\n' 2>/dev/null | head -2)
+    GIT_COUNT=$(printf '%s\n' "$GIT_DIRS" | grep -c . || true)
+    if [[ "$GIT_COUNT" -eq 1 ]]; then
+        WORKDIR="$GIT_DIRS"
+    fi
+fi
+log_diag "Workdir: $WORKDIR"
+cd "$WORKDIR" || exit 1
+
+# Run mi goal loop with timestamped output, separate stderr
+"${MI_RUNNER[@]}" -g "$1" -c "$MI_GOAL_CHECK" \
     > >(timestamp_output | tee "$STDOUT_LOG") \
     2> >(timestamp_output | tee "$STDERR_LOG" >&2)
 EXIT_CODE=$?
@@ -147,27 +165,47 @@ class MiAgent(BaseInstalledAgent):
         return stdout.strip() or "unknown"
 
     async def install(self, environment: BaseEnvironment) -> None:
-        # Install runtime dependencies only when the task image does not already have them.
-        await self.exec_as_root(
-            environment,
-            command=(
-                "if command -v node >/dev/null 2>&1 && command -v bc >/dev/null 2>&1"
-                " && command -v curl >/dev/null 2>&1 && command -v ping >/dev/null 2>&1"
-                " && { test -f /opt/mi/index.mjs || command -v npm >/dev/null 2>&1; }; then exit 0; fi;"
-                "if command -v apk &> /dev/null; then"
-                "  apk add --no-cache nodejs npm bc curl iputils;"
-                " elif command -v apt-get &> /dev/null; then"
-                "  apt-get update && apt-get install -y nodejs npm bc curl iputils-ping;"
-                " elif command -v yum &> /dev/null; then"
-                "  yum install -y nodejs npm bc curl iputils;"
-                " fi"
-            ),
-            env={"DEBIAN_FRONTEND": "noninteractive"},
-        )
-
         # Prefer the local checkout. This avoids npm network install per trial and
         # ensures evals exercise exactly the repo under test.
         package = local_package_archive()
+
+        # Install runtime dependencies only when the task image does not already have them.
+        # Some Terminal-Bench images ship an old Node binary; mi needs Node 18+.
+        await self.exec_as_root(
+            environment,
+            command=(
+                "set -e;"
+                "NEED_NPM=" + ("0" if package else "1") + ";"
+                "node_ok(){ command -v node >/dev/null 2>&1"
+                " && node -e \"process.exit(Number(process.versions.node.split('.')[0])>=18?0:1)\" >/dev/null 2>&1; };"
+                "deps_ok(){ node_ok && command -v bc >/dev/null 2>&1"
+                " && command -v curl >/dev/null 2>&1 && command -v ping >/dev/null 2>&1"
+                " && { test \"$NEED_NPM\" != 1 || command -v npm >/dev/null 2>&1; }; };"
+                "if deps_ok; then exit 0; fi;"
+                "if command -v apk >/dev/null 2>&1; then"
+                "  apk add --no-cache nodejs npm bc curl iputils ca-certificates xz;"
+                " elif command -v apt-get >/dev/null 2>&1; then"
+                "  apt-get update && apt-get install -y nodejs npm bc curl iputils-ping ca-certificates xz-utils;"
+                " elif command -v yum >/dev/null 2>&1; then"
+                "  yum install -y nodejs npm bc curl iputils ca-certificates xz;"
+                " fi;"
+                "if ! node_ok && ! command -v apk >/dev/null 2>&1; then"
+                "  arch=$(uname -m); case \"$arch\" in x86_64|amd64) arch=x64;; aarch64|arm64) arch=arm64;; *) echo \"unsupported node arch: $arch\"; exit 1;; esac;"
+                "  ver=v22.11.0; dir=/usr/local/node-$ver-linux-$arch;"
+                "  curl -fsSL \"https://nodejs.org/dist/$ver/node-$ver-linux-$arch.tar.xz\" -o /tmp/node.tar.xz;"
+                "  rm -rf \"$dir\" && mkdir -p \"$dir\";"
+                "  tar -xJf /tmp/node.tar.xz -C \"$dir\" --strip-components=1;"
+                "  ln -sf \"$dir/bin/node\" /usr/local/bin/node;"
+                "  ln -sf \"$dir/bin/npm\" /usr/local/bin/npm;"
+                "  ln -sf \"$dir/bin/npx\" /usr/local/bin/npx;"
+                "  hash -r 2>/dev/null || true;"
+                " fi;"
+                "if ! deps_ok; then echo 'mi runtime dependency check failed';"
+                "  command -v node >/dev/null 2>&1 && node --version || true;"
+                "  exit 1; fi"
+            ),
+            env={"DEBIAN_FRONTEND": "noninteractive"},
+        )
         if package:
             archive, digest = package
             probe = await self.exec_as_agent(
@@ -236,7 +274,15 @@ class MiAgent(BaseInstalledAgent):
         escaped_instruction = shlex.quote(instruction)
 
         # Build environment for mi
-        env: dict[str, str] = {}
+        env: dict[str, str] = {
+            "PAGER": "cat",
+            "GIT_PAGER": "cat",
+            "GIT_EDITOR": "true",
+            "VISUAL": "true",
+            "EDITOR": "true",
+            "TERM": "dumb",
+            "MI_GOAL_CHECK": TERMINAL_BENCH_CHECK,
+        }
 
         # mi uses OpenAI-compatible API
         api_key = (

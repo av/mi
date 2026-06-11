@@ -64,8 +64,7 @@ const sysMsg = history[0], imgRe = /\.(png|jpg|jpeg|gif|webp)$/i, files = proces
 if (existsSync('AGENTS.md')) sysMsg.content += `\n${readFileSync('AGENTS.md', 'utf8')}`; const skills = listSkills(); if (skills.length) sysMsg.content += `\n\nSkill descriptions:\n${skills.join('\n')}`;
 
 // ── One-shot modes: -p flag and stdin pipe ───────────────────────────
-const prompt = getArg('-p'); if (prompt) { history.push({ role: 'user', content: prompt }); await run(history); process.exit(0); } if (!process.stdin.isTTY) { let input = ''; for await (const chunk of process.stdin) input += chunk; history.push({ role: 'user', content: input.trim() }); await run(history); process.exit(0); }
-const goalArg = getArg('-g'); if (goalArg) { await (await import(`${DIR}tools/goal.mjs?v=${++loadId}`)).default.handler({ goal: goalArg, check: getArg('-c') || goalArg }); process.exit(0); }
+const prompt = getArg('-p'); if (prompt) { history.push({ role: 'user', content: prompt }); await run(history); process.exit(0); } const goalArg = getArg('-g'); if (goalArg) { await (await import(`${DIR}tools/goal.mjs?v=${++loadId}`)).default.handler({ goal: goalArg, check: getArg('-c') || goalArg }); process.exit(0); } if (!process.stdin.isTTY) { let input = ''; for await (const chunk of process.stdin) input += chunk; history.push({ role: 'user', content: input.trim() }); await run(history); process.exit(0); }
 
 // ── Interactive REPL ─────────────────────────────────────────────────
 // readline setup, version banner, then an infinite prompt loop

@@ -1,5 +1,5 @@
 // tools/bash.mjs — Shell execution tool: foreground (captured) and background (detached) modes
-export default { name: 'bash', description: 'Runs in a detached process group. Returns combined stdout+stderr. Optional: timeout=ms kills after delay; bg=truthy fully detaches and returns pid + log file path.', parameters: { type: 'object', properties: { command: { type: 'string' }, timeout: { type: 'string' }, bg: { type: 'string' } }, required: ['command'] }, handler: ({command, timeout, bg}) => {
+export default { name: 'bash', description: 'Runs in a detached process group. Returns combined stdout+stderr. Optional: timeout=ms kills after delay; bg=truthy fully detaches and returns pid + log file path.', parameters: { type: 'object', properties: { command: { type: 'string' }, timeout: { type: 'string' }, bg: { type: 'string' } }, required: ['command'] }, handler: (args) => { let {command, timeout, bg} = args; if (!command && typeof args.arguments === 'string') try { const nested = JSON.parse(args.arguments); command = nested.command; timeout = nested.timeout ?? timeout; bg = nested.bg ?? bg; } catch {} if (!command) return '[missing command]';
 
   // ── Background mode: fire-and-forget ──────────────────────────────
   // Redirect stdout+stderr to a log file so the caller can tail it later.

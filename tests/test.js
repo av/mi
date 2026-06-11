@@ -95,6 +95,7 @@ function runMi(args, env = {}, input = '') {
 function createMockSkillHome(suffix) {
   const mockHome = join(__dirname, `mock_home_${suffix}`);
   const skillsRoot = join(mockHome, '.agents', 'skills');
+  rmSync(mockHome, { recursive: true, force: true });
   mkdirSync(skillsRoot, { recursive: true });
   return {
     mockHome,
@@ -190,6 +191,32 @@ test('bash tool', async () => {
   assert.match(result.stdout, /bash done/);
 });
 
+test('bash tool recovers nested arguments payloads', async () => {
+  let callCount = 0;
+  requestHandler = (req, res, body) => {
+    callCount++;
+    if (callCount === 1) {
+      sse(res, {
+        role: 'assistant',
+        tool_calls: [{
+          id: 'call_nested',
+          type: 'function',
+          function: { name: 'bash', arguments: JSON.stringify({ arguments: JSON.stringify({ command: 'echo "nested_bash_output"' }) }) }
+        }]
+      });
+    } else {
+      const lastMsg = body.messages[body.messages.length - 1];
+      assert.match(lastMsg.content, /nested_bash_output/);
+      assert.doesNotMatch(lastMsg.content, /undefined: command not found/);
+      sse(res, { role: 'assistant', content: 'nested bash done' });
+    }
+  };
+
+  const result = await runMi(['-p', 'execute nested bash']);
+  assert.strictEqual(result.status, 0);
+  assert.match(result.stdout, /nested bash done/);
+});
+
 test('context gathering', async () => {
   requestHandler = (req, res, body) => {
     const sysMsg = body.messages[0].content;
@@ -277,6 +304,54 @@ test('standard input (stdin)', async () => {
   const result = await runMi([], {}, 'piped_input_data');
   assert.strictEqual(result.status, 0);
   assert.match(result.stdout, /stdin checked/);
+});
+
+test('-g goal mode takes precedence over non-tty stdin', async () => {
+  let calls = 0;
+  requestHandler = (req, res, body) => {
+    calls++;
+    assert.match(body.messages.at(-1).content, /you are a judge for a goal loop/);
+    assert.match(body.messages.at(-1).content, /do not invent criteria/);
+    sse(res, { role: 'assistant', content: 'already done\nACK' });
+  };
+
+  const result = await runMi(['-g', 'bench goal', '-c', 'judge it']);
+  assert.strictEqual(result.status, 0);
+  assert.strictEqual(calls, 1);
+  assert.match(result.stdout, /already done/);
+});
+
+test('goal workers do work instead of receiving judge criteria', async () => {
+  const prompts = [];
+  requestHandler = (req, res, body) => {
+    const prompt = body.messages.at(-1).content;
+    prompts.push(prompt);
+    if (prompts.length === 1) {
+      assert.match(prompt, /you are a judge for a goal loop/);
+      assert.match(prompt, /criteria: inspect state/);
+      assert.match(prompt, /do not invent criteria/);
+      sse(res, { role: 'assistant', content: 'missing files\nNACK' });
+    } else if (prompts.length === 2) {
+      assert.match(prompt, /you are worker iteration 1\/128/);
+      assert.match(prompt, /complete the whole goal now/);
+      assert.match(prompt, /previous judge feedback:\n[\s\S]*missing files/);
+      assert.match(prompt, /one noninteractive bash script/);
+      assert.match(prompt, /do not act as the judge/);
+      assert.doesNotMatch(prompt, /progress file:/);
+      assert.doesNotMatch(prompt, /criteria: inspect state/);
+      assert.doesNotMatch(prompt, /judge criteria/);
+      sse(res, { role: 'assistant', content: 'created the files' });
+    } else {
+      assert.match(prompt, /you are a judge for a goal loop/);
+      assert.match(prompt, /criteria: inspect state/);
+      sse(res, { role: 'assistant', content: 'all files exist\nACK' });
+    }
+  };
+
+  const result = await runMi(['-g', 'create files', '-c', 'inspect state; end with ACK or NACK']);
+  assert.strictEqual(result.status, 0);
+  assert.strictEqual(prompts.length, 3);
+  assert.match(result.stdout, /all files exist/);
 });
 
 test('environment variables', async () => {
@@ -2020,9 +2095,23 @@ test('Harbor adapter uses local package and padded timestamp diagnostics', async
   assert.match(adapter, /tar -xzf - -C \/opt\/mi/);
   assert.match(adapter, /\.mi_package_hash/);
   assert.match(adapter, /node \/opt\/mi\/index\.mjs/);
-  assert.match(adapter, /test -f \/opt\/mi\/index\.mjs \|\| command -v npm/);
+  assert.match(adapter, /process\.versions\.node\.split\('\.'\)\[0\]\)>=18/);
+  assert.match(adapter, /NEED_NPM=.*if package else/);
+  assert.match(adapter, /ver=v22\.11\.0/);
+  assert.match(adapter, /node-\$ver-linux-\$arch/);
   assert.match(adapter, /\[\[:space:\]\]\*\[0-9\.\]\+s/);
   assert.match(adapter, /else:\n\s+version_spec =/);
+});
+
+test('Harbor adapter routes Terminal-Bench through goal mode', async () => {
+  const adapter = readFileSync(join(__dirname, '../mi_harbor/mi_agent.py'), 'utf8');
+  assert.match(adapter, /TERMINAL_BENCH_CHECK/);
+  assert.match(adapter, /-g "\$1" -c "\$MI_GOAL_CHECK"/);
+  assert.match(adapter, /nested workdirs/);
+  assert.match(adapter, /"PAGER": "cat"/);
+  assert.match(adapter, /"GIT_PAGER": "cat"/);
+  assert.match(adapter, /"GIT_EDITOR": "true"/);
+  assert.match(adapter, /Workdir: \$WORKDIR/);
 });
 
 test('Harbor cached Docker environment derives task images', async () => {
@@ -2031,6 +2120,8 @@ test('Harbor cached Docker environment derives task images', async () => {
   assert.match(env, /class MiCachedDockerEnvironment\(DockerEnvironment\)/);
   assert.match(env, /FROM \{base_image\}/);
   assert.match(env, /base_image.*digest/);
+  assert.match(env, /node18-runtime-v2/);
+  assert.match(env, /node_ok\(\)/);
   assert.match(env, /mi-eval-cache:\{image_key\[:16\]\}/);
   assert.match(env, /self\.task_env_config\.docker_image = cached/);
   assert.match(env, /\["down", "--volumes", "--remove-orphans"\]/);

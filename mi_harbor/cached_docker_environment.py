@@ -8,7 +8,7 @@ derived image with Node/runtime diagnostics and the current mi checkout under
 from __future__ import annotations
 
 import asyncio
-import hashlib
+from hashlib import sha256
 import subprocess
 import tarfile
 import tempfile
@@ -48,7 +48,7 @@ class MiCachedDockerEnvironment(DockerEnvironment):
             return None
 
         archive, digest = pkg
-        image_key = hashlib.sha256(f"{base_image}\0{digest}".encode()).hexdigest()
+        image_key = sha256(f"{base_image}\0{digest}\0node18-runtime-v2".encode()).hexdigest()
         image = f"mi-eval-cache:{image_key[:16]}"
         if self._image_exists(image):
             return image
@@ -123,11 +123,25 @@ class MiCachedDockerEnvironment(DockerEnvironment):
         return f"""FROM {base_image}
 USER root
 RUN set -eu; \\
-    if command -v node >/dev/null 2>&1 && command -v bc >/dev/null 2>&1 && command -v curl >/dev/null 2>&1 && command -v ping >/dev/null 2>&1; then exit 0; fi; \\
-    if command -v apk >/dev/null 2>&1; then apk add --no-cache nodejs bash bc curl iputils tar gzip ca-certificates; \\
-    elif command -v apt-get >/dev/null 2>&1; then apt-get update && apt-get install -y --no-install-recommends nodejs bash bc curl iputils-ping tar gzip ca-certificates && rm -rf /var/lib/apt/lists/*; \\
-    elif command -v yum >/dev/null 2>&1; then yum install -y nodejs bash bc curl iputils tar gzip ca-certificates; \\
-    else echo 'unsupported package manager for mi cached eval image' >&2; exit 1; fi
+    node_ok() {{ command -v node >/dev/null 2>&1 && node -e "process.exit(Number(process.versions.node.split('.')[0])>=18?0:1)" >/dev/null 2>&1; }}; \\
+    deps_ok() {{ node_ok && command -v bash >/dev/null 2>&1 && command -v bc >/dev/null 2>&1 && command -v curl >/dev/null 2>&1 && command -v ping >/dev/null 2>&1; }}; \\
+    if deps_ok; then exit 0; fi; \\
+    if command -v apk >/dev/null 2>&1; then apk add --no-cache nodejs bash bc curl iputils tar gzip ca-certificates xz; \\
+    elif command -v apt-get >/dev/null 2>&1; then apt-get update && apt-get install -y --no-install-recommends nodejs bash bc curl iputils-ping tar gzip ca-certificates xz-utils && rm -rf /var/lib/apt/lists/*; \\
+    elif command -v yum >/dev/null 2>&1; then yum install -y nodejs bash bc curl iputils tar gzip ca-certificates xz; \\
+    else echo 'unsupported package manager for mi cached eval image' >&2; exit 1; fi; \\
+    if ! node_ok && ! command -v apk >/dev/null 2>&1; then \\
+      arch=$(uname -m); case "$arch" in x86_64|amd64) arch=x64;; aarch64|arm64) arch=arm64;; *) echo "unsupported node arch: $arch" >&2; exit 1;; esac; \\
+      ver=v22.11.0; dir=/usr/local/node-$ver-linux-$arch; \\
+      curl -fsSL "https://nodejs.org/dist/$ver/node-$ver-linux-$arch.tar.xz" -o /tmp/node.tar.xz; \\
+      rm -rf "$dir" && mkdir -p "$dir"; \\
+      tar -xJf /tmp/node.tar.xz -C "$dir" --strip-components=1; \\
+      ln -sf "$dir/bin/node" /usr/local/bin/node; \\
+      ln -sf "$dir/bin/npm" /usr/local/bin/npm; \\
+      ln -sf "$dir/bin/npx" /usr/local/bin/npx; \\
+      hash -r 2>/dev/null || true; \\
+    fi; \\
+    deps_ok || {{ echo 'mi cached image runtime dependency check failed' >&2; command -v node >/dev/null 2>&1 && node --version >&2 || true; exit 1; }}
 COPY mi /opt/mi
 RUN chmod +x /opt/mi/index.mjs
 {restore_user}"""

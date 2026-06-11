@@ -26,26 +26,28 @@ export default {
       log = `/tmp/mi-goal-${Date.now()}.md`;
     const judge = async () => {
       const out = await delegate.handler({
-        prompt: `you are a judge for a goal loop. evaluate:\n\ngoal: ${goal}\ncriteria: ${check}\nprogress file: ${log}\n\nuse tools to inspect the actual state (read files, run commands). end your response with exactly ACK or NACK. if NACK, state what's missing before the verdict.`,
+        prompt: `you are a judge for a goal loop. evaluate:\n\ngoal: ${goal}\ncriteria: ${check}\nprogress file: ${log}\n\nuse concise tools to inspect the actual state. do not invent criteria beyond the goal and criteria. if the required state is satisfied, stop and end with exactly ACK. if not, state only blocking missing or incorrect items and end with exactly NACK.`,
       });
       const m = out.slice(-500).match(/\b(N?ACK)\b/g);
       return { ok: m?.[m.length - 1] === "ACK", out };
     };
     writeFileSync(
       log,
-      `# Goal\n${goal}\n\n# Judge criteria\n${check}\n\n# Log\n`,
+      `# Goal\n${goal}\n\n# Log\n`,
     );
     let pre = await judge();
     if (pre.ok) return `goal already met.\n${pre.out}`;
     appendFileSync(log, `pre-check: NACK\n${pre.out.slice(-500)}\n`);
-    let last;
+    let last, feedback = pre.out.slice(-500);
     for (let i = 1; i <= limit; i++) {
       console.log(gray(`── goal ${i}/${limit} ──`));
-      await delegate.handler({
+      const work = await delegate.handler({
         timeout,
-        prompt: `you are iteration ${i}/${limit} of a goal loop.\n\ngoal: ${goal}\njudge criteria: ${check}\nprogress file: ${log}\n\nread the progress file — it has prior judge feedback. append a short summary of what you did. focus on making the judge accept. do not redo completed work.`,
+        prompt: `you are worker iteration ${i}/${limit} of a goal loop. complete the whole goal now in the real working directory.\n\ngoal: ${goal}\n\nprevious judge feedback:\n${feedback}\n\nrules: do not act as the judge, do not answer ACK/NACK, and do not inspect-only. do all remaining steps, not just one sub-step. if files or commands are needed, prefer one noninteractive bash script that performs all remaining changes and checks. end with a short summary of changes made.`,
       });
+      appendFileSync(log, `\n── worker ${i} ──\n${work.slice(-500)}\n`);
       last = await judge();
+      feedback = last.out.slice(-500);
       appendFileSync(
         log,
         `\n── iteration ${i}: ${last.ok ? "ACK" : "NACK"} ──\n${last.out.slice(-500)}\n`,
