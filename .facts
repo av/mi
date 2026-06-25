@@ -43,10 +43,32 @@
   command: grep -q 'args.arguments' tools/bash.mjs && grep -q 'JSON.parse(args.arguments)' tools/bash.mjs
 - label: background bash writes output to /tmp/mi-{timestamp}.log, returns pid and log path
   command: grep -q '/tmp/mi-' tools/bash.mjs
-- label: goal worker iterations receive only the goal and prior feedback, not judge criteria
-  command: grep -q 'previous judge feedback' tools/goal.mjs && grep -q 'one noninteractive bash script' tools/goal.mjs && ! grep -q 'judge criteria: ${check}' tools/goal.mjs && ! grep -q '# Judge criteria' tools/goal.mjs && ! grep -q 'read the progress file for prior NACK feedback' tools/goal.mjs
+- label: background bash records per-mi-process managed jobs
+  command: grep -q 'MI_SESSION_ID' tools/bash.mjs && grep -q '/tmp/mi-jobs-' tools/bash.mjs && grep -q 'jobs=truthy lists background jobs' tools/bash.mjs
+- label: goal loop establishes refined exit criteria before worker iterations
+  command: grep -q 'you are the planner for a goal loop' tools/goal.mjs && grep -q 'EXIT_CRITERIA' tools/goal.mjs && grep -q 'VERIFIER_SHAPE_CONTRACT' tools/goal.mjs && grep -q 'VERIFICATION_PLAN' tools/goal.mjs && grep -q 'Refined Exit Criteria And Verification Plan' tools/goal.mjs
+- label: goal planner synthesizes verifier shape contract from visible task evidence
+  command: grep -q 'infer the likely verifier shape' tools/goal.mjs && grep -q 'exact artifact paths' tools/goal.mjs && grep -q 'numeric success thresholds' tools/goal.mjs && grep -q 'inputs that must remain unchanged' tools/goal.mjs
+- label: goal worker iterations receive refined exit criteria and prior feedback, not raw judge criteria
+  command: grep -q 'verifier-shape contract' tools/goal.mjs && grep -q 'previous judge feedback' tools/goal.mjs && grep -q 'one noninteractive bash script' tools/goal.mjs && ! grep -q 'judge criteria: ${check}' tools/goal.mjs && ! grep -q '# Judge criteria' tools/goal.mjs && ! grep -q 'read the progress file for prior NACK feedback' tools/goal.mjs
+- label: goal worker iterations receive temporal iteration guidance without a hard benchmark cap
+  command: grep -q 'iteration guidance' tools/goal.mjs && grep -q 'avoid repeating the same failed approach' tools/goal.mjs && grep -q 'after two failed iterations' tools/goal.mjs
+- label: goal loop appends structured iteration summaries to its progress log
+  command: grep -q 'Iteration ${i} Summary' tools/goal.mjs && grep -q 'worker summary:' tools/goal.mjs && grep -q 'judge summary:' tools/goal.mjs && grep -q 'worker tail:' tools/goal.mjs && grep -q 'judge tail:' tools/goal.mjs
+- label: goal loop writes markdown and JSONL progress logs with iteration events
+  command: grep -q "events = log.replace" tools/goal.mjs && grep -q "emit('start'" tools/goal.mjs && grep -q "emit('iteration'" tools/goal.mjs && grep -q 'event log:' tools/goal.mjs
 - label: goal judges must not invent criteria beyond the goal and check
-  command: grep -q 'do not invent criteria' tools/goal.mjs
+  command: grep -q 'do not invent criteria' tools/goal.mjs && grep -q 'treat worker output as claims' tools/goal.mjs && grep -q 'if verification is incomplete' tools/goal.mjs
+- label: goal judges must measure thresholds and exact artifact contracts before ACK
+  command: grep -q 'every success threshold must be measured' tools/goal.mjs && grep -q 'observed value and expected value' tools/goal.mjs && grep -q 'exact path, non-empty content' tools/goal.mjs && grep -q 'service/background job' tools/goal.mjs
+- label: goal tool supports deadline parameter for budget-aware iteration with 4-phase guidance and salvage policy
+  command: grep -q 'deadline.*unix timestamp' tools/goal.mjs && grep -q 'budgetPhase' tools/goal.mjs && grep -q 'SALVAGE' tools/goal.mjs && grep -q 'FINAL SALVAGE' tools/goal.mjs
+- label: goal judge uses strict 8-point verification protocol with 5% margin and adversarial edge-case checks
+  command: grep -q 'STRICT VERIFICATION PROTOCOL' tools/goal.mjs && grep -q 'required_threshold \* 1.05' tools/goal.mjs && grep -q 'adversarial check' tools/goal.mjs && grep -q 'MARGINAL PASS' tools/goal.mjs
+- label: goal worker receives strategy diversity enforcement with failed strategy fingerprints
+  command: grep -q 'strategies.push' tools/goal.mjs && grep -q 'previous failed strategies' tools/goal.mjs && grep -q 'fundamentally different approach' tools/goal.mjs && grep -q 'abandon this entire solution family' tools/goal.mjs
+- label: goal worker receives structured checkpoints for iteration handoff instead of raw judge output
+  command: grep -q 'STRATEGY:' tools/goal.mjs && grep -q 'FILES_MODIFIED' tools/goal.mjs && grep -q 'COMMANDS_SUCCEEDED' tools/goal.mjs && grep -q 'BLOCKERS' tools/goal.mjs && grep -q 'checkpoint' tools/goal.mjs
 - skill tool without name lists all available skills; with name returns SKILL.md body
 - label: skill frontmatter parsed via regex (^name: and ^description: with multiline flag)
   command: grep -q '/m' tools/skill.mjs
@@ -88,6 +110,8 @@
 - MI_DIR and MI_PATH set in process.env for tools/skills to locate package assets
 - label: OPENAI_BASE_URL accepts provider roots with or without trailing /v1
   command: grep -q 'api = p =>' index.mjs && grep -q 'HEALTH_URL="$API_BASE/v1/models"' mi_harbor/mi_agent.py
+- label: CLI supports -d flag and MI_DEADLINE env var for goal deadline
+  command: grep -q "getArg('-d')" index.mjs && grep -q 'MI_DEADLINE' index.mjs && grep -q 'deadline: +dl' index.mjs
 
 # skills
 - label: 11 bundled skills: debug, delegate, explore, new-skill, plan, refactor, review, self, tasks, tdd, verify
@@ -132,6 +156,10 @@
   command: grep -q 'TIMING_FINALIZED=1' mi_harbor/mi_agent.py && grep -q 'TIMING_FINALIZED.*!= "1"' mi_harbor/mi_agent.py
 - label: harbor adapter routes Terminal-Bench tasks through mi goal mode
   command: grep -q 'TERMINAL_BENCH_CHECK' mi_harbor/mi_agent.py && grep -q -- '-g "$1" -c "$MI_GOAL_CHECK"' mi_harbor/mi_agent.py
+- label: harbor adapter computes MI_DEADLINE from MI_TASK_TIMEOUT with 60s verifier buffer
+  command: grep -q 'MI_TASK_TIMEOUT' mi_harbor/mi_agent.py && grep -q 'MI_DEADLINE' mi_harbor/mi_agent.py && grep -q 'TASK_TIMEOUT - 60' mi_harbor/mi_agent.py
+- label: harbor TERMINAL_BENCH_CHECK requires exact file paths, measured thresholds, test suites, and adversarial edge cases
+  command: grep -q 'exact output file paths' mi_harbor/mi_agent.py && grep -q 'numeric thresholds, measure the actual value' mi_harbor/mi_agent.py && grep -q 'adversarial edge case' mi_harbor/mi_agent.py
 - label: harbor smoke eval script runs one Terminal-Bench task through the cached Docker environment
   command: test -x mi_harbor/run-smoke.sh && grep -q 'MiCachedDockerEnvironment' mi_harbor/run-smoke.sh && grep -q 'fix-git' mi_harbor/run-smoke.sh
 - label: cached Docker environment builds mi-eval-cache images from Terminal-Bench task images
@@ -142,3 +170,15 @@
   command: test -f docs/harness-comparison-2026-05-24.md && grep -q 'mi-eval-cache:7f709b1c6fda50c1' docs/harness-comparison-2026-05-24.md && grep -q 'terminus-2' docs/harness-comparison-2026-05-24.md
 - label: AGENTS.md documents Harbor eval launch commands
   command: grep -q 'Harbor eval launch commands' AGENTS.md && grep -q './mi_harbor/run-smoke.sh' AGENTS.md && grep -q -- '--agent terminus-2' AGENTS.md
+
+# benchmark
+- label: 2026-06-18 Terminal-Bench 2.1 full mi vs terminus-2 comparison is stored under docs
+  command: test -f docs/terminal-bench-2.1-full-comparison-2026-06-18.md && grep -q 'mi.*38/89' docs/terminal-bench-2.1-full-comparison-2026-06-18.md && grep -q 'terminus-2.*46/89' docs/terminal-bench-2.1-full-comparison-2026-06-18.md && grep -q 'official-full-deepseek-v4-flash-tb21-20260617-232838' docs/terminal-bench-2.1-full-comparison-2026-06-18.md
+- label: 2026-06-18 Terminal-Bench 2.1 mi failure analysis is stored under docs
+  command: test -f docs/terminal-bench-2.1-mi-failure-analysis-2026-06-18.md && grep -q 'False completion after normal exit.*20' docs/terminal-bench-2.1-mi-failure-analysis-2026-06-18.md && grep -q 'Agent timeout at task budget.*28' docs/terminal-bench-2.1-mi-failure-analysis-2026-06-18.md && grep -q 'Replace the Harbor adapter' docs/terminal-bench-2.1-mi-failure-analysis-2026-06-18.md
+- label: Terminal-Bench 2.1 summarizer supports mi-only result directories
+  command: grep -q 'if (!existsSync(root)) return null' scripts/summarize-terminal-bench-2-1.mjs && grep -q 'results.mi && brief(results.mi)' scripts/summarize-terminal-bench-2-1.mjs
+- label: 2026-06-18 goal-hardened mi-only Terminal-Bench 2.1 run scored 50/89
+  command: test -f docs/terminal-bench-2.1-goal-hardening-mi-only-2026-06-18.md && grep -q 'Score: `50/89`' docs/terminal-bench-2.1-goal-hardening-mi-only-2026-06-18.md && grep -q 'Goal-hardened mi: `50/89`' docs/terminal-bench-2.1-goal-hardening-mi-only-2026-06-18.md
+- label: 2026-06-19 goal-hardened mi failure analysis classifies 39 failed Terminal-Bench 2.1 tasks
+  command: test -f docs/terminal-bench-2.1-goal-hardening-failure-analysis-2026-06-19.md && grep -q 'False ACK after normal exit | 14' docs/terminal-bench-2.1-goal-hardening-failure-analysis-2026-06-19.md && grep -q 'Timeout while still incomplete | 22' docs/terminal-bench-2.1-goal-hardening-failure-analysis-2026-06-19.md && grep -q 'Non-zero agent or infrastructure exit | 3' docs/terminal-bench-2.1-goal-hardening-failure-analysis-2026-06-19.md
