@@ -310,14 +310,22 @@ test('-g goal mode takes precedence over non-tty stdin', async () => {
   let calls = 0;
   requestHandler = (req, res, body) => {
     calls++;
-    assert.match(body.messages.at(-1).content, /you are a judge for a goal loop/);
-    assert.match(body.messages.at(-1).content, /do not invent criteria/);
-    sse(res, { role: 'assistant', content: 'already done\nACK' });
+    const prompt = body.messages.at(-1).content;
+    if (calls === 1) {
+      assert.match(prompt, /you are the planner for a goal loop/);
+      assert.match(prompt, /EXIT_CRITERIA/);
+      assert.match(prompt, /VERIFIER_SHAPE_CONTRACT/);
+      sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- done\nVERIFIER_SHAPE_CONTRACT\n- artifact checked\nVERIFICATION_PLAN\n- inspect\nCURRENT_STATE\n- clean' });
+    } else {
+      assert.match(prompt, /you are a judge for a goal loop/);
+      assert.match(prompt, /do not invent criteria/);
+      sse(res, { role: 'assistant', content: 'already done\nACK' });
+    }
   };
 
   const result = await runMi(['-g', 'bench goal', '-c', 'judge it']);
   assert.strictEqual(result.status, 0);
-  assert.strictEqual(calls, 1);
+  assert.strictEqual(calls, 2);
   assert.match(result.stdout, /already done/);
 });
 
@@ -327,17 +335,30 @@ test('goal workers do work instead of receiving judge criteria', async () => {
     const prompt = body.messages.at(-1).content;
     prompts.push(prompt);
     if (prompts.length === 1) {
+      assert.match(prompt, /you are the planner for a goal loop/);
+      assert.match(prompt, /goal: create files/);
+      assert.match(prompt, /user criteria: inspect state/);
+      assert.match(prompt, /VERIFIER_SHAPE_CONTRACT/);
+      assert.match(prompt, /do not invent requirements/);
+      sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- files exist\nVERIFIER_SHAPE_CONTRACT\n- exact files exist\nVERIFICATION_PLAN\n- inspect files\nCURRENT_STATE\n- missing files' });
+    } else if (prompts.length === 2) {
       assert.match(prompt, /you are a judge for a goal loop/);
       assert.match(prompt, /criteria: inspect state/);
+      assert.match(prompt, /refined plan:/);
+      assert.match(prompt, /event log:/);
+      assert.match(prompt, /NEVER trust worker-reported values/);
+      assert.match(prompt, /EXACT MEASURED VALUE/);
       assert.match(prompt, /do not invent criteria/);
       sse(res, { role: 'assistant', content: 'missing files\nNACK' });
-    } else if (prompts.length === 2) {
+    } else if (prompts.length === 3) {
       assert.match(prompt, /you are worker iteration 1\/128/);
       assert.match(prompt, /complete the whole goal now/);
+      assert.match(prompt, /progress file:/);
+      assert.match(prompt, /verifier-shape contract/);
       assert.match(prompt, /previous judge feedback:\n[\s\S]*missing files/);
+      assert.match(prompt, /iteration guidance/);
       assert.match(prompt, /one noninteractive bash script/);
       assert.match(prompt, /do not act as the judge/);
-      assert.doesNotMatch(prompt, /progress file:/);
       assert.doesNotMatch(prompt, /criteria: inspect state/);
       assert.doesNotMatch(prompt, /judge criteria/);
       sse(res, { role: 'assistant', content: 'created the files' });
@@ -350,8 +371,37 @@ test('goal workers do work instead of receiving judge criteria', async () => {
 
   const result = await runMi(['-g', 'create files', '-c', 'inspect state; end with ACK or NACK']);
   assert.strictEqual(result.status, 0);
-  assert.strictEqual(prompts.length, 3);
+  assert.strictEqual(prompts.length, 4);
   assert.match(result.stdout, /all files exist/);
+});
+
+test('goal mode passes deadline from -d flag and MI_DEADLINE env', async () => {
+  let calls = 0;
+  requestHandler = (req, res, body) => {
+    calls++;
+    const prompt = body.messages.at(-1).content;
+    if (calls === 1) {
+      assert.match(prompt, /you are the planner for a goal loop/);
+      sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- done\nVERIFIER_SHAPE_CONTRACT\n- checked\nVERIFICATION_PLAN\n- inspect\nCURRENT_STATE\n- clean' });
+    } else {
+      // Judge should see budget info when deadline is set
+      assert.match(prompt, /you are a judge for a goal loop/);
+      assert.match(prompt, /budget:.*remaining of.*total/);
+      sse(res, { role: 'assistant', content: 'done\nACK' });
+    }
+  };
+
+  // Test with -d flag
+  const dl = Math.floor(Date.now() / 1000) + 300;
+  const result = await runMi(['-g', 'deadline test', '-c', 'check it', '-d', String(dl)]);
+  assert.strictEqual(result.status, 0);
+  assert.strictEqual(calls, 2);
+
+  // Test with MI_DEADLINE env var
+  calls = 0;
+  const result2 = await runMi(['-g', 'deadline test', '-c', 'check it'], { MI_DEADLINE: String(dl) });
+  assert.strictEqual(result2.status, 0);
+  assert.strictEqual(calls, 2);
 });
 
 test('environment variables', async () => {
@@ -857,6 +907,47 @@ test('bash tool bg', async () => {
   const result = await runMi(['-p', 'executeAgent bg']);
   assert.strictEqual(result.status, 0);
   assert.match(result.stdout, /bg works/);
+});
+
+test('bash tool bg records managed jobs for current mi process', async () => {
+  let callCount = 0;
+  let jobsPath = null;
+  requestHandler = (req, res, body) => {
+    callCount++;
+    if (callCount === 1) {
+      sse(res, {
+        role: 'assistant',
+        tool_calls: [{
+          id: 'call_bg_job',
+          type: 'function',
+          function: { name: 'bash', arguments: JSON.stringify({ command: 'sleep 1', bg: 'true' }) }
+        }]
+      });
+    } else if (callCount === 2) {
+      const lastMsg = body.messages[body.messages.length - 1];
+      assert.match(lastMsg.content, /job:\d+-\d+/);
+      assert.match(lastMsg.content, /jobs:\/tmp\/mi-jobs-/);
+      jobsPath = lastMsg.content.match(/jobs:(\/tmp\/mi-jobs-[^\s]+)/)?.[1];
+      sse(res, {
+        role: 'assistant',
+        tool_calls: [{
+          id: 'call_jobs',
+          type: 'function',
+          function: { name: 'bash', arguments: JSON.stringify({ jobs: 'true' }) }
+        }]
+      });
+    } else {
+      const lastMsg = body.messages[body.messages.length - 1];
+      assert.match(lastMsg.content, /job:\d+-\d+/);
+      assert.match(lastMsg.content, /alive:(true|false)/);
+      assert.ok(jobsPath && lastMsg.content.includes(jobsPath));
+      sse(res, { role: 'assistant', content: 'jobs work' });
+    }
+  };
+
+  const result = await runMi(['-p', 'executeAgent bg jobs']);
+  assert.strictEqual(result.status, 0);
+  assert.match(result.stdout, /jobs work/);
 });
 
 test('-h help flag', async () => {
