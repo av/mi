@@ -21,7 +21,13 @@ from mi_harbor.package import local_package_archive
 TERMINAL_BENCH_CHECK = (
     "Inspect the actual task state under /app, including nested workdirs. "
     "Run available tests or direct checks that would fail if the task is incomplete. "
-    "End with ACK only when the requested task is fully complete; otherwise end with NACK."
+    "Check exact output file paths mentioned in the goal — verify they exist and are non-empty. "
+    "For parseable artifacts (code, JSON, config), verify they parse/compile/import without error. "
+    "For numeric thresholds, measure the actual value and compare to the required value — do not accept qualitative assessments. "
+    "Run any visible test suite (pytest, npm test, make test, etc.) if present. "
+    "Verify input files are unchanged unless the goal explicitly requires modifying them. "
+    "Attempt at least one adversarial edge case check relevant to the task. "
+    "End with ACK only when ALL checks pass with measured values; otherwise end with NACK."
 )
 
 
@@ -104,6 +110,13 @@ timestamp_output() {
 
 log_diag "Starting mi agent..."
 echo "start=$(date +%s.%N)" > "$TIMING_LOG"
+
+# Compute deadline for budget-aware goal loop (60s buffer for verifier)
+if [[ -n "$MI_TASK_TIMEOUT" ]]; then
+    DEADLINE=$(echo "$START_TIME + $MI_TASK_TIMEOUT - 60" | bc | cut -d. -f1)
+    export MI_DEADLINE="$DEADLINE"
+    log_diag "Budget: ${MI_TASK_TIMEOUT}s task timeout, deadline=$DEADLINE (60s verifier buffer)"
+fi
 
 if [[ -f /opt/mi/index.mjs ]]; then
     MI_RUNNER=(node /opt/mi/index.mjs)
@@ -311,6 +324,11 @@ class MiAgent(BaseInstalledAgent):
         system_prompt = self._get_env("MI_SYSTEM_PROMPT")
         if system_prompt:
             env["SYSTEM_PROMPT"] = system_prompt
+
+        # Pass task timeout for budget-aware goal loop
+        task_timeout = self._get_env("MI_TASK_TIMEOUT")
+        if task_timeout:
+            env["MI_TASK_TIMEOUT"] = task_timeout
 
         if not env.get("OPENAI_API_KEY"):
             raise RuntimeError(
