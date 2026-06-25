@@ -10,7 +10,7 @@ Source run: `bench/terminal-bench-2.1/deepseek_deepseek-v4-flash/full-rerun-n16-
 
 ## Changes
 
-9 commits from `9d1b373` to `70085d7`. Tests: 73 → 79. Lines: 29 (unchanged).
+14 commits from `9d1b373` to `14e34a2`. Tests: 73 → 79. Facts: 72 pass. Lines: 29 (unchanged).
 
 | Commit | Change |
 |---|---|
@@ -23,6 +23,11 @@ Source run: `bench/terminal-bench-2.1/deepseek_deepseek-v4-flash/full-rerun-n16-
 | `10fc21d` | Edge case fixes: salvage on iteration 1, strategy cap at 5, totalS clamp |
 | `56fa123` | 6 new tests: strategy diversity, checkpoints, salvage triggers, budget phases, escalation |
 | `70085d7` | Fix 3 stale fact assertions after prompt refinement |
+| `2cc5003` | Initial results doc |
+| `ca6ffbb` | Planner: explicit 3-step inspection checklist (dir listing, project scan, output file check) |
+| `29d5e3b` | Worker/salvage: bash discipline (timeouts, output piping, no interactive, bg for services) |
+| `d9ae79f` | Fix uninitialized `last` crash when salvage fires on iteration 1 |
+| `14e34a2` | 3 new facts for strategy cap, planner checklist, worker bash discipline |
 
 ## Architecture: budget-aware goal loop
 
@@ -65,7 +70,22 @@ The two remaining failures correctly NACKed — they ran out of time but did not
 
 ### 10-task broader eval (1.0x timeout = 900s)
 
-Pending. Tasks: `build-cython-ext`, `cancel-async-tasks`, `adaptive-rejection-sampler`, `financial-document-processor`, `bn-fit-modify`, `filter-js-from-html`, `raman-fitting`, `extract-elf`, `gcode-to-text`, `torch-tensor-parallelism`.
+In progress. Partial results:
+
+| Task | Previous | Now | Notes |
+|---|---|---|---|
+| `extract-elf` | false ACK (0) | **pass (1)** | Was worst false ACK (claimed 700/700, verifier 0%) |
+| `filter-js-from-html` | false ACK (0) | correct NACK (0) | Adversarial XSS bypasses — model capability limit |
+| `adaptive-rejection-sampler` | false ACK (0) | pending | |
+| `bn-fit-modify` | false ACK (0) | pending | |
+| `build-cython-ext` | false ACK (0) | pending | |
+| `cancel-async-tasks` | false ACK (0) | pending | |
+| `financial-document-processor` | false ACK (0) | pending | |
+| `gcode-to-text` | false ACK (0) | pending | |
+| `raman-fitting` | false ACK (0) | pending | |
+| `torch-tensor-parallelism` | false ACK (0) | pending | |
+
+Running at N_CONCURRENT=5, jobs dir: `jobs/mi-false-ack-reeval-10task-20260625-212653`.
 
 ## Failure pattern comparison
 
@@ -84,6 +104,10 @@ Pending. Tasks: `build-cython-ext`, `cancel-async-tasks`, `adaptive-rejection-sa
 3. **Strategy diversity** — failed approach fingerprints prevent repeating the same strategy. After 2 similar failures, prompt escalates to "abandon this solution family entirely."
 
 4. **Structured checkpoints** — workers return structured summaries (strategy, files, successes, failures, blockers). Next iteration gets the checkpoint, not raw judge output — reduces re-exploration.
+
+5. **Planner inspection checklist** — planner runs explicit 3-step scan (directory listing, project structure/test/package manager scan, output file existence check) before reasoning, reducing exploration waste.
+
+6. **Worker bash discipline** — worker prompt requires timeouts on commands >60s, output piping through tail/head for verbose commands, never interactive processes, bg mode for services.
 
 ## Next steps
 
