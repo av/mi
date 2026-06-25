@@ -58,7 +58,7 @@ export default {
     emit('precheck', { status: pre.ok ? 'ACK' : 'NACK', duration_ms: pre.duration, budget_remaining_s: budget(), excerpt: tail(pre.out) });
     if (pre.ok) return `goal already met.\nprogress log: ${log}\nevent log: ${events}\n${pre.out}`;
     appendFileSync(log, `\n# Pre-check\nstatus: NACK\nduration_ms: ${pre.duration}\n\n${tail(pre.out)}\n`);
-    let last, feedback = tail(pre.out);
+    let last = pre, feedback = tail(pre.out);
     checkpoint = `blockers: ${tail(pre.out, 500)}`;
     for (let i = 1; i <= limit; i++) {
       const phase = budgetPhase();
