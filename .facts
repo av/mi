@@ -75,6 +75,8 @@
   command: grep -q 'first, run these inspection commands' tools/goal.mjs && grep -q 'ls -la' tools/goal.mjs && grep -q 'check for any output files' tools/goal.mjs
 - label: goal worker prompt includes bash discipline guidance (timeouts, output piping, no interactive processes)
   command: grep -q 'bash discipline' tools/goal.mjs && grep -q 'timeout on any command' tools/goal.mjs && grep -q 'pipe verbose output' tools/goal.mjs && grep -q 'never start interactive' tools/goal.mjs
+- label: goal worker gets budget-derived timeout (remaining - 120s) when deadline is set
+  command: grep -q 'iterTimeout.*deadline.*budget.*120' tools/goal.mjs
 - skill tool without name lists all available skills; with name returns SKILL.md body
 - label: skill frontmatter parsed via regex (^name: and ^description: with multiline flag)
   command: grep -q '/m' tools/skill.mjs
