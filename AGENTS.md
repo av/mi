@@ -8,6 +8,8 @@ No build step, no transpilation, no lint config.
 Tool modules hot-load from `tools/*.mjs` before each model call and must default-export `{ name, description, parameters, handler }`.
 Bundled skills and user skills are loaded through the `skill` tool from `skills/` and `~/.agents/skills/`.
 
+The `goal` tool (`tools/goal.mjs`) uses a planner/worker/judge loop. It supports budget-aware iteration via `deadline` (unix timestamp): phases shift from EXPLORE → COMMIT → URGENT → SALVAGE as time runs out, with a forced artifact-write salvage pass before timeout. The judge uses a strict adversarial verification protocol (5% margin on thresholds, measured values, edge-case probing). Workers receive structured checkpoints and strategy diversity enforcement to avoid repeating failed approaches.
+
 `scripts/count-lines.mjs` is a dev utility — not part of the published package (`files` in `package.json` is `index.mjs`, `tools/`, and `skills/`).
 `tests/`, `assets/`, docs, CI config, `scripts/`, and `mi_harbor/` are also excluded from the npm package by `.npmignore` / `package.json` publishing rules.
 
@@ -42,6 +44,7 @@ The test suite is real and should be kept green. It covers CLI modes, streaming 
 
 `mi_harbor/` contains a Python adapter and helper scripts for running `mi` against Harbor-supported benchmarks such as Terminal-Bench 2.0.
 It is development/evaluation infrastructure, not part of the published npm CLI.
+The adapter automatically computes `MI_DEADLINE` from `MI_TASK_TIMEOUT` (with 60s verifier buffer) to enable budget-aware goal iteration.
 See `mi_harbor/README.md` for setup and commands.
 
 ## Harbor eval launch commands
@@ -125,6 +128,8 @@ Requires Node 24.x in CI. `index.mjs`, `tools/`, and `skills/` are the published
 | `SYSTEM_PROMPT` | built-in prompt (fully overrides) |
 | `MI_API_PARAMS` | unset (JSON object merged into chat completion payload) |
 | `MI_HOME` | `~/.mi` (config directory; reads `config.json`) |
+| `MI_DEADLINE` | unset (unix timestamp; enables budget-aware goal loop with salvage policy) |
+| `MI_TASK_TIMEOUT` | unset (seconds; Harbor adapter computes `MI_DEADLINE` from this with 60s verifier buffer) |
 
 ## AGENTS.md auto-ingestion
 
