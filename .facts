@@ -58,13 +58,13 @@
 - label: goal loop writes markdown and JSONL progress logs with iteration events
   command: grep -q "events = log.replace" tools/goal.mjs && grep -q "emit('start'" tools/goal.mjs && grep -q "emit('iteration'" tools/goal.mjs && grep -q 'event log:' tools/goal.mjs
 - label: goal judges must not invent criteria beyond the goal and check
-  command: grep -q 'do not invent criteria' tools/goal.mjs && grep -q 'treat worker output as claims' tools/goal.mjs && grep -q 'if verification is incomplete' tools/goal.mjs
+  command: grep -q 'do not invent criteria' tools/goal.mjs && grep -q 'NEVER trust worker-reported values' tools/goal.mjs && grep -q 'verification was skipped' tools/goal.mjs
 - label: goal judges must measure thresholds and exact artifact contracts before ACK
-  command: grep -q 'every success threshold must be measured' tools/goal.mjs && grep -q 'observed value and expected value' tools/goal.mjs && grep -q 'exact path, non-empty content' tools/goal.mjs && grep -q 'service/background job' tools/goal.mjs
+  command: grep -q 'measured_value > required_threshold' tools/goal.mjs && grep -q 'EXACT MEASURED VALUE vs EXACT EXPECTED VALUE' tools/goal.mjs && grep -q 'exact path exists' tools/goal.mjs && grep -q 'liveness alone' tools/goal.mjs
 - label: goal tool supports deadline parameter for budget-aware iteration with 4-phase guidance and salvage policy
   command: grep -q 'deadline.*unix timestamp' tools/goal.mjs && grep -q 'budgetPhase' tools/goal.mjs && grep -q 'SALVAGE' tools/goal.mjs && grep -q 'FINAL SALVAGE' tools/goal.mjs
 - label: goal judge uses strict 8-point verification protocol with 5% margin and adversarial edge-case checks
-  command: grep -q 'STRICT VERIFICATION PROTOCOL' tools/goal.mjs && grep -q 'required_threshold \* 1.05' tools/goal.mjs && grep -q 'adversarial check' tools/goal.mjs && grep -q 'MARGINAL PASS' tools/goal.mjs
+  command: grep -q 'STRICT VERIFICATION PROTOCOL' tools/goal.mjs && grep -q 'required_threshold \* 1.05' tools/goal.mjs && grep -q 'adversarial check' tools/goal.mjs && grep -q 'WARNING: MARGINAL' tools/goal.mjs
 - label: goal worker receives strategy diversity enforcement with failed strategy fingerprints
   command: grep -q 'strategies.push' tools/goal.mjs && grep -q 'previous failed strategies' tools/goal.mjs && grep -q 'fundamentally different approach' tools/goal.mjs && grep -q 'abandon this entire solution family' tools/goal.mjs
 - label: goal worker receives structured checkpoints for iteration handoff instead of raw judge output
