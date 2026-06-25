@@ -69,6 +69,12 @@
   command: grep -q 'strategies.push' tools/goal.mjs && grep -q 'previous failed strategies' tools/goal.mjs && grep -q 'fundamentally different approach' tools/goal.mjs && grep -q 'abandon this entire solution family' tools/goal.mjs
 - label: goal worker receives structured checkpoints for iteration handoff instead of raw judge output
   command: grep -q 'STRATEGY:' tools/goal.mjs && grep -q 'FILES_MODIFIED' tools/goal.mjs && grep -q 'COMMANDS_SUCCEEDED' tools/goal.mjs && grep -q 'BLOCKERS' tools/goal.mjs && grep -q 'checkpoint' tools/goal.mjs
+- label: goal strategy history is capped at last 5 entries to prevent prompt bloat
+  command: grep -q 'slice(-5)' tools/goal.mjs
+- label: goal planner runs explicit inspection checklist before reasoning (directory listing, project structure, output file check)
+  command: grep -q 'first, run these inspection commands' tools/goal.mjs && grep -q 'ls -la' tools/goal.mjs && grep -q 'check for any output files' tools/goal.mjs
+- label: goal worker prompt includes bash discipline guidance (timeouts, output piping, no interactive processes)
+  command: grep -q 'bash discipline' tools/goal.mjs && grep -q 'timeout on any command' tools/goal.mjs && grep -q 'pipe verbose output' tools/goal.mjs && grep -q 'never start interactive' tools/goal.mjs
 - skill tool without name lists all available skills; with name returns SKILL.md body
 - label: skill frontmatter parsed via regex (^name: and ^description: with multiline flag)
   command: grep -q '/m' tools/skill.mjs
