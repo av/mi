@@ -30,7 +30,7 @@ export default {
       now = () => new Date().toISOString(),
       bullets = s => tail(s, 1200).replace(/\r/g, '').split('\n').map(x => x.trim()).filter(Boolean).slice(-8).map(x => `- ${x}`).join('\n') || '- no notable output captured',
       emit = (type, data = {}) => appendFileSync(events, `${JSON.stringify({ t: now(), type, ...data })}\n`);
-    const totalS = deadline ? Math.floor(deadline - Date.now() / 1000) : null;
+    const totalS = deadline ? Math.max(1, Math.floor(deadline - Date.now() / 1000)) : null;
     const budget = () => deadline ? Math.max(0, Math.floor(deadline - Date.now() / 1000)) : null;
     const budgetPhase = () => { const r = budget(), frac = r / totalS; return r === null ? '' : r < 60 ? 'SALVAGE' : frac < 0.2 ? 'URGENT' : frac < 0.5 ? 'COMMIT' : 'EXPLORE'; };
     const budgetGuidance = () => { const phase = budgetPhase(), r = budget(); if (!phase) return ''; const lines = [`\nbudget: ${r}s remaining of ${totalS}s total (phase: ${phase}).`]; if (phase === 'EXPLORE') lines.push('explore freely, try your best approach.'); else if (phase === 'COMMIT') lines.push('commit to the most promising path. stop exploring alternatives.'); else if (phase === 'URGENT') lines.push('write your best-effort artifact NOW. do not start new exploration.'); else lines.push('FINAL SALVAGE: write the best artifact you can from current state immediately. do not debug, do not explore, just produce the deliverable.'); return lines.join(' '); };
@@ -62,7 +62,7 @@ export default {
     checkpoint = `blockers: ${tail(pre.out, 500)}`;
     for (let i = 1; i <= limit; i++) {
       const phase = budgetPhase();
-      if (phase === 'SALVAGE' && i > 1) {
+      if (phase === 'SALVAGE') {
         console.log(gray(`── salvage (${budget()}s left) ──`));
         const salvage = await delegate.handler({ timeout, prompt: `FINAL SALVAGE — budget is nearly exhausted. do not debug, do not explore, do not run tests. your only job is to write output artifacts.\n\ngoal: ${goal}\nprogress file: ${log}\nrefined exit criteria and verifier-shape contract:\n${tail(plan, 5000)}\n\nlatest checkpoint:\n${checkpoint}\n\nfor every required output file in the verifier-shape contract: if it does not exist, create it with the best content you can produce from the current state. if it exists but is incomplete, complete it. prefer a working but imperfect solution over a perfect but missing one. if a service must be running, start it. write ALL required artifacts before doing anything else. end with a summary of files written.` });
         last = await judge(budgetGuidance());
@@ -72,7 +72,8 @@ export default {
         break;
       }
       console.log(gray(`── goal ${i}/${limit}${budget() !== null ? ` (${budget()}s left, ${phase})` : ''} ──`));
-      const strategyWarning = strategies.length ? `\nprevious failed strategies (do NOT repeat these):\n${strategies.map((s, j) => `${j + 1}. ${s}`).join('\n')}\nyou MUST try a fundamentally different approach. ${strategies.length >= 2 ? 'abandon this entire solution family — use a completely different method.' : ''}` : '';
+      const recentStrats = strategies.slice(-5);
+      const strategyWarning = recentStrats.length ? `\nprevious failed strategies (do NOT repeat these):\n${recentStrats.map((s, j) => `${j + 1}. ${s}`).join('\n')}\nyou MUST try a fundamentally different approach. ${recentStrats.length >= 2 ? 'abandon this entire solution family — use a completely different method.' : ''}` : '';
       const started = Date.now();
       const work = await delegate.handler({
         timeout,
