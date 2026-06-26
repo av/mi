@@ -58,6 +58,12 @@ class MiCachedDockerEnvironment(DockerEnvironment):
             if self._image_exists(image):
                 return image
 
+            if not self._image_exists(base_image):
+                self._pull_image(base_image)
+                if not self._image_exists(base_image):
+                    self.logger.warning("failed to pull base image %s", base_image)
+                    return None
+
             user = self._image_user(base_image)
             with tempfile.TemporaryDirectory(prefix="mi-eval-image-") as tmp:
                 ctx = Path(tmp)
@@ -96,6 +102,14 @@ class MiCachedDockerEnvironment(DockerEnvironment):
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         ).returncode == 0
+
+    @staticmethod
+    def _pull_image(image: str) -> None:
+        subprocess.run(
+            ["docker", "pull", image],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
 
     @staticmethod
     def _image_user(image: str) -> str:

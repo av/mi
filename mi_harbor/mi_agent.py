@@ -124,16 +124,27 @@ else
     MI_RUNNER=(npx @avcodes/mi)
 fi
 
-WORKDIR="/app"
-if [[ ! -d "$WORKDIR/.git" ]]; then
-    GIT_DIRS=$(find "$WORKDIR" -mindepth 2 -maxdepth 2 -type d -name .git -printf '%h\n' 2>/dev/null | head -2)
-    GIT_COUNT=$(printf '%s\n' "$GIT_DIRS" | grep -c . || true)
-    if [[ "$GIT_COUNT" -eq 1 ]]; then
-        WORKDIR="$GIT_DIRS"
-    fi
-fi
+detect_workdir() {
+    for candidate in /app /home /workspace /work /root /src; do
+        if [[ -d "$candidate" ]]; then
+            if [[ -d "$candidate/.git" ]]; then
+                echo "$candidate"; return
+            fi
+            GIT_DIRS=$(find "$candidate" -mindepth 1 -maxdepth 2 -type d -name .git -printf '%h\n' 2>/dev/null | head -2)
+            GIT_COUNT=$(printf '%s\n' "$GIT_DIRS" | grep -c . 2>/dev/null || echo 0)
+            if [[ "$GIT_COUNT" -eq 1 ]]; then
+                echo "$GIT_DIRS"; return
+            fi
+            if [[ "$GIT_COUNT" -eq 0 && -d "$candidate" ]]; then
+                echo "$candidate"; return
+            fi
+        fi
+    done
+    echo "/"
+}
+WORKDIR=$(detect_workdir)
 log_diag "Workdir: $WORKDIR"
-cd "$WORKDIR" || exit 1
+cd "$WORKDIR" || cd / || exit 1
 
 # Run mi goal loop with timestamped output, separate stderr
 "${MI_RUNNER[@]}" -g "$1" -c "$MI_GOAL_CHECK" \
@@ -341,13 +352,13 @@ class MiAgent(BaseInstalledAgent):
             environment,
             command=f"cat > {wrapper_path} << 'WRAPPER_EOF'\n{DIAGNOSTIC_WRAPPER}\nWRAPPER_EOF\nchmod +x {wrapper_path}",
             env=env,
-            cwd="/app",
+            cwd="/",
         )
 
-        # Run mi via diagnostic wrapper
+        # Run mi via diagnostic wrapper (wrapper detects workdir internally)
         await self.exec_as_agent(
             environment,
             command=f"bash {wrapper_path} {escaped_instruction}",
             env=env,
-            cwd="/app",
+            cwd="/",
         )
