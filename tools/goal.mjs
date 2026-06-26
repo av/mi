@@ -34,7 +34,9 @@ export default {
     const budget = () => deadline ? Math.max(0, Math.floor(deadline - Date.now() / 1000)) : null;
     const budgetPhase = () => { const r = budget(), frac = r / totalS; return r === null ? '' : r < 60 ? 'SALVAGE' : frac < 0.2 ? 'URGENT' : frac < 0.5 ? 'COMMIT' : 'EXPLORE'; };
     const budgetGuidance = () => { const phase = budgetPhase(), r = budget(); if (!phase) return ''; const lines = [`\nbudget: ${r}s remaining of ${totalS}s total (phase: ${phase}).`]; if (phase === 'EXPLORE') lines.push('explore freely, try your best approach.'); else if (phase === 'COMMIT') lines.push('commit to the most promising path. stop exploring alternatives. refine and fix existing implementation only — do not start a new approach or rewrite from scratch.'); else if (phase === 'URGENT') lines.push('write your best-effort artifact NOW. do not start new exploration.'); else lines.push('FINAL SALVAGE: write the best artifact you can from current state immediately. do not debug, do not explore, just produce the deliverable.'); return lines.join(' '); };
-    const strategies = [];
+    const strategies = [], blockerSigs = [];
+    const blockerSig = s => (s.match(/NACK[:\s.]*(.*)/i)?.[1] || s.split('\n').filter(l => /fail|block|error|missing/i.test(l))[0] || '').trim().slice(0, 120).toLowerCase();
+    const blockerWarning = () => { if (blockerSigs.length < 3) return ''; const last3 = blockerSigs.slice(-3); if (last3[0] === last3[1] && last3[1] === last3[2] && last3[0]) return `\nBLOCKED: the last 3 iterations failed on the same issue: "${last3[0]}". you MUST try a fundamentally different approach — the current strategy is not working. consider: different algorithm, different library, different language, or completely different architecture.`; return ''; };
     let checkpoint = '', fatal = false;
     const isFatal = s => /requires more credits|insufficient.{0,20}(credits|balance|funds)|payment required|HTTP 402/i.test(s?.slice?.(-2000) || '');
     writeFileSync(log, `# Goal\n${goal}\n\n# User Criteria\n${check}\n${deadline ? `\n# Budget\n- total: ${totalS}s\n- deadline: ${new Date(deadline * 1000).toISOString()}\n` : ''}\n# Logs\n- markdown: ${log}\n- events: ${events}\n\n# Log\n`);
@@ -76,7 +78,7 @@ export default {
       }
       console.log(gray(`── goal ${i}/${limit}${budget() !== null ? ` (${budget()}s left, ${phase})` : ''} ──`));
       const recentStrats = strategies.slice(-5);
-      const strategyWarning = recentStrats.length ? `\nprevious failed strategies (do NOT repeat these):\n${recentStrats.map((s, j) => `${j + 1}. ${s}`).join('\n')}\nyou MUST try a fundamentally different approach. ${recentStrats.length >= 2 ? 'abandon this entire solution family — use a completely different method.' : ''}` : '';
+      const strategyWarning = recentStrats.length ? `\nprevious failed strategies (do NOT repeat these):\n${recentStrats.map((s, j) => `${j + 1}. ${s}`).join('\n')}\nyou MUST try a fundamentally different approach. ${recentStrats.length >= 2 ? 'abandon this entire solution family — use a completely different method.' : ''}${blockerWarning()}` : '';
       const started = Date.now();
       const iterTimeout = deadline ? Math.min(timeout ?? Infinity, Math.max(30000, (budget() - 120) * 1000)) : timeout;
       const work = await delegate.handler({
@@ -96,7 +98,7 @@ export default {
         if (m) cpLines.push(`${key}: ${m[1].trim().slice(0, 300)}`);
       }
       checkpoint = cpLines.length >= 2 ? cpLines.join('\n') : `strategy: ${stratLine}\njudge feedback: ${tail(feedback, 800)}`;
-      if (!last.ok) strategies.push(stratLine);
+      if (!last.ok) { strategies.push(stratLine); blockerSigs.push(blockerSig(feedback)); }
       emit('iteration', { iteration: i, status: last.ok ? 'ACK' : 'NACK', strategy: stratLine, worker_duration_ms: workMs, judge_duration_ms: last.duration, budget_remaining_s: budget(), worker_excerpt: tail(work), judge_excerpt: feedback });
       appendFileSync(log, `\n# Iteration ${i} Summary\nstatus: ${last.ok ? "ACK" : "NACK"}\nstrategy: ${stratLine}\nworker_duration_ms: ${workMs}\njudge_duration_ms: ${last.duration}\n${budget() !== null ? `budget_remaining_s: ${budget()}\n` : ''}\ncheckpoint:\n${checkpoint}\n\nworker summary:\n${bullets(work)}\n\njudge summary:\n${bullets(last.out)}\n\nworker tail:\n${tail(work)}\n\njudge tail:\n${feedback}\n`);
       console.log(gray(`── ${last.ok ? "✓" : "✗"} ──`));
