@@ -35,7 +35,8 @@ export default {
     const budgetPhase = () => { const r = budget(), frac = r / totalS; return r === null ? '' : r < 60 ? 'SALVAGE' : frac < 0.2 ? 'URGENT' : frac < 0.5 ? 'COMMIT' : 'EXPLORE'; };
     const budgetGuidance = () => { const phase = budgetPhase(), r = budget(); if (!phase) return ''; const lines = [`\nbudget: ${r}s remaining of ${totalS}s total (phase: ${phase}).`]; if (phase === 'EXPLORE') lines.push('explore freely, try your best approach.'); else if (phase === 'COMMIT') lines.push('commit to the most promising path. stop exploring alternatives.'); else if (phase === 'URGENT') lines.push('write your best-effort artifact NOW. do not start new exploration.'); else lines.push('FINAL SALVAGE: write the best artifact you can from current state immediately. do not debug, do not explore, just produce the deliverable.'); return lines.join(' '); };
     const strategies = [];
-    let checkpoint = '';
+    let checkpoint = '', fatal = false;
+    const isFatal = s => /requires more credits|insufficient.{0,20}(credits|balance|funds)|payment required|HTTP 402/i.test(s?.slice?.(-2000) || '');
     writeFileSync(log, `# Goal\n${goal}\n\n# User Criteria\n${check}\n${deadline ? `\n# Budget\n- total: ${totalS}s\n- deadline: ${new Date(deadline * 1000).toISOString()}\n` : ''}\n# Logs\n- markdown: ${log}\n- events: ${events}\n\n# Log\n`);
     writeFileSync(events, '');
     emit('start', { goal, check, max: limit, timeout: timeout ?? null, deadline: deadline ?? null, totalBudgetS: totalS, log });
@@ -45,6 +46,7 @@ export default {
     });
     emit('plan', { duration_ms: Date.now() - t0, excerpt: tail(plan) });
     appendFileSync(log, `\n# Refined Exit Criteria And Verification Plan\nstarted: ${now()}\nduration_ms: ${Date.now() - t0}\n\n${tail(plan, 4000)}\n`);
+    if (isFatal(plan)) { emit('fatal', { phase: 'plan' }); return `goal aborted: API credit exhaustion.\nprogress log: ${log}\nevent log: ${events}`; }
     const judge = async (budgetInfo) => {
       const started = Date.now();
       const bCtx = budgetInfo ?? '';
@@ -57,6 +59,7 @@ export default {
     let pre = await judge(budgetGuidance());
     emit('precheck', { status: pre.ok ? 'ACK' : 'NACK', duration_ms: pre.duration, budget_remaining_s: budget(), excerpt: tail(pre.out) });
     if (pre.ok) return `goal already met.\nprogress log: ${log}\nevent log: ${events}\n${pre.out}`;
+    if (isFatal(pre.out)) { emit('fatal', { phase: 'precheck' }); return `goal aborted: API credit exhaustion.\nprogress log: ${log}\nevent log: ${events}`; }
     appendFileSync(log, `\n# Pre-check\nstatus: NACK\nduration_ms: ${pre.duration}\n\n${tail(pre.out)}\n`);
     let last = pre, feedback = tail(pre.out);
     checkpoint = `blockers: ${tail(pre.out, 500)}`;
@@ -80,6 +83,7 @@ export default {
         timeout: iterTimeout,
         prompt: `you are worker iteration ${i}/${limit} of a goal loop. complete the whole goal now in the real working directory.\n\ngoal: ${goal}\nprogress file: ${log}\n${budgetGuidance()}\niteration guidance: bias toward producing artifacts early — write output files first, then refine. a complete but imperfect artifact beats a perfect plan with no artifact. write partial results to disk before starting long computations so they survive timeout. avoid repeating the same failed approach. after two failed iterations, prefer the simplest complete artifact that satisfies the verifier-shape contract over more exploration.${strategyWarning}\n\nrefined exit criteria, verifier-shape contract, and verification plan:\n${tail(plan, 5000)}\n\nprevious judge feedback and iteration checkpoint:\n${checkpoint}\n\nrules: do not act as the judge, do not answer ACK/NACK, and do not inspect-only. do all remaining steps, not just one sub-step. if files or commands are needed, prefer one noninteractive bash script that performs all remaining changes and checks.\nbash discipline: set timeout on any command that might exceed 60s (compilations, tests, downloads, training). pipe verbose output through tail -50 or head -50 to avoid context overflow. never start interactive processes — background long-running services with bg mode. end with a structured summary:\n1. STRATEGY: one-line description of the approach you took\n2. FILES_MODIFIED: list of files created or changed\n3. COMMANDS_SUCCEEDED: key commands that worked\n4. COMMANDS_FAILED: commands that failed and why\n5. BLOCKERS: what still blocks completion\n6. REMAINING: what high-impact work remains`,
       });
+      if (isFatal(work)) { fatal = true; emit('fatal', { iteration: i }); appendFileSync(log, `\n# Fatal: API credit exhaustion at iteration ${i}\n`); break; }
       const workMs = Date.now() - started;
       last = await judge(budgetGuidance());
       feedback = tail(last.out);
@@ -100,7 +104,10 @@ export default {
         emit('complete', { iterations: i, status: 'ACK' });
         return `goal achieved in ${i} iteration${i > 1 ? "s" : ""}.\nprogress log: ${log}\nevent log: ${events}\n${last.out}`;
       }
+      if (isFatal(last.out)) { fatal = true; emit('fatal', { iteration: i, phase: 'judge' }); appendFileSync(log, `\n# Fatal: API credit exhaustion (judge) at iteration ${i}\n`); break; }
+      if (strategies.length >= 10 && !deadline) { emit('stall', { iteration: i, consecutive_nacks: strategies.length }); appendFileSync(log, `\n# Stall: ${strategies.length} consecutive failures without deadline, aborting\n`); break; }
     }
+    if (fatal) { emit('complete', { iterations: 'aborted', status: 'FATAL' }); return `goal aborted: API credit exhaustion.\nprogress log: ${log}\nevent log: ${events}\nlast output:\n${tail(last?.out || '')}`; }
     emit('complete', { iterations: limit, status: 'NACK', budget_remaining_s: budget() });
     return `goal not achieved after ${limit} iterations.\nprogress log: ${log}\nevent log: ${events}\nlast judge:\n${last.out}`;
   },
