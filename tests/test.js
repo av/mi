@@ -337,28 +337,28 @@ test('goal workers do work instead of receiving judge criteria', async () => {
     if (prompts.length === 1) {
       assert.match(prompt, /you are the planner for a goal loop/);
       assert.match(prompt, /goal: create files/);
-      assert.match(prompt, /user criteria: inspect state/);
+      assert.match(prompt, /criteria: inspect state/);
       assert.match(prompt, /VERIFIER_SHAPE_CONTRACT/);
       assert.match(prompt, /do not invent requirements/);
       sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- files exist\nVERIFIER_SHAPE_CONTRACT\n- exact files exist\nVERIFICATION_PLAN\n- inspect files\nCURRENT_STATE\n- missing files' });
     } else if (prompts.length === 2) {
       assert.match(prompt, /you are a judge for a goal loop/);
       assert.match(prompt, /criteria: inspect state/);
-      assert.match(prompt, /refined plan:/);
+      assert.match(prompt, /plan and verifier contract:/);
       assert.match(prompt, /event log:/);
       assert.match(prompt, /NEVER trust worker-reported values/);
-      assert.match(prompt, /EXACT MEASURED VALUE/);
+      assert.match(prompt, /measured=X expected=Y/);
       assert.match(prompt, /do not invent criteria/);
       sse(res, { role: 'assistant', content: 'missing files\nNACK' });
     } else if (prompts.length === 3) {
-      assert.match(prompt, /you are worker iteration 1\/128/);
-      assert.match(prompt, /complete the whole goal now/);
+      assert.match(prompt, /you are worker 1\/128/);
+      assert.match(prompt, /complete the goal now/);
       assert.match(prompt, /progress file:/);
-      assert.match(prompt, /verifier-shape contract/);
-      assert.match(prompt, /previous judge feedback:\n[\s\S]*missing files/);
-      assert.match(prompt, /iteration guidance/);
+      assert.match(prompt, /verifier contract and plan:/);
+      assert.match(prompt, /judge feedback and checkpoint:\n[\s\S]*missing files/);
+      assert.match(prompt, /guidance:/);
       assert.match(prompt, /one noninteractive bash script/);
-      assert.match(prompt, /do not act as the judge/);
+      assert.match(prompt, /do not judge/);
       assert.doesNotMatch(prompt, /criteria: inspect state/);
       assert.doesNotMatch(prompt, /judge criteria/);
       sse(res, { role: 'assistant', content: 'created the files' });
@@ -417,18 +417,18 @@ test('goal NACK iteration includes strategy fingerprint and diversity warning in
       sse(res, { role: 'assistant', content: 'tests fail\nNACK' });
     } else if (prompts.length === 3) {
       // Worker 1 — no strategy warning yet (first iteration)
-      assert.match(prompt, /you are worker iteration 1/);
-      assert.doesNotMatch(prompt, /previous failed strategies/);
+      assert.match(prompt, /you are worker 1/);
+      assert.doesNotMatch(prompt, /failed strategies/);
       sse(res, { role: 'assistant', content: 'tried fixing imports\n\n1. STRATEGY: fixed import paths\n2. FILES_MODIFIED: src/index.js\n3. COMMANDS_SUCCEEDED: npm install\n4. COMMANDS_FAILED: npm test (3 failures)\n5. BLOCKERS: type errors\n6. REMAINING: fix types' });
     } else if (prompts.length === 4) {
       // Judge 1 → NACK
       sse(res, { role: 'assistant', content: '3 tests still fail\nNACK' });
     } else if (prompts.length === 5) {
       // Worker 2 — should have strategy warning with fingerprint from iteration 1
-      assert.match(prompt, /you are worker iteration 2/);
-      assert.match(prompt, /previous failed strategies/);
+      assert.match(prompt, /you are worker 2/);
+      assert.match(prompt, /failed strategies/);
       assert.match(prompt, /fixed import paths/);
-      assert.match(prompt, /fundamentally different approach/);
+      assert.match(prompt, /what is different/);
       sse(res, { role: 'assistant', content: 'rewrote module\n\n1. STRATEGY: complete rewrite\n2. FILES_MODIFIED: src/index.js\n3. COMMANDS_SUCCEEDED: npm test\n4. COMMANDS_FAILED: none\n5. BLOCKERS: none\n6. REMAINING: none' });
     } else {
       // Judge 2 → ACK
@@ -573,7 +573,7 @@ test('goal strategy escalation after 2+ failures', async () => {
       sse(res, { role: 'assistant', content: 'still broken\nNACK' });
     } else if (prompts.length === 7) {
       // Worker 3 — should have escalated language (2+ prior strategies)
-      assert.match(prompt, /abandon this entire solution family/);
+      assert.match(prompt, /abandon this solution family/);
       assert.match(prompt, /patched config/);
       assert.match(prompt, /rewrote config parser/);
       sse(res, { role: 'assistant', content: 'complete rewrite\nSTRATEGY: new architecture\nFILES_MODIFIED: all\nCOMMANDS_SUCCEEDED: test\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
