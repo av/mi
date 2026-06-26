@@ -87,6 +87,8 @@ export default {
       });
       if (isFatal(work)) { fatal = true; emit('fatal', { iteration: i }); appendFileSync(log, `\n# Fatal: API credit exhaustion at iteration ${i}\n`); break; }
       const workMs = Date.now() - started;
+      const isSpawnErr = /^\[spawn error:|^\[exit \d|^\[timeout after \d/.test(work.trim());
+      if (isSpawnErr) { feedback = work; checkpoint = `spawn/exit error: ${tail(work, 500)}`; strategies.push('spawn error'); blockerSigs.push(blockerSig(work)); last = { ok: false, out: work, duration: 0 }; emit('iteration', { iteration: i, status: 'NACK', strategy: 'spawn error', worker_duration_ms: workMs, judge_duration_ms: 0, budget_remaining_s: budget(), worker_excerpt: tail(work), judge_excerpt: work }); appendFileSync(log, `\n# Iteration ${i} — spawn error (judge skipped)\n${work}\n`); console.log(gray(`── ✗ spawn error ──`)); continue; }
       last = await judge(budgetGuidance());
       feedback = tail(last.out);
       // Extract structured checkpoint from worker output
