@@ -108,6 +108,7 @@ export default {
       }
       if (isFatal(last.out)) { fatal = true; emit('fatal', { iteration: i, phase: 'judge' }); appendFileSync(log, `\n# Fatal: API credit exhaustion (judge) at iteration ${i}\n`); break; }
       if (strategies.length >= 10 && !deadline) { emit('stall', { iteration: i, consecutive_nacks: strategies.length }); appendFileSync(log, `\n# Stall: ${strategies.length} consecutive failures without deadline, aborting\n`); break; }
+      const lastN = blockerSigs.slice(-5); if (deadline && lastN.length >= 5 && lastN[0] && lastN.every(s => s === lastN[0])) { emit('stall_salvage', { iteration: i, blocker: lastN[0] }); appendFileSync(log, `\n# Forced salvage: 5 consecutive identical blockers: "${lastN[0]}"\n`); deadline = Math.min(deadline, Date.now() / 1000 + 60); }
     }
     if (fatal) { emit('complete', { iterations: 'aborted', status: 'FATAL' }); return `goal aborted: API credit exhaustion.\nprogress log: ${log}\nevent log: ${events}\nlast output:\n${tail(last?.out || '')}`; }
     emit('complete', { iterations: limit, status: 'NACK', budget_remaining_s: budget() });

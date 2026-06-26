@@ -2401,3 +2401,25 @@ test('Harbor cached Docker environment derives task images', async () => {
   assert.match(env, /\["down", "--volumes", "--remove-orphans"\]/);
   assert.match(smoke, /--environment-import-path mi_harbor\.cached_docker_environment:MiCachedDockerEnvironment/);
 });
+
+test('goal 402 credit exhaustion aborts immediately with fatal event', async () => {
+  const prompts = [];
+  requestHandler = (req, res, body) => {
+    prompts.push(body.messages.at(-1).content);
+    if (prompts.length === 1) {
+      sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- done\nVERIFIER_SHAPE_CONTRACT\n- check\nVERIFICATION_PLAN\n- verify\nCURRENT_STATE\n- not started' });
+    } else if (prompts.length === 2) {
+      sse(res, { role: 'assistant', content: 'not done\nNACK' });
+    } else if (prompts.length === 3) {
+      sse(res, { role: 'assistant', content: 'Error: This request requires more credits, or fewer max_tokens. You requested up to 65536 tokens, but can only afford 3858.' });
+    } else {
+      sse(res, { role: 'assistant', content: 'should not reach\nACK' });
+    }
+  };
+
+  const result = await runMi(['-g', 'build app', '-c', 'check it']);
+  assert.strictEqual(result.status, 0);
+  // isFatal detects credit exhaustion in worker output → breaks loop immediately
+  // Only 3 calls: planner + precheck judge + worker. No judge call after fatal worker.
+  assert.strictEqual(prompts.length, 3);
+});
