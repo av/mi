@@ -140,9 +140,10 @@ RUN set -eu; \\
     node_ok() {{ command -v node >/dev/null 2>&1 && node -e "process.exit(Number(process.versions.node.split('.')[0])>=18?0:1)" >/dev/null 2>&1; }}; \\
     deps_ok() {{ node_ok && command -v bash >/dev/null 2>&1 && command -v bc >/dev/null 2>&1 && command -v curl >/dev/null 2>&1 && command -v ping >/dev/null 2>&1; }}; \\
     if deps_ok; then exit 0; fi; \\
-    if command -v apk >/dev/null 2>&1; then apk add --no-cache nodejs bash bc curl iputils tar gzip ca-certificates xz; \\
-    elif command -v apt-get >/dev/null 2>&1; then apt-get update && apt-get install -y --no-install-recommends nodejs bash bc curl iputils-ping tar gzip ca-certificates xz-utils && rm -rf /var/lib/apt/lists/*; \\
-    elif command -v yum >/dev/null 2>&1; then yum install -y nodejs bash bc curl iputils tar gzip ca-certificates xz; \\
+    node_ok && NODE_PKG= || NODE_PKG=nodejs; \\
+    if command -v apk >/dev/null 2>&1; then apk add --no-cache $NODE_PKG bash bc curl iputils tar gzip ca-certificates xz; \\
+    elif command -v apt-get >/dev/null 2>&1; then apt-get update && apt-get install -y --no-install-recommends $NODE_PKG bash bc curl iputils-ping tar gzip ca-certificates xz-utils && rm -rf /var/lib/apt/lists/*; \\
+    elif command -v yum >/dev/null 2>&1; then yum install -y $NODE_PKG bash bc curl iputils tar gzip ca-certificates xz; \\
     else echo 'unsupported package manager for mi cached eval image' >&2; exit 1; fi; \\
     if ! node_ok && ! command -v apk >/dev/null 2>&1; then \\
       arch=$(uname -m); case "$arch" in x86_64|amd64) arch=x64;; aarch64|arm64) arch=arm64;; *) echo "unsupported node arch: $arch" >&2; exit 1;; esac; \\
