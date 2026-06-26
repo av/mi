@@ -2423,3 +2423,107 @@ test('goal 402 credit exhaustion aborts immediately with fatal event', async () 
   // Only 3 calls: planner + precheck judge + worker. No judge call after fatal worker.
   assert.strictEqual(prompts.length, 3);
 });
+
+test('goal blocker detection warns after 3 identical NACKs', async () => {
+  const prompts = [];
+  requestHandler = (req, res, body) => {
+    const prompt = body.messages.at(-1).content;
+    prompts.push(prompt);
+    if (prompts.length === 1) {
+      // Planner
+      sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- done\nVERIFIER_SHAPE_CONTRACT\n- check\nVERIFICATION_PLAN\n- verify\nCURRENT_STATE\n- not started' });
+    } else if (prompts.length === 2) {
+      // Precheck judge → NACK
+      sse(res, { role: 'assistant', content: 'error: port 8080 still in use\nNACK' });
+    } else if (prompts.length <= 7 && prompts.length % 2 === 1) {
+      // Workers 1-3 (odd positions: 3,5,7)
+      sse(res, { role: 'assistant', content: `attempt\nSTRATEGY: tried something\nFILES_MODIFIED: none\nCOMMANDS_SUCCEEDED: none\nCOMMANDS_FAILED: start\nBLOCKERS: port\nREMAINING: fix port` });
+    } else if (prompts.length <= 8 && prompts.length % 2 === 0) {
+      // Judges 1-3 (even positions: 4,6,8) → same NACK
+      sse(res, { role: 'assistant', content: 'error: port 8080 still in use\nNACK' });
+    } else if (prompts.length === 9) {
+      // Worker 4: should have BLOCKED warning after 3 identical blocker sigs
+      assert.match(prompt, /BLOCKED/i);
+      assert.match(prompt, /port 8080/i, 'BLOCKED warning should cite the repeated blocker');
+      sse(res, { role: 'assistant', content: 'fixed\nSTRATEGY: new approach\nFILES_MODIFIED: config\nCOMMANDS_SUCCEEDED: start\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
+    } else {
+      // Judge 4 → ACK
+      sse(res, { role: 'assistant', content: 'done\nACK' });
+    }
+  };
+  const result = await runMi(['-g', 'start server', '-c', 'check port']);
+  assert.strictEqual(result.status, 0);
+  // 1 planner + 1 precheck + 3*(worker+judge) + 1 worker4 + 1 judge4 = 10
+  assert.strictEqual(prompts.length, 10);
+});
+
+test('goal spawn error skips judge call', async () => {
+  const prompts = [];
+  requestHandler = (req, res, body) => {
+    prompts.push(body.messages.at(-1).content);
+    if (prompts.length === 1) {
+      sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- done\nVERIFIER_SHAPE_CONTRACT\n- check\nVERIFICATION_PLAN\n- verify\nCURRENT_STATE\n- not started' });
+    } else if (prompts.length === 2) {
+      sse(res, { role: 'assistant', content: 'not done\nNACK' });
+    } else if (prompts.length === 3) {
+      // Worker 1 returns spawn error
+      sse(res, { role: 'assistant', content: '[spawn error: ENOMEM]' });
+    } else if (prompts.length === 4) {
+      // Worker 2 (judge was skipped for worker 1)
+      assert.match(prompts[3], /worker 2/i);
+      sse(res, { role: 'assistant', content: 'fixed\nSTRATEGY: worked\nFILES_MODIFIED: f\nCOMMANDS_SUCCEEDED: ok\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
+    } else {
+      sse(res, { role: 'assistant', content: 'done\nACK' });
+    }
+  };
+  const result = await runMi(['-g', 'build', '-c', 'check']);
+  assert.strictEqual(result.status, 0);
+  // 1 planner + 1 precheck + 1 worker1(spawn err, no judge) + 1 worker2 + 1 judge2 = 5
+  assert.strictEqual(prompts.length, 5);
+});
+
+test('goal forced salvage after 5 identical blockers in deadline mode', async () => {
+  const prompts = [];
+  let sawSalvage = false;
+  requestHandler = (req, res, body) => {
+    const prompt = body.messages.at(-1).content;
+    prompts.push(prompt);
+    if (prompts.length === 1) {
+      sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- done\nVERIFIER_SHAPE_CONTRACT\n- check\nVERIFICATION_PLAN\n- verify\nCURRENT_STATE\n- not started' });
+    } else if (/FINAL SALVAGE/i.test(prompt)) {
+      sawSalvage = true;
+      sse(res, { role: 'assistant', content: 'wrote best artifact\nSTRATEGY: salvage\nFILES_MODIFIED: out.txt' });
+    } else if (prompts.length % 2 === 0) {
+      // All judges → same NACK
+      sse(res, { role: 'assistant', content: 'missing output.json\nNACK' });
+    } else {
+      // Workers
+      sse(res, { role: 'assistant', content: `attempt\nSTRATEGY: tried\nFILES_MODIFIED: none\nCOMMANDS_SUCCEEDED: none\nCOMMANDS_FAILED: gen\nBLOCKERS: missing data\nREMAINING: gen` });
+    }
+  };
+  // deadline far in the future so budget doesn't naturally hit SALVAGE
+  const deadline = Math.floor(Date.now() / 1000) + 3600;
+  const result = await runMi(['-g', 'gen data', '-c', 'check output', '-d', String(deadline)]);
+  assert.strictEqual(result.status, 0);
+  // After 5 identical blockers the deadline is compressed → SALVAGE phase triggers
+  assert.ok(sawSalvage, 'forced salvage should have triggered after 5 identical blockers');
+});
+
+test('bash tool truncates output exceeding 50KB', async () => {
+  requestHandler = (req, res, body) => {
+    const tc = body.messages.at(-1)?.tool_calls?.[0] || body.messages.find(m => m.tool_calls)?. tool_calls?.[0];
+    // Look for the tool result in messages
+    const toolResult = body.messages.find(m => m.role === 'tool');
+    if (toolResult) {
+      assert.match(toolResult.content, /truncated/);
+      assert.ok(toolResult.content.length < 55000, 'truncated output should be under 55KB');
+      sse(res, { role: 'assistant', content: 'truncation verified' });
+    } else {
+      // First call: issue bash command that produces >50KB
+      sse(res, { role: 'assistant', tool_calls: [{ id: 'tc1', type: 'function', function: { name: 'bash', arguments: JSON.stringify({ command: 'python3 -c "print(\'A\' * 60000)"' }) } }] });
+    }
+  };
+  const result = await runMi(['-p', 'test truncation']);
+  assert.strictEqual(result.status, 0);
+  assert.match(result.stdout, /truncation verified/);
+});
