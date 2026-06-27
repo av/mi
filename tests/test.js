@@ -2513,6 +2513,42 @@ test('goal forced salvage after 5 identical blockers in deadline mode', async ()
   assert.ok(sawSalvage, 'forced salvage should have triggered after 5 identical blockers');
 });
 
+test('goal first iteration capped to 1/3 budget with partition hint', async () => {
+  const prompts = [];
+  requestHandler = (req, res, body) => {
+    const prompt = body.messages.at(-1).content;
+    prompts.push(prompt);
+    if (prompts.length === 1) {
+      sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- done\nVERIFIER_SHAPE_CONTRACT\n- checked\nVERIFICATION_PLAN\n- inspect\nCURRENT_STATE\n- empty' });
+    } else if (prompts.length === 2) {
+      // Pre-check judge → NACK
+      sse(res, { role: 'assistant', content: 'not done\nNACK' });
+    } else if (prompts.length === 3) {
+      // Worker 1 — should have time partition hint
+      assert.match(prompt, /you are worker 1/);
+      assert.match(prompt, /budget is partitioned to guarantee retries/);
+      assert.match(prompt, /capped at ~\d+min/);
+      sse(res, { role: 'assistant', content: 'did work\nSTRATEGY: attempt 1\nFILES_MODIFIED: x\nCOMMANDS_SUCCEEDED: y\nCOMMANDS_FAILED: z\nBLOCKERS: b\nREMAINING: r' });
+    } else if (prompts.length === 4) {
+      // Judge 1 → NACK
+      sse(res, { role: 'assistant', content: 'still broken\nNACK' });
+    } else if (prompts.length === 5) {
+      // Worker 2 — should NOT have partition hint (only applies to iteration 1)
+      assert.match(prompt, /you are worker 2/);
+      assert.doesNotMatch(prompt, /budget is partitioned to guarantee retries/);
+      sse(res, { role: 'assistant', content: 'fixed\nSTRATEGY: attempt 2\nFILES_MODIFIED: x\nCOMMANDS_SUCCEEDED: all\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
+    } else {
+      // Judge 2 → ACK
+      sse(res, { role: 'assistant', content: 'all good\nACK' });
+    }
+  };
+
+  const deadline = Math.floor(Date.now() / 1000) + 900; // 15 min budget
+  const result = await runMi(['-g', 'partition test', '-c', 'check it', '-d', String(deadline)]);
+  assert.strictEqual(result.status, 0);
+  assert.strictEqual(prompts.length, 6);
+});
+
 test('bash tool truncates output exceeding 50KB', async () => {
   requestHandler = (req, res, body) => {
     const tc = body.messages.at(-1)?.tool_calls?.[0] || body.messages.find(m => m.tool_calls)?. tool_calls?.[0];
