@@ -20,14 +20,35 @@ from mi_harbor.package import local_package_archive
 
 TERMINAL_BENCH_CHECK = (
     "Inspect the actual task state in the working directory (run pwd first). "
-    "Run available tests or direct checks that would fail if the task is incomplete. "
+    "FIRST: if /tests/ exists, run `cd / && python3 -m pytest tests/ --tb=short 2>&1 | tail -80` — "
+    "test results are GROUND TRUTH. If any test fails, NACK immediately. If all pass, ACK. "
+    "If no /tests/: run any visible test suite (pytest, npm test, make test, etc.). "
     "Check exact output file paths mentioned in the goal — verify they exist and are non-empty. "
     "For parseable artifacts (code, JSON, config), verify they parse/compile/import without error. "
-    "For numeric thresholds, measure the actual value and compare to the required value — do not accept qualitative assessments. "
-    "Run any visible test suite (pytest, npm test, make test, etc.) if present. "
+    "For numeric thresholds, measure the actual value and compare to the required value — "
+    "do not accept qualitative assessments. Use threshold * 1.05. "
     "Verify input files are unchanged unless the goal explicitly requires modifying them. "
-    "Attempt at least one adversarial edge case check relevant to the task. "
+    "Do NOT kill, restart, or stop any running services — the external verifier needs them alive. "
     "End with ACK only when ALL checks pass with measured values; otherwise end with NACK."
+)
+
+
+# System prompt optimized for eval tasks. Shorter than the interactive DEFAULT_PROMPT,
+# Docker-aware, test-first oriented, no persona/formatting restrictions.
+EVAL_SYSTEM_PROMPT = (
+    "You are an autonomous coding agent in a Linux terminal inside a Docker container. "
+    "Your tools are bash and file editing.\n\n"
+    "Act, don't speculate. Read the task description and any README in the working directory. "
+    "Check if /tests/ exists — those tests define success criteria. "
+    "Explore the working directory, then solve. One step at a time, verify each.\n\n"
+    "If something fails, read the error, form a diagnosis, change approach. "
+    "Don't repeat failed strategies.\n\n"
+    "Docker constraints: containers may use BusyBox (limited coreutils). "
+    "No systemd. Use nohup for background services so they survive shell exit. "
+    "Do not kill running services after verification.\n\n"
+    "Minimize context: head -20 for file starts, tail -20 for ends, grep -n to locate, "
+    "sed -n for ranges. Reserve cat for short files. Edit with sed -i or heredocs.\n\n"
+    "Do not fake tool output."
 )
 
 
@@ -148,6 +169,23 @@ detect_workdir() {
 WORKDIR=$(detect_workdir)
 log_diag "Workdir: $WORKDIR"
 cd "$WORKDIR" || cd / || exit 1
+
+# Inject task README into AGENTS.md for auto-ingestion by mi subagents.
+# Only if AGENTS.md doesn't already exist and a README is found.
+if [[ ! -f AGENTS.md ]]; then
+    README=""
+    for rf in README.md README.txt README readme.md; do
+        if [[ -f "$rf" ]]; then README="$rf"; break; fi
+    done
+    if [[ -n "$README" ]]; then
+        {
+            echo "# Task Context"
+            echo ""
+            head -100 "$README"
+        } > AGENTS.md
+        log_diag "Injected $README into AGENTS.md for mi context"
+    fi
+fi
 
 # Run mi goal loop with timestamped output, separate stderr
 "${MI_RUNNER[@]}" -g "$1" -c "$MI_GOAL_CHECK" \
@@ -335,10 +373,9 @@ class MiAgent(BaseInstalledAgent):
                 model = model.split("/", 1)[-1]
             env["MODEL"] = model
 
-        # Optional: custom system prompt
+        # System prompt: use eval-optimized prompt by default, allow override
         system_prompt = self._get_env("MI_SYSTEM_PROMPT")
-        if system_prompt:
-            env["SYSTEM_PROMPT"] = system_prompt
+        env["SYSTEM_PROMPT"] = system_prompt or EVAL_SYSTEM_PROMPT
 
         # Pass task timeout for budget-aware goal loop.
         # Without MI_TASK_TIMEOUT, the goal loop runs without budget phases
