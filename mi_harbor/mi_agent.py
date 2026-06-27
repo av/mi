@@ -125,22 +125,25 @@ else
 fi
 
 detect_workdir() {
-    for candidate in /app /home /workspace /work /root /src; do
-        if [[ -d "$candidate" ]]; then
-            if [[ -d "$candidate/.git" ]]; then
-                echo "$candidate"; return
-            fi
-            GIT_DIRS=$(find "$candidate" -mindepth 1 -maxdepth 2 -type d -name .git -printf '%h\n' 2>/dev/null | head -2)
-            GIT_COUNT=$(printf '%s\n' "$GIT_DIRS" | grep -c . 2>/dev/null || echo 0)
-            if [[ "$GIT_COUNT" -eq 1 ]]; then
-                echo "$GIT_DIRS"; return
-            fi
-            if [[ "$GIT_COUNT" -eq 0 && -d "$candidate" ]]; then
-                echo "$candidate"; return
-            fi
+    local fallback=""
+    for candidate in /app /workdir /home /workspace /work /root /src; do
+        [[ -d "$candidate" ]] || continue
+        # Prefer directories with .git
+        if [[ -d "$candidate/.git" ]]; then
+            echo "$candidate"; return
+        fi
+        # Check for nested git repos (use -exec for BusyBox compat)
+        GIT_DIRS=$(find "$candidate" -mindepth 1 -maxdepth 2 -type d -name .git -exec dirname {} \; 2>/dev/null | head -2)
+        GIT_COUNT=$(printf '%s\n' "$GIT_DIRS" | grep -c . 2>/dev/null || echo 0)
+        if [[ "$GIT_COUNT" -eq 1 ]]; then
+            echo "$GIT_DIRS"; return
+        fi
+        # Remember first non-empty candidate as fallback (skip empty dirs like /home)
+        if [[ -z "$fallback" ]] && [[ -n "$(ls -A "$candidate" 2>/dev/null | head -1)" ]]; then
+            fallback="$candidate"
         fi
     done
-    echo "/"
+    echo "${fallback:-/}"
 }
 WORKDIR=$(detect_workdir)
 log_diag "Workdir: $WORKDIR"
