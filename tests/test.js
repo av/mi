@@ -2387,7 +2387,7 @@ test('Harbor adapter routes Terminal-Bench through goal mode', async () => {
   const adapter = readFileSync(join(__dirname, '../mi_harbor/mi_agent.py'), 'utf8');
   assert.match(adapter, /TERMINAL_BENCH_CHECK/);
   assert.match(adapter, /-g "\$1" -c "\$MI_GOAL_CHECK"/);
-  assert.match(adapter, /nested workdirs/);
+  assert.match(adapter, /working directory/);
   assert.match(adapter, /"PAGER": "cat"/);
   assert.match(adapter, /"GIT_PAGER": "cat"/);
   assert.match(adapter, /"GIT_EDITOR": "true"/);

@@ -19,7 +19,7 @@ from mi_harbor.package import local_package_archive
 
 
 TERMINAL_BENCH_CHECK = (
-    "Inspect the actual task state under /app, including nested workdirs. "
+    "Inspect the actual task state in the working directory (run pwd first). "
     "Run available tests or direct checks that would fail if the task is incomplete. "
     "Check exact output file paths mentioned in the goal — verify they exist and are non-empty. "
     "For parseable artifacts (code, JSON, config), verify they parse/compile/import without error. "
@@ -337,10 +337,13 @@ class MiAgent(BaseInstalledAgent):
         if system_prompt:
             env["SYSTEM_PROMPT"] = system_prompt
 
-        # Pass task timeout for budget-aware goal loop
-        task_timeout = self._get_env("MI_TASK_TIMEOUT")
-        if task_timeout:
-            env["MI_TASK_TIMEOUT"] = task_timeout
+        # Pass task timeout for budget-aware goal loop.
+        # Without MI_TASK_TIMEOUT, the goal loop runs without budget phases
+        # (no EXPLORE→COMMIT→URGENT→SALVAGE transitions, no time partitioning,
+        # no forced salvage before timeout).  Default to 900s — most TBLite tasks
+        # have 900-1800s agent timeouts.  Override via MI_TASK_TIMEOUT env var.
+        task_timeout = self._get_env("MI_TASK_TIMEOUT") or "900"
+        env["MI_TASK_TIMEOUT"] = task_timeout
 
         if not env.get("OPENAI_API_KEY"):
             raise RuntimeError(
