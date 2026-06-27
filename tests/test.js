@@ -442,7 +442,8 @@ test('goal NACK iteration includes strategy fingerprint and diversity warning in
 
   const result = await runMi(['-g', 'fix tests', '-c', 'run npm test']);
   assert.strictEqual(result.status, 0);
-  assert.strictEqual(prompts.length, 6);
+  // 1 planner + 1 precheck + 1 worker1 + 1 judge1(NACK) + 1 worker2 + 1 judge2(ACK) + 1 skeptical(ACK) = 7
+  assert.strictEqual(prompts.length, 7);
 });
 
 test('goal NACK iteration passes structured checkpoint to next worker', async () => {
@@ -473,7 +474,8 @@ test('goal NACK iteration passes structured checkpoint to next worker', async ()
 
   const result = await runMi(['-g', 'build app', '-c', 'check it']);
   assert.strictEqual(result.status, 0);
-  assert.strictEqual(prompts.length, 6);
+  // 1 planner + 1 precheck + 1 worker1 + 1 judge1(NACK) + 1 worker2 + 1 judge2(ACK) + 1 skeptical(ACK) = 7
+  assert.strictEqual(prompts.length, 7);
 });
 
 test('goal salvage triggers when deadline is near', async () => {
@@ -2482,8 +2484,8 @@ test('goal spawn error skips judge call', async () => {
   };
   const result = await runMi(['-g', 'build', '-c', 'check']);
   assert.strictEqual(result.status, 0);
-  // 1 planner + 1 precheck + 1 worker1(spawn err, no judge) + 1 worker2 + 1 judge2 = 5
-  assert.strictEqual(prompts.length, 5);
+  // 1 planner + 1 precheck + 1 worker1(spawn err, no judge) + 1 worker2 + 1 judge2(ACK) + 1 skeptical(ACK) = 6
+  assert.strictEqual(prompts.length, 6);
 });
 
 test('goal forced salvage after 5 identical blockers in deadline mode', async () => {
@@ -2546,7 +2548,8 @@ test('goal first iteration capped to 1/3 budget with partition hint', async () =
   const deadline = Math.floor(Date.now() / 1000) + 900; // 15 min budget
   const result = await runMi(['-g', 'partition test', '-c', 'check it', '-d', String(deadline)]);
   assert.strictEqual(result.status, 0);
-  assert.strictEqual(prompts.length, 6);
+  // 1 planner + 1 precheck + 1 worker1 + 1 judge1(NACK) + 1 worker2 + 1 judge2(ACK) + 1 skeptical(ACK) = 7
+  assert.strictEqual(prompts.length, 7);
 });
 
 test('bash tool truncates output exceeding 50KB', async () => {
