@@ -8,7 +8,9 @@ Includes diagnostics to debug failure modes:
 """
 
 import base64
+import json
 import shlex
+import tomllib
 from pathlib import Path
 
 from harbor.agents.installed.base import BaseInstalledAgent, with_prompt_template
@@ -220,6 +222,84 @@ class MiAgent(BaseInstalledAgent):
 
     SUPPORTS_ATIF: bool = False  # mi doesn't produce structured trajectory logs
 
+    def _compute_task_timeout(self) -> float | None:
+        """Compute per-task timeout by reading task.toml from Harbor's cache.
+
+        Harbor computes _agent_timeout_sec from task.toml but only passes it
+        to Oracle agents. This method replicates that computation by:
+        1. Reading trial config.json (written by Harbor before agent.run())
+        2. Finding task.toml in Harbor's cache using the task name
+        3. Extracting [agent].timeout_sec and applying the timeout multiplier
+
+        Returns the effective timeout in seconds, or None if unavailable.
+        """
+        try:
+            config_path = self.logs_dir.parent / "config.json"
+            if not config_path.exists():
+                return None
+
+            trial_config = json.loads(config_path.read_text())
+
+            # Check for explicit override first
+            override = (trial_config.get("agent") or {}).get("override_timeout_sec")
+            multiplier = trial_config.get("agent_timeout_multiplier")
+            if multiplier is None:
+                multiplier = trial_config.get("timeout_multiplier", 1.0)
+
+            if override:
+                max_sec = (trial_config.get("agent") or {}).get("max_timeout_sec")
+                base = min(override, max_sec) if max_sec else override
+                return base * multiplier
+
+            # Find task.toml in Harbor's cache
+            task_toml_path = self._find_task_toml(trial_config)
+            if not task_toml_path:
+                return None
+
+            task_config = tomllib.loads(task_toml_path.read_text())
+            base_timeout = (task_config.get("agent") or {}).get("timeout_sec")
+            if base_timeout is None:
+                return None
+
+            max_sec = (trial_config.get("agent") or {}).get("max_timeout_sec")
+            if max_sec:
+                base_timeout = min(base_timeout, max_sec)
+
+            return base_timeout * multiplier
+        except Exception as exc:
+            self.logger.debug(f"Could not compute task timeout: {exc}")
+            return None
+
+    @staticmethod
+    def _find_task_toml(trial_config: dict) -> Path | None:
+        """Find task.toml in Harbor's cache from trial config metadata."""
+        cache_dir = Path.home() / ".cache" / "harbor" / "tasks"
+        task_info = trial_config.get("task", {})
+
+        # Extract task name from config
+        task_path = task_info.get("path")  # relative path for git-based tasks
+        task_name = task_info.get("name")  # org/name for package-based tasks
+
+        if task_path:
+            # Git-based tasks: ~/.cache/harbor/tasks/<hash>/<task_path>/task.toml
+            for match in cache_dir.glob(f"*/{task_path}/task.toml"):
+                # Skip the packages subdirectory
+                if "packages" not in match.parts:
+                    return match
+
+        if task_name:
+            # Package-based: ~/.cache/harbor/tasks/packages/<org>/<name>/*/task.toml
+            pkg_path = task_name  # already in org/name format
+            for match in cache_dir.glob(f"packages/{pkg_path}/*/task.toml"):
+                return match
+
+        if task_path:
+            # Fallback: try package cache with just the task name
+            for match in cache_dir.glob(f"packages/*/{task_path}/*/task.toml"):
+                return match
+
+        return None
+
     @staticmethod
     def name() -> str:
         return "mi"
@@ -378,18 +458,22 @@ class MiAgent(BaseInstalledAgent):
         system_prompt = self._get_env("MI_SYSTEM_PROMPT")
         env["SYSTEM_PROMPT"] = system_prompt or EVAL_SYSTEM_PROMPT
 
-        # Pass task timeout for budget-aware goal loop (optional).
+        # Pass task timeout for budget-aware goal loop.
         # Without MI_TASK_TIMEOUT, the goal loop runs without budget phases
         # (no EXPLORE→COMMIT→URGENT→SALVAGE transitions, no time partitioning,
         # no forced salvage before timeout).
-        # DO NOT default to a fixed value — TBLite task timeouts range from
-        # 60s to 3600s, and a wrong default miscalibrates phases:
-        #   - Too high (e.g. 900s on a 500s task): agent never enters URGENT/SALVAGE
-        #     before Harbor kills it, wasting the first-iteration 1/3 cap.
-        #   - Too low (e.g. 900s on a 3600s task): agent artificially limits itself.
-        # Harbor doesn't pass per-task timeout to the agent, so budget mode
-        # should only activate when MI_TASK_TIMEOUT is explicitly set.
+        # Priority: explicit env var > computed from task.toml + multiplier.
         task_timeout = self._get_env("MI_TASK_TIMEOUT")
+        if not task_timeout:
+            # Compute per-task timeout from Harbor's cached task.toml.
+            # This gives us the EXACT value Harbor uses for asyncio.wait_for(),
+            # correctly calibrated per-task (300s-3600s in TBLite).
+            computed = self._compute_task_timeout()
+            if computed is not None:
+                task_timeout = str(int(computed))
+                self.logger.debug(
+                    f"Computed MI_TASK_TIMEOUT={task_timeout}s from task.toml"
+                )
         if task_timeout:
             env["MI_TASK_TIMEOUT"] = task_timeout
 
