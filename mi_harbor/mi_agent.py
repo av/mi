@@ -155,7 +155,8 @@ detect_workdir() {
         fi
         # Check for nested git repos (use -exec for BusyBox compat)
         GIT_DIRS=$(find "$candidate" -mindepth 1 -maxdepth 2 -type d -name .git -exec dirname {} \; 2>/dev/null | head -2)
-        GIT_COUNT=$(printf '%s\n' "$GIT_DIRS" | grep -c . 2>/dev/null || echo 0)
+        GIT_COUNT=$(printf '%s\n' "$GIT_DIRS" | { grep -c . 2>/dev/null || true; })
+        GIT_COUNT=${GIT_COUNT:-0}
         if [[ "$GIT_COUNT" -eq 1 ]]; then
             echo "$GIT_DIRS"; return
         fi
@@ -377,13 +378,20 @@ class MiAgent(BaseInstalledAgent):
         system_prompt = self._get_env("MI_SYSTEM_PROMPT")
         env["SYSTEM_PROMPT"] = system_prompt or EVAL_SYSTEM_PROMPT
 
-        # Pass task timeout for budget-aware goal loop.
+        # Pass task timeout for budget-aware goal loop (optional).
         # Without MI_TASK_TIMEOUT, the goal loop runs without budget phases
         # (no EXPLORE→COMMIT→URGENT→SALVAGE transitions, no time partitioning,
-        # no forced salvage before timeout).  Default to 900s — most TBLite tasks
-        # have 900-1800s agent timeouts.  Override via MI_TASK_TIMEOUT env var.
-        task_timeout = self._get_env("MI_TASK_TIMEOUT") or "900"
-        env["MI_TASK_TIMEOUT"] = task_timeout
+        # no forced salvage before timeout).
+        # DO NOT default to a fixed value — TBLite task timeouts range from
+        # 60s to 3600s, and a wrong default miscalibrates phases:
+        #   - Too high (e.g. 900s on a 500s task): agent never enters URGENT/SALVAGE
+        #     before Harbor kills it, wasting the first-iteration 1/3 cap.
+        #   - Too low (e.g. 900s on a 3600s task): agent artificially limits itself.
+        # Harbor doesn't pass per-task timeout to the agent, so budget mode
+        # should only activate when MI_TASK_TIMEOUT is explicitly set.
+        task_timeout = self._get_env("MI_TASK_TIMEOUT")
+        if task_timeout:
+            env["MI_TASK_TIMEOUT"] = task_timeout
 
         if not env.get("OPENAI_API_KEY"):
             raise RuntimeError(
