@@ -362,17 +362,21 @@ test('goal workers do work instead of receiving judge criteria', async () => {
       assert.doesNotMatch(prompt, /criteria: inspect state/);
       assert.doesNotMatch(prompt, /judge criteria/);
       sse(res, { role: 'assistant', content: 'created the files' });
-    } else {
+    } else if (prompts.length === 4) {
       assert.match(prompt, /you are a judge for a goal loop/);
       assert.match(prompt, /criteria: inspect state/);
       sse(res, { role: 'assistant', content: 'all files exist\nACK' });
+    } else {
+      assert.match(prompt, /you are a judge for a goal loop/);
+      assert.match(prompt, /SKEPTICAL RECHECK/);
+      sse(res, { role: 'assistant', content: 'independently verified — all files exist\nACK' });
     }
   };
 
   const result = await runMi(['-g', 'create files', '-c', 'inspect state; end with ACK or NACK']);
   assert.strictEqual(result.status, 0);
-  assert.strictEqual(prompts.length, 4);
-  assert.match(result.stdout, /all files exist/);
+  assert.strictEqual(prompts.length, 5);
+  assert.match(result.stdout, /independently verified/);
 });
 
 test('goal mode passes deadline from -d flag and MI_DEADLINE env', async () => {
