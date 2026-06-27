@@ -3,10 +3,10 @@ export default { name: 'delegate', description: 'Spawn a mi subagent with a prom
 handler: ({prompt, timeout}) => new Promise(resolve => {
   const child = spawn('node', [process.env.MI_PATH], { stdio: ['pipe', 'pipe', 'pipe'], detached: true });
   child.on('error', e => resolve(`[spawn error: ${e.message}]`));
-  child.stdin.end(prompt); let out = '';
-  for (const s of [child.stdout, child.stderr]) s.on('data', d => { process.stdout.write(d); out += d; });
-  const kill = () => { try { process.kill(-child.pid); } catch {} };
-  process.on('SIGINT', kill);
-  const timer = timeout ? setTimeout(() => { kill(); resolve(`${out}\n[timeout after ${timeout}ms]`); }, timeout) : null;
-  child.on('exit', (code) => { process.off('SIGINT', kill); if (timer) clearTimeout(timer); resolve(code ? `${out}\n[exit ${code}]` : out); });
+  child.stdin.end(prompt); let out = '', done = false;
+  for (const s of [child.stdout, child.stderr]) s.on('data', d => { if (!done) { process.stdout.write(d); out += d; } });
+  const kill = sig => { try { process.kill(-child.pid, sig); } catch {} };
+  const onInt = () => kill(); process.on('SIGINT', onInt);
+  const timer = timeout ? setTimeout(() => { done = true; kill('SIGKILL'); resolve(`${out}\n[timeout after ${timeout}ms]`); }, timeout) : null;
+  child.on('exit', (code) => { process.off('SIGINT', onInt); if (timer) clearTimeout(timer); if (!done) { done = true; resolve(code ? `${out}\n[exit ${code}]` : out); } });
 })};
