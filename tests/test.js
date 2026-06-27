@@ -2570,3 +2570,59 @@ test('bash tool truncates output exceeding 50KB', async () => {
   assert.strictEqual(result.status, 0);
   assert.match(result.stdout, /truncation verified/);
 });
+
+test('transient mid-stream SSE error retries automatically', async () => {
+  // First call sends a 502 mid-stream error; second call succeeds
+  let callCount = 0;
+  requestHandler = (req, res, body) => {
+    callCount++;
+    if (callCount === 1) {
+      // Mid-stream error with retryable code
+      res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+      res.write(`data: ${JSON.stringify({ error: { message: 'Bad Gateway', code: 502 } })}\n\n`);
+      res.end();
+    } else {
+      // Success on retry
+      sse(res, { role: 'assistant', content: 'recovered from transient error' });
+    }
+  };
+  const result = await runMi(['-p', 'trigger retry']);
+  assert.strictEqual(result.status, 0);
+  assert.match(result.stdout, /recovered from transient error/);
+  assert.ok(callCount >= 2, 'should have retried at least once');
+  assert.match(result.stderr, /retry.*502/);
+});
+
+test('malformed JSON in tool call arguments returns error instead of crashing', async () => {
+  let callCount = 0;
+  requestHandler = (req, res, body) => {
+    callCount++;
+    // Look for tool error result in messages
+    const toolResult = body.messages.find(m => m.role === 'tool' && m.content?.includes('malformed JSON'));
+    if (toolResult) {
+      // Model got the error message back — verify it and respond
+      sse(res, { role: 'assistant', content: 'handled malformed args gracefully' });
+    } else {
+      // Send a tool call with invalid JSON arguments
+      res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+      res.write(`data: ${JSON.stringify({ choices: [{ delta: { tool_calls: [{ index: 0, id: 'tc-bad', type: 'function', function: { name: 'bash', arguments: '{invalid json!!!' } }] } }] })}\n\n`);
+      res.write('data: [DONE]\n\n');
+      res.end();
+    }
+  };
+  const result = await runMi(['-p', 'test bad args']);
+  assert.strictEqual(result.status, 0);
+  assert.match(result.stdout, /handled malformed args gracefully/);
+});
+
+test('non-retryable SSE stream error still throws immediately', async () => {
+  // Error with non-retryable code (e.g., 401) should not retry
+  requestHandler = (req, res, body) => {
+    res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+    res.write(`data: ${JSON.stringify({ error: { message: 'Unauthorized', code: 401 } })}\n\n`);
+    res.end();
+  };
+  const result = await runMi(['-p', 'trigger non-retryable']);
+  assert.notStrictEqual(result.status, 0);
+  assert.match(result.stderr, /Unauthorized/);
+});
