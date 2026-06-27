@@ -66,10 +66,10 @@ export default {
     if (pre.ok) return `goal already met.\nprogress log: ${log}\nevent log: ${events}\n${pre.out}`;
     if (isFatal(pre.out)) { emit('fatal', { phase: 'precheck' }); return `goal aborted: API credit exhaustion.\nprogress log: ${log}\nevent log: ${events}`; }
     appendFileSync(log, `\n# Pre-check\nstatus: NACK\nduration_ms: ${pre.duration}\n\n${tail(pre.out)}\n`);
-    let last = pre, feedback = tail(pre.out);
+    let last = pre, feedback = tail(pre.out), done = 0;
     checkpoint = `blockers: ${tail(pre.out, 500)}`;
     for (let i = 1; i <= limit; i++) {
-      const phase = budgetPhase();
+      done = i; const phase = budgetPhase();
       if (phase === 'SALVAGE') {
         console.log(gray(`── salvage (${budget()}s left) ──`));
         const salvage = await delegate.handler({ timeout, prompt: `FINAL SALVAGE — budget is nearly exhausted. do not debug, do not explore, do not run tests. your only job is to write output artifacts.\n\ngoal: ${goal}\nprogress file: ${log}\nrefined exit criteria and verifier-shape contract:\n${planTrunc(plan)}\n\nlatest checkpoint:\n${checkpoint}\n\nfor every required output file in the verifier-shape contract: if it does not exist, create it with the best content you can produce from the current state. if it exists but is incomplete, complete it. prefer a working but imperfect solution over a perfect but missing one. if a service must be running, start it with bg mode. write ALL required artifacts before doing anything else. set timeout on every command — you have no time to wait. end with a summary of files written.` });
@@ -116,7 +116,7 @@ export default {
       const lastN = blockerSigs.slice(-5); if (deadline && lastN.length >= 5 && lastN[0] && lastN.every(s => s === lastN[0])) { emit('stall_salvage', { iteration: i, blocker: lastN[0] }); appendFileSync(log, `\n# Forced salvage: 5 consecutive identical blockers: "${lastN[0]}"\n`); deadline = Math.min(deadline, Date.now() / 1000 + 60); }
     }
     if (fatal) { emit('complete', { iterations: 'aborted', status: 'FATAL' }); return `goal aborted: API credit exhaustion.\nprogress log: ${log}\nevent log: ${events}\nlast output:\n${tail(last?.out || '')}`; }
-    emit('complete', { iterations: limit, status: 'NACK', budget_remaining_s: budget() });
-    return `goal not achieved after ${limit} iterations.\nprogress log: ${log}\nevent log: ${events}\nlast judge:\n${last.out}`;
+    emit('complete', { iterations: done, status: 'NACK', budget_remaining_s: budget() });
+    return `goal not achieved after ${done} iterations.\nprogress log: ${log}\nevent log: ${events}\nlast judge:\n${last.out}`;
   },
 };
