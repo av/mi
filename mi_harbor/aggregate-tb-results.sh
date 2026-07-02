@@ -56,13 +56,13 @@ parse_run() {
 
   if [[ -f "$scoref" ]]; then
     # Try to extract from human-written score.txt
-    completed=$(grep -oE '([0-9]+)\s*/\s*([0-9]+)' "$scoref" | head -1 | sed 's| / |/|' || echo "?")
+    completed=$(grep -oE '([0-9]+)[[:space:]]*/[[:space:]]*([0-9]+)' "$scoref" | head -1 | sed -E 's/[[:space:]]*\/[[:space:]]*/\//' || echo "?")
     if [[ "$completed" == "?" ]]; then
-      completed=$(grep -oE 'Completed:\s*[0-9]+\s*/\s*[0-9]+' "$scoref" | head -1 | sed -E 's/.*: *([0-9]+) *\/ *([0-9]+).*/\1\/\2/' || echo "?")
+      completed=$(grep -oE 'Completed:[[:space:]]*[0-9]+[[:space:]]*/[[:space:]]*[0-9]+' "$scoref" | head -1 | sed -E 's/.*: *([0-9]+) *\/ *([0-9]+).*/\1\/\2/' || echo "?")
     fi
-    pass_rate=$(grep -oE 'Pass rate:\s*[0-9]+\s*/\s*[0-9]+[^%]*' "$scoref" | head -1 | sed -E 's/Pass rate:\s*//' || echo "?")
+    pass_rate=$(grep -oE 'Pass rate:[[:space:]]*[0-9]+[[:space:]]*/[[:space:]]*[0-9]+' "$scoref" | head -1 | sed -E 's/Pass rate:[[:space:]]*//; s|[[:space:]]*/[[:space:]]*| / |' || echo "?")
     pass_pct=$(grep -oE '\([0-9.]+%\)' "$scoref" | head -1 | tr -d '()' || echo "?")
-    mean_reward=$(grep -oE 'Mean reward:\s*[0-9.]+' "$scoref" | head -1 | awk '{print $NF}' || echo "?")
+    mean_reward=$(grep -oE 'Mean reward:[[:space:]]*[0-9.]+' "$scoref" | head -1 | awk '{print $NF}' || echo "?")
     duration=$(grep -oE 'Duration:.*' "$scoref" | head -1 | sed 's/Duration: *//' || echo "?")
     if grep -q 'RUNNING\|PARTIAL\|SNAPSHOT' "$scoref" 2>/dev/null; then status="partial/live"; fi
     if grep -q 'FINAL RESULT' "$scoref" 2>/dev/null; then status="final"; fi
@@ -136,7 +136,7 @@ for entry in "${RUNS[@]}"; do
       term_total_done=$((term_total_done + c)); term_total_tasks=$((term_total_tasks + t))
     fi
   fi
-  if [[ "$pr" =~ ([0-9]+)\s*/\s*([0-9]+) ]]; then
+  if [[ "$pr" =~ ([0-9]+)[[:space:]]*/[[:space:]]*([0-9]+) ]]; then
     p="${BASH_REMATCH[1]}"
     if [[ "$h" == "mi" ]]; then mi_passes=$((mi_passes + p)); else term_passes=$((term_passes + p)); fi
   fi
@@ -148,14 +148,14 @@ done
 
 echo
 echo "=== Grand totals (from parsed scores / raw rewards across all committed snapshots) ==="
-if [[ "$mi_total_tasks" -gt 0 ]]; then
-  mi_pct=$(python3 -c "print('{:.1f}%'.format(100*int($mi_passes)/int($mi_total_tasks)))" 2>/dev/null || echo "n/a")
+if [[ "$mi_total_done" -gt 0 ]]; then
+  mi_pct=$(python3 -c "print('{:.1f}%'.format(100*int($mi_passes)/int($mi_total_done)))" 2>/dev/null || echo "n/a")
   echo "mi     : $mi_passes passes / $mi_total_done completed / $mi_total_tasks tasks  ($mi_pct pass rate on completed)"
 else
   echo "mi     : no data yet"
 fi
-if [[ "$term_total_tasks" -gt 0 ]]; then
-  term_pct=$(python3 -c "print('{:.1f}%'.format(100*int($term_passes)/int($term_total_tasks)))" 2>/dev/null || echo "n/a")
+if [[ "$term_total_done" -gt 0 ]]; then
+  term_pct=$(python3 -c "print('{:.1f}%'.format(100*int($term_passes)/int($term_total_done)))" 2>/dev/null || echo "n/a")
   echo "terminus: $term_passes passes / $term_total_done completed / $term_total_tasks tasks  ($term_pct pass rate on completed)"
 else
   echo "terminus: no data yet"
