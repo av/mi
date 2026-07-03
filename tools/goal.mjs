@@ -1,5 +1,5 @@
 // tools/goal.mjs — Pursue a goal by iterating: refine criteria, worker acts, judge verifies
-import { writeFileSync, appendFileSync, statSync } from "fs";
+import { writeFileSync, appendFileSync, statSync, existsSync, readFileSync } from "fs";
 import delegate from "./delegate.mjs";
 
 export default {
@@ -55,6 +55,10 @@ export default {
     if (isFatal(plan)) { emit('fatal', { phase: 'plan' }); return `goal aborted: API credit exhaustion.\nprogress log: ${log}\nevent log: ${events}`; }
     const artifacts = (plan.match(/ARTIFACTS:\s*([^\n]+)/i)?.[1] || '').split(/[,\s]+/).filter(p => p.startsWith('/'));
     const draftGate = () => deadline && artifacts.length && (totalS - budget()) / totalS > 0.25 ? artifacts.filter(p => !existsSync(p)) : [];
+    // No judge cycles before the artifact exists: when the plan declares ARTIFACTS and NONE exists yet,
+    // skip the LLM judge and record a mechanical NACK (~0s). Progress-neutral: exempt from strategy/blockerSig accounting.
+    const missingAll = () => artifacts.length && !artifacts.some(p => existsSync(p)) ? artifacts : null;
+    const mechNack = paths => { emit('judge_skipped', { reason: 'no declared artifact exists yet', missing: paths }); return { ok: false, mech: true, duration: 0, out: `NACK — artifact(s) still missing: ${paths.join(', ')} — implementation does not exist yet; write the artifact first.` }; };
     // Shared bg-jobs registry: MI_SESSION_ID is inherited by all delegates, so every worker's bash tool
     // appends to the same jobs file. After a worker returns, if a registered job is still alive and its
     // log is growing, poll it (no LLM calls) instead of burning judge+worker cycles — long compute
@@ -77,7 +81,8 @@ export default {
       });
       return { ok: verdict(out), out, duration: Date.now() - started };
     };
-    let pre = await judge(budgetGuidance());
+    const preMiss = missingAll();
+    let pre = preMiss ? mechNack(preMiss) : await judge(budgetGuidance());
     emit('precheck', { status: pre.ok ? 'ACK' : 'NACK', duration_ms: pre.duration, budget_remaining_s: budget(), excerpt: tail(pre.out) });
     if (pre.ok) return `goal already met.\nprogress log: ${log}\nevent log: ${events}\n${pre.out}`;
     if (isFatal(pre.out)) { emit('fatal', { phase: 'precheck' }); return `goal aborted: API credit exhaustion.\nprogress log: ${log}\nevent log: ${events}`; }
@@ -89,7 +94,8 @@ export default {
       if (phase === 'SALVAGE') {
         console.log(gray(`── salvage (${budget()}s left) ──`));
         const salvage = await delegate.handler({ timeout, prompt: `FINAL SALVAGE — budget is nearly exhausted. do not debug, do not explore, do not run tests. your only job is to write output artifacts.\n\ngoal: ${goal}\nprogress file: ${log}\nrefined exit criteria and verifier-shape contract:\n${planTrunc(plan)}\n\nlatest checkpoint:\n${checkpoint}\n\nFIRST check which required artifacts already exist and pass hard constraints — an existing passing artifact is worth more than a hypothetically better rewrite. if an artifact exists and meets its threshold/constraints, leave it alone. for every required output file in the verifier-shape contract: if it does not exist, create it with the best content you can produce from the current state. if it exists but is incomplete, make minimal targeted repairs only — NEVER rewrite from scratch. if a service must be running, start it with bg mode. write ALL required artifacts before doing anything else. set timeout on every command — you have no time to wait. end with a summary of files written.` });
-        last = await judge(budgetGuidance());
+        const sMiss = missingAll();
+        last = sMiss ? mechNack(sMiss) : await judge(budgetGuidance());
         emit('salvage', { iteration: i, status: last.ok ? 'ACK' : 'NACK', budget_remaining_s: budget(), excerpt: tail(salvage) });
         appendFileSync(log, `\n# Salvage\nstatus: ${last.ok ? 'ACK' : 'NACK'}\nbudget_remaining_s: ${budget()}\n\n${bullets(salvage)}\n`);
         if (last.ok) { emit('complete', { iterations: i, status: 'ACK', salvaged: true }); return `goal achieved via salvage.\nprogress log: ${log}\nevent log: ${events}\n${last.out}`; }
@@ -112,7 +118,8 @@ export default {
       if (isSpawnErr) { feedback = work; checkpoint = `spawn/exit error: ${tail(work, 500)}`; strategies.push('spawn error'); blockerSigs.push(blockerSig(work)); last = { ok: false, out: work, duration: 0 }; emit('iteration', { iteration: i, status: 'NACK', strategy: 'spawn error', worker_duration_ms: workMs, judge_duration_ms: 0, budget_remaining_s: budget(), worker_excerpt: tail(work), judge_excerpt: work }); appendFileSync(log, `\n# Iteration ${i} — spawn error (judge skipped)\n${work}\n`); console.log(gray(`── ✗ spawn error ──`)); continue; }
       const waitedMs = await monitorJobs();
       if (waitedMs) appendFileSync(log, `\n# Background Job Monitor (iteration ${i})\nwaited_ms: ${waitedMs}\nlive_after: ${liveJobs().length}\n`);
-      last = await judge(budgetGuidance());
+      const iterMiss = missingAll();
+      last = iterMiss ? mechNack(iterMiss) : await judge(budgetGuidance());
       feedback = tail(last.out);
       const workTail = tail(work, 3000);
       const stratLine = workTail.match(/STRATEGY:\s*(.+)/i)?.[1]?.trim() || workTail.match(/\d\.\s*(?:strategy|approach)[:\s]*(.+)/i)?.[1]?.trim() || `iteration ${i} approach`;
@@ -122,7 +129,7 @@ export default {
         if (m) cpLines.push(`${key}: ${m[1].trim().slice(0, 300)}`);
       }
       checkpoint = cpLines.length >= 2 ? cpLines.join('\n') : `strategy: ${stratLine}\njudge feedback: ${tail(feedback, 800)}`;
-      if (!last.ok) { strategies.push(stratLine); blockerSigs.push(blockerSig(feedback)); }
+      if (!last.ok && !last.mech) { strategies.push(stratLine); blockerSigs.push(blockerSig(feedback)); }
       emit('iteration', { iteration: i, status: last.ok ? 'ACK' : 'NACK', strategy: stratLine, worker_duration_ms: workMs, judge_duration_ms: last.duration, budget_remaining_s: budget(), iter_timeout_ms: iterTimeout, worker_excerpt: tail(work), judge_excerpt: feedback });
       appendFileSync(log, `\n# Iteration ${i} Summary\nstatus: ${last.ok ? "ACK" : "NACK"}\nstrategy: ${stratLine}\nworker_duration_ms: ${workMs}\njudge_duration_ms: ${last.duration}\n${budget() !== null ? `budget_remaining_s: ${budget()}\n` : ''}\ncheckpoint:\n${checkpoint}\n\nworker summary:\n${bullets(work)}\n\njudge summary:\n${bullets(last.out)}\n\nworker tail:\n${tail(work)}\n\njudge tail:\n${feedback}\n`);
       console.log(gray(`── ${last.ok ? "✓" : "✗"} ──`));

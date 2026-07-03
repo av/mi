@@ -447,6 +447,47 @@ test('goal loop monitors live background jobs from shared registry before judgin
   }
 });
 
+test('goal skips judge with mechanical NACK while declared artifacts are missing', async () => {
+  const art = `/tmp/mi-test-artifact-${Date.now()}.txt`;
+  const prompts = [];
+  requestHandler = (req, res, body) => {
+    const prompt = body.messages.at(-1).content;
+    prompts.push(prompt);
+    if (prompts.length === 1) {
+      sse(res, { role: 'assistant', content: `EXIT_CRITERIA\n- file written\nARTIFACTS: ${art}\nVERIFIER_SHAPE_CONTRACT\n- file exists\nVERIFICATION_PLAN\n- inspect file\nCURRENT_STATE\n- missing` });
+    } else if (prompts.length === 2) {
+      // pre-check judge was skipped (mechanical NACK) — this is already worker 1
+      assert.match(prompt, /you are worker 1\/128/);
+      assert.match(prompt, /artifact\(s\) still missing:/);
+      assert.match(prompt, /implementation does not exist yet; write the artifact first/);
+      sse(res, { role: 'assistant', content: 'attempted but wrote nothing\nSTRATEGY: approach A' });
+    } else if (prompts.length === 3) {
+      // artifact still missing → iteration judge skipped again, straight to worker 2
+      assert.match(prompt, /you are worker 2\/128/);
+      assert.match(prompt, /implementation does not exist yet/);
+      // mechanical NACKs are progress-neutral: no strategy/blocker accounting
+      assert.doesNotMatch(prompt, /failed strategies \(do NOT repeat\)/);
+      assert.doesNotMatch(prompt, /BLOCKED: 3 iterations failed/);
+      writeFileSync(art, 'content'); // worker writes the artifact this time
+      sse(res, { role: 'assistant', content: 'wrote the file\nSTRATEGY: approach B' });
+    } else if (prompts.length === 4) {
+      // artifact exists now → the skip stops, real judge runs
+      assert.match(prompt, /you are a judge for a goal loop/);
+      sse(res, { role: 'assistant', content: 'file exists and passes\nACK' });
+    } else {
+      assert.match(prompt, /BLIND SKEPTICAL RECHECK/);
+      sse(res, { role: 'assistant', content: 'independently verified\nACK' });
+    }
+  };
+  try {
+    const result = await runMi(['-g', 'write the file', '-c', 'inspect; ACK or NACK']);
+    assert.strictEqual(result.status, 0);
+    assert.strictEqual(prompts.length, 5);
+    // exactly one judge model call, and only after the artifact existed
+    assert.strictEqual(prompts.filter(p => /you are a judge for a goal loop/.test(p)).length, 1);
+  } finally { try { unlinkSync(art); } catch {} }
+});
+
 test('goal mode passes deadline from -d flag and MI_DEADLINE env', async () => {
   let calls = 0;
   requestHandler = (req, res, body) => {
