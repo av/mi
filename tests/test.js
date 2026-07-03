@@ -338,6 +338,7 @@ test('goal workers do work instead of receiving judge criteria', async () => {
       assert.match(prompt, /you are the planner for a goal loop/);
       assert.match(prompt, /goal: create files/);
       assert.match(prompt, /criteria: inspect state/);
+      assert.match(prompt, /ARTIFACTS/);
       assert.match(prompt, /VERIFIER_SHAPE_CONTRACT/);
       assert.match(prompt, /do not invent requirements/);
       sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- files exist\nVERIFIER_SHAPE_CONTRACT\n- exact files exist\nVERIFICATION_PLAN\n- inspect files\nCURRENT_STATE\n- missing files' });
@@ -377,6 +378,33 @@ test('goal workers do work instead of receiving judge criteria', async () => {
   assert.strictEqual(result.status, 0);
   assert.strictEqual(prompts.length, 5);
   assert.match(result.stdout, /independently verified/);
+});
+
+test('MI_JUDGE_MODEL overrides model for judge and recheck only', async () => {
+  const seen = [];
+  requestHandler = (req, res, body) => {
+    const prompt = body.messages.at(-1).content;
+    seen.push({ prompt, model: body.model });
+    if (seen.length === 1) {
+      sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- files exist\nARTIFACTS: none\nVERIFIER_SHAPE_CONTRACT\n- files\nVERIFICATION_PLAN\n- inspect\nCURRENT_STATE\n- missing' });
+    } else if (seen.length === 2) {
+      sse(res, { role: 'assistant', content: 'missing files\nNACK' });
+    } else if (seen.length === 3) {
+      sse(res, { role: 'assistant', content: 'created files' });
+    } else {
+      sse(res, { role: 'assistant', content: 'verified\nACK' });
+    }
+  };
+
+  const result = await runMi(['-g', 'create files', '-c', 'inspect; ACK or NACK'], { MODEL: 'worker-model', MI_JUDGE_MODEL: 'judge-model' });
+  assert.strictEqual(result.status, 0);
+  assert.strictEqual(seen.length, 5);
+  assert.strictEqual(seen[0].model, 'worker-model');   // planner
+  assert.strictEqual(seen[1].model, 'judge-model');    // pre-check judge
+  assert.strictEqual(seen[2].model, 'worker-model');   // worker
+  assert.strictEqual(seen[3].model, 'judge-model');    // judge
+  assert.strictEqual(seen[4].model, 'judge-model');    // blind skeptical recheck
+  assert.match(seen[4].prompt, /BLIND SKEPTICAL RECHECK/);
 });
 
 test('goal mode passes deadline from -d flag and MI_DEADLINE env', async () => {
