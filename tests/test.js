@@ -587,6 +587,46 @@ test('goal NACK iteration passes structured checkpoint to next worker', async ()
   assert.strictEqual(prompts.length, 7);
 });
 
+test('goal measured/expected ledger surfaces PARAMETER HISTORY after oscillating NACKs', async () => {
+  const prompts = [];
+  requestHandler = (req, res, body) => {
+    const prompt = body.messages.at(-1).content;
+    prompts.push(prompt);
+    if (prompts.length === 1) {
+      sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- sim stable\nVERIFIER_SHAPE_CONTRACT\n- check timestep\nVERIFICATION_PLAN\n- run sim\nCURRENT_STATE\n- unstable' });
+    } else if (prompts.length === 2) {
+      // Pre-check NACK, no measured pairs
+      sse(res, { role: 'assistant', content: 'sim unstable [FAIL]\nNACK' });
+    } else if (prompts.length === 3) {
+      // Worker 1 — single NACK so far, no history table yet
+      assert.doesNotMatch(prompt, /PARAMETER HISTORY/);
+      sse(res, { role: 'assistant', content: '1. STRATEGY: guessed timestep 0.004\n2. FILES_MODIFIED: model.xml\n3. COMMANDS_SUCCEEDED: sim\n4. COMMANDS_FAILED: check\n5. BLOCKERS: unstable\n6. REMAINING: tune' });
+    } else if (prompts.length === 4) {
+      // Judge 1 → NACK with measured pair
+      sse(res, { role: 'assistant', content: 'timestep drift: measured=0.004 expected=0.001 [FAIL]\nNACK' });
+    } else if (prompts.length === 5) {
+      // Worker 2 — one ledger entry only, still no table
+      assert.doesNotMatch(prompt, /PARAMETER HISTORY/);
+      sse(res, { role: 'assistant', content: '1. STRATEGY: guessed timestep 0.0005\n2. FILES_MODIFIED: model.xml\n3. COMMANDS_SUCCEEDED: sim\n4. COMMANDS_FAILED: check\n5. BLOCKERS: unstable\n6. REMAINING: tune' });
+    } else if (prompts.length === 6) {
+      // Judge 2 → NACK, same criterion, DIFFERENT measured value
+      sse(res, { role: 'assistant', content: 'timestep drift: measured=0.0005 expected=0.001 [FAIL]\nNACK' });
+    } else if (prompts.length === 7) {
+      // Worker 3 — oscillation detected, history table appears
+      assert.match(prompt, /PARAMETER HISTORY timestep drift: tried→got: \[0\.004, 0\.0005\]; expected 0\.001/);
+      assert.match(prompt, /interpolate\/bisect/);
+      sse(res, { role: 'assistant', content: '1. STRATEGY: bisected to 0.001\n2. FILES_MODIFIED: model.xml\n3. COMMANDS_SUCCEEDED: sim, check\n4. COMMANDS_FAILED: none\n5. BLOCKERS: none\n6. REMAINING: none' });
+    } else {
+      sse(res, { role: 'assistant', content: 'timestep drift: measured=0.001 expected=0.001 [PASS]\nACK' });
+    }
+  };
+
+  const result = await runMi(['-g', 'tune sim', '-c', 'check timestep']);
+  assert.strictEqual(result.status, 0);
+  // planner + precheck + w1 + j1 + w2 + j2 + w3 + j3(ACK) = 8 (skeptical skipped: i>2, no deadline)
+  assert.strictEqual(prompts.length, 8);
+});
+
 test('goal salvage triggers when deadline is near', async () => {
   const prompts = [];
   // Deadline 30s from now — after planner + precheck, budget should be in SALVAGE
