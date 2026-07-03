@@ -94,6 +94,21 @@
   command: grep -q 'MI_SESSION_ID' tools/goal.mjs && grep -q 'MI_JOB_POLL_MS' tools/goal.mjs && grep -q 'monTotalMs' tools/goal.mjs && grep -q 'liveJobs' tools/goal.mjs && grep -qF 'stalls < 3' tools/goal.mjs
 - label: goal planner emits INVARIANTS section (input-derived conservation checks) and judge rule 6b executes them against pristine input before ACK
   command: grep -q 'INVARIANTS' tools/goal.mjs && grep -q '6b\.' tools/goal.mjs && grep -q 'PRISTINE input' tools/goal.mjs && grep -q 'self-referential' tools/goal.mjs
+- label: goal verdict quarantine: verdicts need an ACK/NACK token plus evidence (measured=/PASS/FAIL); garbled judge output gets exactly one retry then counts as NACK; garbled recheck output keeps the primary ACK (recheck_invalid event)
+  command: grep -q 'judge_invalid' tools/goal.mjs && grep -q 'recheck_invalid' tools/goal.mjs && grep -q 'measured=|PASS|FAIL' tools/goal.mjs
+  tags: [implemented]
+- label: goal verdict scans the full judge message and takes the last ACK/NACK-bearing line — a front-loaded ACK with long trailing rationale parses as ACK
+  command: grep -q 'findLast' tools/goal.mjs
+  tags: [implemented]
+- label: goal judge and skeptical recheck delegates get a wall-clamped timeout (45-180s scaled from budget); recheck is skipped entirely when budget < 180s, banking the ACK
+  command: grep -q 'wallT' tools/goal.mjs && grep -q 'recheck_skipped' tools/goal.mjs
+  tags: [implemented]
+- label: goal salvage/urgent phases trigger adaptively from an EMA of iteration duration (SALVAGE at max(60, 1.3*EMA); URGENT at max(2.5*EMA, 20% total)), EMA contribution clamped to 25% of total budget
+  command: grep -q '1.3 \* e' tools/goal.mjs && grep -q '2.5 \* e' tools/goal.mjs
+  tags: [implemented]
+- label: goal draft-gate escalates one-shot past 50% elapsed budget with no live jobs: worker prompt becomes an artifacts-first salvage-style directive whose NACK is exempt from strategy/blockerSig accounting
+  command: grep -q 'ARTIFACT ESCALATION' tools/goal.mjs && grep -q 'escalated' tools/goal.mjs
+  tags: [implemented]
 
 # agent-loop
 - agent loop streams OpenAI chat completions via SSE, executes tool calls, repeats until text response
