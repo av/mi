@@ -407,6 +407,40 @@ test('MI_JUDGE_MODEL overrides model for judge and recheck only', async () => {
   assert.match(seen[4].prompt, /BLIND SKEPTICAL RECHECK/);
 });
 
+test('goal loop monitors live background jobs from shared registry before judging', async () => {
+  const sid = `test-monitor-${Date.now()}`;
+  const jobsFile = `/tmp/mi-jobs-${sid}.jsonl`, jobLog = `/tmp/mi-test-job-${sid}.log`;
+  writeFileSync(jobLog, 'working\n');
+  const bg = spawn('sleep', ['5'], { detached: true, stdio: 'ignore' }); bg.unref();
+  writeFileSync(jobsFile, JSON.stringify({ id: 'j1', pid: bg.pid, pgid: bg.pid, log: jobLog, started_at: Date.now(), command: 'long compute' }) + '\n');
+  const prompts = [];
+  requestHandler = (req, res, body) => {
+    prompts.push(body.messages.at(-1).content);
+    if (prompts.length === 1) {
+      sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- done\nARTIFACTS: none\nVERIFIER_SHAPE_CONTRACT\n- out\nVERIFICATION_PLAN\n- inspect\nCURRENT_STATE\n- running' });
+    } else if (prompts.length === 2) {
+      sse(res, { role: 'assistant', content: 'not done\nNACK' });
+    } else if (prompts.length === 3) {
+      assert.match(prompts[2], /check for running background jobs from previous iterations/);
+      assert.match(prompts[2], /do NOT restart or duplicate it/);
+      sse(res, { role: 'assistant', content: 'job still running, waiting' });
+    } else {
+      assert.match(prompts[3], /a live background job .* is work in progress/);
+      sse(res, { role: 'assistant', content: 'done\nACK' });
+    }
+  };
+  try {
+    const result = await runMi(['-g', 'finish compute', '-c', 'inspect; ACK or NACK'], { MI_SESSION_ID: sid, MI_JOB_POLL_MS: '100' });
+    assert.strictEqual(result.status, 0);
+    // monitor detected the live registered job and polled it (stall guard: log never grew → 3 polls then judge)
+    assert.match(result.stdout, /waiting on 1 live bg job/);
+  } finally {
+    try { process.kill(bg.pid); } catch {}
+    try { unlinkSync(jobsFile); } catch {}
+    try { unlinkSync(jobLog); } catch {}
+  }
+});
+
 test('goal mode passes deadline from -d flag and MI_DEADLINE env', async () => {
   let calls = 0;
   requestHandler = (req, res, body) => {
