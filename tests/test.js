@@ -372,6 +372,9 @@ test('goal workers do work instead of receiving judge criteria', async () => {
       sse(res, { role: 'assistant', content: 'all files exist\nACK' });
     } else {
       assert.match(prompt, /BLIND SKEPTICAL RECHECK/);
+      assert.match(prompt, /STRICTLY READ-ONLY/);
+      assert.match(prompt, /NEVER run git write operations/);
+      assert.match(prompt, /so the WORKER performs the repair/);
       assert.doesNotMatch(prompt, /plan and verifier contract/);
       sse(res, { role: 'assistant', content: 'independently verified — all files exist\nACK' });
     }

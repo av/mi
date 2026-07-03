@@ -82,6 +82,8 @@
   command: grep -q 'BLIND SKEPTICAL RECHECK' tools/goal.mjs && grep -q 'no worker plan, no worker claims' tools/goal.mjs && grep -q 'enumerate EVERY requirement element' tools/goal.mjs && grep -qF 'i <= 2 || (budget() ?? 0) > 300' tools/goal.mjs && grep -q 'CONCRETE measured-vs-required mismatch' tools/goal.mjs
 - label: goal judge and recheck probes are observational only — never write to service control channels (monitor sockets, FIFOs, admin endpoints)
   command: test $(grep -c 'NEVER write to service control channels' tools/goal.mjs) -eq 2 && grep -q 'monitor sockets, FIFOs' tools/goal.mjs
+- label: goal judge and blind recheck are strictly read-only — no file writes, git write ops, or installs; mismatches route to the worker via NACK
+  command: test $(grep -c 'STRICTLY READ-ONLY' tools/goal.mjs) -eq 2 && grep -q 'commit/merge/cherry-pick/rebase/checkout/reset/branch/clean/stash/apply' tools/goal.mjs && grep -q 'so the WORKER performs the repair' tools/goal.mjs
 - label: goal worker restart-before-ACK guidance carves out VMs/emulators/long-boot systems — never restart those
   command: grep -q 'VM/emulator/long-boot system — never restart those' tools/goal.mjs
 - label: goal planner emits ARTIFACTS: line; draft gate prefixes worker with draft-first directive when artifacts missing past 25% budget, without producing NACKs or feeding blockerSigs
