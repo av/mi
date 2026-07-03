@@ -340,6 +340,7 @@ test('goal workers do work instead of receiving judge criteria', async () => {
       assert.match(prompt, /criteria: inspect state/);
       assert.match(prompt, /ARTIFACTS/);
       assert.match(prompt, /VERIFIER_SHAPE_CONTRACT/);
+      assert.match(prompt, /INVARIANTS:.*transforms\/extracts\/converts/);
       assert.match(prompt, /do not invent requirements/);
       sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- files exist\nVERIFIER_SHAPE_CONTRACT\n- exact files exist\nVERIFICATION_PLAN\n- inspect files\nCURRENT_STATE\n- missing files' });
     } else if (prompts.length === 2) {
@@ -349,6 +350,8 @@ test('goal workers do work instead of receiving judge criteria', async () => {
       assert.match(prompt, /event log:/);
       assert.match(prompt, /NEVER trust worker-reported values/);
       assert.match(prompt, /measured=X expected=Y/);
+      assert.match(prompt, /INVARIANTS commands against the PRISTINE input/);
+      assert.match(prompt, /self-referential/);
       assert.match(prompt, /do not invent criteria/);
       sse(res, { role: 'assistant', content: 'missing files\nNACK' });
     } else if (prompts.length === 3) {
