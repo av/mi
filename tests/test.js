@@ -367,8 +367,8 @@ test('goal workers do work instead of receiving judge criteria', async () => {
       assert.match(prompt, /criteria: inspect state/);
       sse(res, { role: 'assistant', content: 'all files exist\nACK' });
     } else {
-      assert.match(prompt, /you are a judge for a goal loop/);
-      assert.match(prompt, /SKEPTICAL RECHECK/);
+      assert.match(prompt, /BLIND SKEPTICAL RECHECK/);
+      assert.doesNotMatch(prompt, /plan and verifier contract/);
       sse(res, { role: 'assistant', content: 'independently verified — all files exist\nACK' });
     }
   };
