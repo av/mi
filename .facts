@@ -48,38 +48,50 @@
 - label: goal loop establishes refined exit criteria before worker iterations
   command: grep -q 'you are the planner for a goal loop' tools/goal.mjs && grep -q 'EXIT_CRITERIA' tools/goal.mjs && grep -q 'VERIFIER_SHAPE_CONTRACT' tools/goal.mjs && grep -q 'VERIFICATION_PLAN' tools/goal.mjs && grep -q 'Refined Exit Criteria And Verification Plan' tools/goal.mjs
 - label: goal planner synthesizes verifier shape contract from visible task evidence
-  command: grep -q 'infer the likely verifier shape' tools/goal.mjs && grep -q 'exact artifact paths' tools/goal.mjs && grep -q 'numeric success thresholds' tools/goal.mjs && grep -q 'inputs that must remain unchanged' tools/goal.mjs
+  command: grep -q 'infer verifier shape' tools/goal.mjs && grep -q 'exact artifact paths' tools/goal.mjs && grep -q 'numeric thresholds' tools/goal.mjs && grep -q 'preservation constraints' tools/goal.mjs
 - label: goal worker iterations receive refined exit criteria and prior feedback, not raw judge criteria
-  command: grep -q 'verifier-shape contract' tools/goal.mjs && grep -q 'previous judge feedback' tools/goal.mjs && grep -q 'one noninteractive bash script' tools/goal.mjs && ! grep -q 'judge criteria: ${check}' tools/goal.mjs && ! grep -q '# Judge criteria' tools/goal.mjs && ! grep -q 'read the progress file for prior NACK feedback' tools/goal.mjs
-- label: goal worker iterations receive temporal iteration guidance without a hard benchmark cap
-  command: grep -q 'iteration guidance' tools/goal.mjs && grep -q 'avoid repeating the same failed approach' tools/goal.mjs && grep -q 'after two failed iterations' tools/goal.mjs
+  command: grep -q 'verifier contract and plan' tools/goal.mjs && grep -q 'judge feedback and checkpoint' tools/goal.mjs && grep -q 'one noninteractive bash script' tools/goal.mjs && ! grep -q 'judge criteria: ${check}' tools/goal.mjs
 - label: goal loop appends structured iteration summaries to its progress log
   command: grep -q 'Iteration ${i} Summary' tools/goal.mjs && grep -q 'worker summary:' tools/goal.mjs && grep -q 'judge summary:' tools/goal.mjs && grep -q 'worker tail:' tools/goal.mjs && grep -q 'judge tail:' tools/goal.mjs
 - label: goal loop writes markdown and JSONL progress logs with iteration events
   command: grep -q "events = log.replace" tools/goal.mjs && grep -q "emit('start'" tools/goal.mjs && grep -q "emit('iteration'" tools/goal.mjs && grep -q 'event log:' tools/goal.mjs
 - label: goal judges must not invent criteria beyond the goal and check
-  command: grep -q 'do not invent criteria' tools/goal.mjs && grep -q 'NEVER trust worker-reported values' tools/goal.mjs && grep -q 'verification was skipped' tools/goal.mjs
+  command: grep -q 'do not invent criteria' tools/goal.mjs && grep -q 'NEVER trust worker-reported values' tools/goal.mjs && grep -q 'skipped, approximate, or uncertain' tools/goal.mjs
 - label: goal judges must measure thresholds and exact artifact contracts before ACK
-  command: grep -q 'measured_value > required_threshold' tools/goal.mjs && grep -q 'EXACT MEASURED VALUE vs EXACT EXPECTED VALUE' tools/goal.mjs && grep -q 'exact path exists' tools/goal.mjs && grep -q 'liveness alone' tools/goal.mjs
+  command: grep -q 'EXACT stated threshold' tools/goal.mjs && grep -q 'measured=X expected=Y' tools/goal.mjs && grep -q 'exact path exists' tools/goal.mjs
 - label: goal tool supports deadline parameter for budget-aware iteration with 4-phase guidance and salvage policy
   command: grep -q 'deadline.*unix timestamp' tools/goal.mjs && grep -q 'budgetPhase' tools/goal.mjs && grep -q 'SALVAGE' tools/goal.mjs && grep -q 'FINAL SALVAGE' tools/goal.mjs
-- label: goal judge uses strict 8-point verification protocol with 5% margin and adversarial edge-case checks
-  command: grep -q 'STRICT VERIFICATION PROTOCOL' tools/goal.mjs && grep -q 'required_threshold \* 1.05' tools/goal.mjs && grep -q 'adversarial check' tools/goal.mjs && grep -q 'WARNING: MARGINAL' tools/goal.mjs
+- label: goal judge uses strict 8-rule verification protocol — exact thresholds with 5%-margin risk note, adversarial edge-case checks
+  command: grep -q 'STRICT VERIFICATION' tools/goal.mjs && grep -q 'within 5% of the bar as a risk' tools/goal.mjs && grep -q 'adversarial checks' tools/goal.mjs
 - label: goal worker receives strategy diversity enforcement with failed strategy fingerprints
-  command: grep -q 'strategies.push' tools/goal.mjs && grep -q 'previous failed strategies' tools/goal.mjs && grep -q 'fundamentally different approach' tools/goal.mjs && grep -q 'abandon this entire solution family' tools/goal.mjs
+  command: grep -q 'strategies.push' tools/goal.mjs && grep -q 'failed strategies (do NOT repeat)' tools/goal.mjs && grep -q 'abandon this solution family entirely' tools/goal.mjs
 - label: goal worker receives structured checkpoints for iteration handoff instead of raw judge output
   command: grep -q 'STRATEGY:' tools/goal.mjs && grep -q 'FILES_MODIFIED' tools/goal.mjs && grep -q 'COMMANDS_SUCCEEDED' tools/goal.mjs && grep -q 'BLOCKERS' tools/goal.mjs && grep -q 'checkpoint' tools/goal.mjs
 - label: goal strategy history is capped at last 5 entries to prevent prompt bloat
   command: grep -q 'slice(-5)' tools/goal.mjs
 - label: goal planner runs explicit inspection checklist before reasoning (directory listing, project structure, output file check)
-  command: grep -q 'first, run these inspection commands' tools/goal.mjs && grep -q 'ls -la' tools/goal.mjs && grep -q 'check for any output files' tools/goal.mjs
-- label: goal worker prompt includes bash discipline guidance (timeouts, output piping, no interactive processes)
-  command: grep -q 'bash discipline' tools/goal.mjs && grep -q 'timeout on any command' tools/goal.mjs && grep -q 'pipe verbose output' tools/goal.mjs && grep -q 'never start interactive' tools/goal.mjs
+  command: grep -q 'run at most 12 commands' tools/goal.mjs && grep -q 'pwd && ls -la' tools/goal.mjs && grep -q 'check if output files from the goal already exist' tools/goal.mjs
+- label: goal worker prompt includes bash discipline guidance (command timeouts, output piping, noninteractive scripts)
+  command: grep -q 'timeout commands >60s' tools/goal.mjs && grep -q 'pipe verbose output through tail -50' tools/goal.mjs && grep -q 'one noninteractive bash script' tools/goal.mjs
 - label: goal worker gets budget-derived timeout (remaining - 120s) when deadline is set
   command: grep -q 'iterTimeout.*deadline.*budget.*120' tools/goal.mjs
 - skill tool without name lists all available skills; with name returns SKILL.md body
 - label: skill frontmatter parsed via regex (^name: and ^description: with multiline flag)
   command: grep -q '/m' tools/skill.mjs
+- label: goal ACK triggers blind skeptical recheck (idle-budget gated) that sees only the task, not the plan, and enumerates every requirement element
+  command: grep -q 'BLIND SKEPTICAL RECHECK' tools/goal.mjs && grep -q 'no worker plan, no worker claims' tools/goal.mjs && grep -q 'enumerate EVERY requirement element' tools/goal.mjs && grep -qF 'i <= 2 || (budget() ?? 0) > 300' tools/goal.mjs && grep -q 'CONCRETE measured-vs-required mismatch' tools/goal.mjs
+- label: goal judge and recheck probes are observational only — never write to service control channels (monitor sockets, FIFOs, admin endpoints)
+  command: test $(grep -c 'NEVER write to service control channels' tools/goal.mjs) -eq 2 && grep -q 'monitor sockets, FIFOs' tools/goal.mjs
+- label: goal worker restart-before-ACK guidance carves out VMs/emulators/long-boot systems — never restart those
+  command: grep -q 'VM/emulator/long-boot system — never restart those' tools/goal.mjs
+- label: goal planner emits ARTIFACTS: line; draft gate prefixes worker with draft-first directive when artifacts missing past 25% budget, without producing NACKs or feeding blockerSigs
+  command: grep -q 'ARTIFACTS:' tools/goal.mjs && grep -q 'draftGate' tools/goal.mjs && grep -qF '> 0.25' tools/goal.mjs && grep -q 'DRAFT FIRST' tools/goal.mjs && grep -q "emit('draft_gate'" tools/goal.mjs
+- label: MI_JUDGE_MODEL and MI_JUDGE_PARAMS optionally override model/params for judge and skeptical recheck delegates only
+  command: grep -q 'MI_JUDGE_MODEL' tools/goal.mjs && grep -q 'MI_JUDGE_PARAMS' tools/goal.mjs && test $(grep -c 'env: jenv' tools/goal.mjs) -eq 2
+- label: goal loop shares one bg-jobs registry per session (MI_SESSION_ID) and polls live jobs without LLM calls — MI_JOB_POLL_MS interval, stall guard, cumulative 50%-of-budget cap
+  command: grep -q 'MI_SESSION_ID' tools/goal.mjs && grep -q 'MI_JOB_POLL_MS' tools/goal.mjs && grep -q 'monTotalMs' tools/goal.mjs && grep -q 'liveJobs' tools/goal.mjs && grep -qF 'stalls < 3' tools/goal.mjs
+- label: goal planner emits INVARIANTS section (input-derived conservation checks) and judge rule 6b executes them against pristine input before ACK
+  command: grep -q 'INVARIANTS' tools/goal.mjs && grep -q '6b\.' tools/goal.mjs && grep -q 'PRISTINE input' tools/goal.mjs && grep -q 'self-referential' tools/goal.mjs
 
 # agent-loop
 - agent loop streams OpenAI chat completions via SSE, executes tool calls, repeats until text response
@@ -166,8 +178,8 @@
   command: grep -q 'TERMINAL_BENCH_CHECK' mi_harbor/mi_agent.py && grep -q -- '-g "$1" -c "$MI_GOAL_CHECK"' mi_harbor/mi_agent.py
 - label: harbor adapter computes MI_DEADLINE from MI_TASK_TIMEOUT with 60s verifier buffer
   command: grep -q 'MI_TASK_TIMEOUT' mi_harbor/mi_agent.py && grep -q 'MI_DEADLINE' mi_harbor/mi_agent.py && grep -q 'TASK_TIMEOUT - 60' mi_harbor/mi_agent.py
-- label: harbor TERMINAL_BENCH_CHECK requires exact file paths, measured thresholds, test suites, and adversarial edge cases
-  command: grep -q 'exact output file paths' mi_harbor/mi_agent.py && grep -q 'numeric thresholds, measure the actual value' mi_harbor/mi_agent.py && grep -q 'adversarial edge case' mi_harbor/mi_agent.py
+- label: harbor TERMINAL_BENCH_CHECK treats /tests/ results as ground truth, requires exact file paths and measured thresholds, never NACKs for margin
+  command: grep -q 'test results are GROUND TRUTH' mi_harbor/mi_agent.py && grep -q 'exact output file paths' mi_harbor/mi_agent.py && grep -q 'numeric thresholds, measure the actual value' mi_harbor/mi_agent.py && grep -q 'never NACK for margin' mi_harbor/mi_agent.py
 - label: harbor smoke eval script runs one Terminal-Bench task through the cached Docker environment
   command: test -x mi_harbor/run-smoke.sh && grep -q 'MiCachedDockerEnvironment' mi_harbor/run-smoke.sh && grep -q 'fix-git' mi_harbor/run-smoke.sh
 - label: cached Docker environment builds mi-eval-cache images from Terminal-Bench task images
