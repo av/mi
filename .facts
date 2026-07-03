@@ -223,3 +223,6 @@
   command: grep -q 'missingAll' tools/goal.mjs && grep -q "emit('judge_skipped'" tools/goal.mjs && grep -q 'implementation does not exist yet; write the artifact first' tools/goal.mjs && grep -qF '!last.ok && !last.mech' tools/goal.mjs && grep -qF 'existsSync, readFileSync } from "fs"' tools/goal.mjs
 - label: goal loop keeps a per-criterion measured/expected ledger from judge NACKs and injects a PARAMETER HISTORY table into the worker checkpoint when >=2 different measured values exist for the same criterion (capped at 5 entries)
   command: grep -q 'PARAMETER HISTORY' tools/goal.mjs && grep -q 'harvest' tools/goal.mjs && grep -q 'withHist' tools/goal.mjs && grep -qF 'e.length > 5' tools/goal.mjs && grep -q 'interpolate/bisect' tools/goal.mjs
+- label: goal loop single-blocker fast lane: when a real (non-mech) judge NACK has exactly one failing criterion (canonical [FAIL] lines or markdown FAIL rows) and remaining budget is under 30% of total, the next worker gets a surgical brief (single criterion verbatim + parameter history, fix-only-this directive) with strategy/exploration scaffolding dropped, preempting blind salvage
+  command: grep -q 'SINGLE-BLOCKER FAST LANE' tools/goal.mjs && grep -q 'failLines' tools/goal.mjs && grep -q 'fastLane' tools/goal.mjs && grep -q "budget() / totalS < 0.3" tools/goal.mjs
+  tags: [implemented]

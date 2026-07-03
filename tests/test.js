@@ -705,8 +705,8 @@ test('goal with past deadline triggers immediate salvage', async () => {
       // Planner
       sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- done\nVERIFIER_SHAPE_CONTRACT\n- checked\nVERIFICATION_PLAN\n- run\nCURRENT_STATE\n- empty' });
     } else if (prompts.length === 2) {
-      // Pre-check judge → NACK
-      sse(res, { role: 'assistant', content: 'not ready [FAIL]\nNACK' });
+      // Pre-check judge → NACK with TWO failing criteria (multi-FAIL → not fast lane, stays salvage)
+      sse(res, { role: 'assistant', content: 'not ready [FAIL]\nalso broken [FAIL]\nNACK' });
     } else if (prompts.length === 3) {
       // Should be salvage (budget is 0, past deadline)
       assert.match(prompt, /FINAL SALVAGE/);
@@ -721,6 +721,59 @@ test('goal with past deadline triggers immediate salvage', async () => {
   // Should exit (NACK after salvage breaks the loop)
   assert.strictEqual(result.status, 0);
   assert.strictEqual(prompts.length, 4);
+});
+
+test('goal single-blocker fast lane: low budget + one FAIL → surgical brief', async () => {
+  const prompts = [];
+  const dl = Math.floor(Date.now() / 1000) - 100; // past deadline → budget fraction 0 < 0.3
+  requestHandler = (req, res, body) => {
+    const prompt = body.messages.at(-1).content;
+    prompts.push(prompt);
+    if (prompts.length === 1) {
+      sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- constant right\nVERIFIER_SHAPE_CONTRACT\n- check R\nVERIFICATION_PLAN\n- run\nCURRENT_STATE\n- off' });
+    } else if (prompts.length === 2) {
+      // Pre-check judge → NACK with exactly ONE failing criterion
+      sse(res, { role: 'assistant', content: 'R integration constant: measured=0.5 expected=1.0 [FAIL]\nNACK' });
+    } else if (prompts.length === 3) {
+      // Worker should get the SURGICAL brief, not salvage/strategy scaffolding
+      assert.match(prompt, /SINGLE-BLOCKER FAST LANE/);
+      assert.match(prompt, /fix ONLY this criterion/);
+      assert.match(prompt, /R integration constant: measured=0.5 expected=1.0 \[FAIL\]/);
+      assert.doesNotMatch(prompt, /FINAL SALVAGE/);
+      assert.doesNotMatch(prompt, /failed strategies/);
+      assert.doesNotMatch(prompt, /BLOCKED/);
+      sse(res, { role: 'assistant', content: 'fixed the constant\nSTRATEGY: one-line fix\nFILES_MODIFIED: r.py\nCOMMANDS_SUCCEEDED: check\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
+    } else {
+      sse(res, { role: 'assistant', content: 'R integration constant: measured=1.0 expected=1.0 [PASS]\nACK' });
+    }
+  };
+  const result = await runMi(['-g', 'fix sampler', '-c', 'check R', '-d', String(dl)]);
+  assert.strictEqual(result.status, 0);
+  // planner + precheck + surgical worker + judge(ACK); recheck skipped (budget < 180s)
+  assert.strictEqual(prompts.length, 4);
+});
+
+test('goal fast lane suppressed: high budget one FAIL → normal worker prompt', async () => {
+  const prompts = [];
+  const dl = Math.floor(Date.now() / 1000) + 600; // budget fraction ~1.0 > 0.3 → no fast lane
+  requestHandler = (req, res, body) => {
+    const prompt = body.messages.at(-1).content;
+    prompts.push(prompt);
+    if (prompts.length === 1) {
+      sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- ok\nVERIFIER_SHAPE_CONTRACT\n- check\nVERIFICATION_PLAN\n- run\nCURRENT_STATE\n- off' });
+    } else if (prompts.length === 2) {
+      sse(res, { role: 'assistant', content: 'one thing: measured=2 expected=3 [FAIL]\nNACK' });
+    } else if (prompts.length === 3) {
+      // High budget → normal worker scaffolding, NOT the fast lane
+      assert.match(prompt, /you are worker/);
+      assert.doesNotMatch(prompt, /SINGLE-BLOCKER FAST LANE/);
+      sse(res, { role: 'assistant', content: 'did it\nSTRATEGY: normal\nFILES_MODIFIED: x\nCOMMANDS_SUCCEEDED: y\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
+    } else {
+      sse(res, { role: 'assistant', content: 'one thing: measured=3 expected=3 [PASS]\nACK' });
+    }
+  };
+  const result = await runMi(['-g', 'fix it', '-c', 'check', '-d', String(dl)]);
+  assert.strictEqual(result.status, 0);
 });
 
 test('goal budget phase shows in console output', async () => {
