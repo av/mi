@@ -627,6 +627,43 @@ test('goal measured/expected ledger surfaces PARAMETER HISTORY after oscillating
   assert.strictEqual(prompts.length, 8);
 });
 
+test('goal ledger harvests markdown-table FAIL rows into PARAMETER HISTORY', async () => {
+  const prompts = [];
+  requestHandler = (req, res, body) => {
+    const prompt = body.messages.at(-1).content;
+    prompts.push(prompt);
+    if (prompts.length === 1) {
+      sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- tm in range\nVERIFIER_SHAPE_CONTRACT\n- check tm\nVERIFICATION_PLAN\n- run\nCURRENT_STATE\n- off' });
+    } else if (prompts.length === 2) {
+      // Pre-check NACK, no measured pairs
+      sse(res, { role: 'assistant', content: 'off [FAIL]\nNACK' });
+    } else if (prompts.length === 3) {
+      assert.doesNotMatch(prompt, /PARAMETER HISTORY/);
+      sse(res, { role: 'assistant', content: '1. STRATEGY: primer A\n2. FILES_MODIFIED: p.txt\n3. COMMANDS_SUCCEEDED: sim\n4. COMMANDS_FAILED: check\n5. BLOCKERS: hot\n6. REMAINING: tune' });
+    } else if (prompts.length === 4) {
+      // Judge 1 → NACK as markdown table row only (no canonical line)
+      sse(res, { role: 'assistant', content: '| Criterion | Measured | Required | Status |\n| --- | --- | --- | --- |\n| Melting temperature (forward) | 74.35°C | 58-72°C | FAIL |\nNACK' });
+    } else if (prompts.length === 5) {
+      assert.doesNotMatch(prompt, /PARAMETER HISTORY/);
+      sse(res, { role: 'assistant', content: '1. STRATEGY: primer B\n2. FILES_MODIFIED: p.txt\n3. COMMANDS_SUCCEEDED: sim\n4. COMMANDS_FAILED: check\n5. BLOCKERS: cold\n6. REMAINING: tune' });
+    } else if (prompts.length === 6) {
+      // Judge 2 → NACK as table row, same criterion, DIFFERENT measured value
+      sse(res, { role: 'assistant', content: '| Melting temperature (forward) | 55.10°C | 58-72°C | FAIL |\nNACK' });
+    } else if (prompts.length === 7) {
+      // Worker 3 — oscillation across table rows → history appears
+      assert.match(prompt, /PARAMETER HISTORY melting temperature \(forward\): tried→got: \[74\.35°C, 55\.10°C\]; expected 58-72°C/);
+      assert.match(prompt, /interpolate\/bisect/);
+      sse(res, { role: 'assistant', content: '1. STRATEGY: primer C\n2. FILES_MODIFIED: p.txt\n3. COMMANDS_SUCCEEDED: sim, check\n4. COMMANDS_FAILED: none\n5. BLOCKERS: none\n6. REMAINING: none' });
+    } else {
+      sse(res, { role: 'assistant', content: 'melting temperature (forward): measured=65 expected=58-72 [PASS]\nACK' });
+    }
+  };
+
+  const result = await runMi(['-g', 'design primer', '-c', 'check tm']);
+  assert.strictEqual(result.status, 0);
+  assert.strictEqual(prompts.length, 8);
+});
+
 test('goal salvage triggers when deadline is near', async () => {
   const prompts = [];
   // Deadline 30s from now — after planner + precheck, budget should be in SALVAGE
