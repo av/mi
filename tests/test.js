@@ -339,6 +339,10 @@ test('goal workers do work instead of receiving judge criteria', async () => {
       assert.match(prompt, /goal: create files/);
       assert.match(prompt, /criteria: inspect state/);
       assert.match(prompt, /ARTIFACTS/);
+      assert.match(prompt, /SECTIONS FIRST — MANDATORY OUTPUT ORDER/);
+      assert.match(prompt, /within your first response tokens/);
+      assert.match(prompt, /discovery output comes after/);
+      assert.match(prompt, /discovery \(AFTER the section block is emitted\)/);
       assert.match(prompt, /VERIFIER_SHAPE_CONTRACT/);
       assert.match(prompt, /INVARIANTS:.*transforms\/extracts\/converts/);
       assert.match(prompt, /do not invent requirements/);
@@ -493,6 +497,65 @@ test('goal skips judge with mechanical NACK while declared artifacts are missing
     // exactly one judge model call, and only after the artifact existed
     assert.strictEqual(prompts.filter(p => /you are a judge for a goal loop/.test(p)).length, 1);
   } finally { try { unlinkSync(art); } catch {} }
+});
+
+test('goal parses header-form ARTIFACTS section (paths on following lines)', async () => {
+  const art = `/tmp/mi-test-hdr-artifact-${Date.now()}.txt`;
+  const prompts = [];
+  requestHandler = (req, res, body) => {
+    const prompt = body.messages.at(-1).content;
+    prompts.push(prompt);
+    if (prompts.length === 1) {
+      // markdown-header ARTIFACTS form with bulleted absolute paths, terminated by next section header
+      sse(res, { role: 'assistant', content: `## ARTIFACTS\n- ${art}\n\n## EXIT_CRITERIA\n- file written\nVERIFIER_SHAPE_CONTRACT\n- file exists\nVERIFICATION_PLAN\n- inspect\nCURRENT_STATE\n- missing` });
+    } else if (prompts.length === 2) {
+      // header-form artifact was parsed → pre-check judge skipped via mechanical NACK
+      assert.match(prompt, /you are worker 1\/128/);
+      assert.match(prompt, new RegExp(`artifact\\(s\\) still missing: ${art}`));
+      writeFileSync(art, 'content');
+      sse(res, { role: 'assistant', content: 'wrote the file\nSTRATEGY: direct write' });
+    } else if (prompts.length === 3) {
+      assert.match(prompt, /you are a judge for a goal loop/);
+      sse(res, { role: 'assistant', content: 'file exists [PASS]\nACK' });
+    } else {
+      sse(res, { role: 'assistant', content: 'verified [PASS]\nACK' });
+    }
+  };
+  try {
+    const result = await runMi(['-g', 'write the file', '-c', 'inspect; ACK or NACK']);
+    assert.strictEqual(result.status, 0);
+    assert.strictEqual(prompts.length, 4);
+  } finally { try { unlinkSync(art); } catch {} }
+});
+
+test('goal parses inline-refined and mid-line DECISION forms', async () => {
+  const prompts = [];
+  requestHandler = (req, res, body) => {
+    const prompt = body.messages.at(-1).content;
+    prompts.push(prompt);
+    if (prompts.length === 1) {
+      // later inline ARTIFACTS refinement wins ('none' overrides earlier list); DECISION appears mid-line
+      sse(res, { role: 'assistant', content: 'ARTIFACTS: /tmp/never-checked-stale.txt\nAMBIGUITIES\nafter reading the tests, DECISION: units → seconds BECAUSE "timeout is given in seconds" [DERIVED]\nEXIT_CRITERIA\n- done\nrefinement after discovery — ARTIFACTS: none\nVERIFIER_SHAPE_CONTRACT\n- ok\nVERIFICATION_PLAN\n- inspect\nCURRENT_STATE\n- clean' });
+    } else if (prompts.length === 2) {
+      // 'ARTIFACTS: none' refinement won → no mechanical NACK, real pre-check judge runs
+      assert.match(prompt, /you are a judge for a goal loop/);
+      sse(res, { role: 'assistant', content: 'not done [FAIL]\nNACK' });
+    } else if (prompts.length === 3) {
+      // mid-line DECISION parsed verbatim from DECISION: onward
+      assert.match(prompt, /you are worker 1\/128/);
+      assert.match(prompt, /DECISIONS \(interpretation forks already resolved/);
+      // DECISIONS block carries the line starting at DECISION: (prose prefix stripped) — anchored match only satisfiable by the block, not the echoed plan
+      assert.match(prompt, /^DECISION: units → seconds BECAUSE "timeout is given in seconds" \[DERIVED\]$/m);
+      sse(res, { role: 'assistant', content: 'done\nSTRATEGY: fix units' });
+    } else if (prompts.length === 4) {
+      sse(res, { role: 'assistant', content: 'done [PASS]\nACK' });
+    } else {
+      sse(res, { role: 'assistant', content: 'verified [PASS]\nACK' });
+    }
+  };
+  const result = await runMi(['-g', 'convert units', '-c', 'inspect; ACK or NACK']);
+  assert.strictEqual(result.status, 0);
+  assert.strictEqual(prompts.length, 5);
 });
 
 test('goal mode passes deadline from -d flag and MI_DEADLINE env', async () => {
