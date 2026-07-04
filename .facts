@@ -226,3 +226,6 @@
 - label: goal loop single-blocker fast lane: when a real (non-mech) judge NACK has exactly one failing criterion (canonical [FAIL] lines or markdown FAIL rows) and remaining budget is under 30% of total, the next worker gets a surgical brief (single criterion verbatim + parameter history, fix-only-this directive) with strategy/exploration scaffolding dropped, preempting blind salvage
   command: grep -q 'SINGLE-BLOCKER FAST LANE' tools/goal.mjs && grep -q 'failLines' tools/goal.mjs && grep -q 'fastLane' tools/goal.mjs && grep -q "budget() / totalS < 0.3" tools/goal.mjs
   tags: [implemented]
+- label: goal planner mandates an AMBIGUITIES section resolving every interpretation fork as a DECISION line with verbatim quoted evidence ([DERIVED]) or an [ASSUMED — verify both branches] tag; DECISION lines are parsed from the plan and echoed verbatim as a DECISIONS block into every worker prompt, the fast-lane surgical brief, and the salvage brief
+  command: grep -qF 'AMBIGUITIES' tools/goal.mjs && grep -qF 'DECISION: <fork> → <choice> BECAUSE' tools/goal.mjs && grep -qF 'ASSUMED — verify both branches' tools/goal.mjs && test "$(grep -c 'decBlock}' tools/goal.mjs)" -ge 3 && grep -qF 'DECISIONS (interpretation forks already resolved' tools/goal.mjs
+  tags: [implemented]

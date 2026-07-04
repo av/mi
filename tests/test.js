@@ -776,6 +776,99 @@ test('goal fast lane suppressed: high budget one FAIL → normal worker prompt',
   assert.strictEqual(result.status, 0);
 });
 
+test('goal DECISION lines from plan are echoed verbatim into worker prompts', async () => {
+  const prompts = [];
+  requestHandler = (req, res, body) => {
+    const prompt = body.messages.at(-1).content;
+    prompts.push(prompt);
+    if (prompts.length === 1) {
+      // Planner prompt must mandate the AMBIGUITIES section and the DECISION format
+      assert.match(prompt, /AMBIGUITIES/);
+      assert.match(prompt, /DECISION: <fork> → <choice> BECAUSE/);
+      assert.match(prompt, /\[DERIVED\]/);
+      assert.match(prompt, /\[ASSUMED — verify both branches/);
+      sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- count right\nARTIFACTS: none\nAMBIGUITIES\n- DECISION: which fields to tokenize → text field only BECAUSE "count tokens in the text column" [DERIVED]\nDECISION: tokenizer variant → cl100k_base [ASSUMED — verify both branches before final answer]\nVERIFIER_SHAPE_CONTRACT\n- check count\nVERIFICATION_PLAN\n- run\nCURRENT_STATE\n- empty' });
+    } else if (prompts.length === 2) {
+      sse(res, { role: 'assistant', content: 'count wrong [FAIL]\nNACK' });
+    } else if (prompts.length === 3) {
+      // Worker prompt carries the DECISIONS block with both lines verbatim (bullet prefix stripped)
+      assert.match(prompt, /DECISIONS \(interpretation forks already resolved/);
+      assert.match(prompt, /DECISION: which fields to tokenize → text field only BECAUSE "count tokens in the text column" \[DERIVED\]/);
+      assert.match(prompt, /DECISION: tokenizer variant → cl100k_base \[ASSUMED — verify both branches before final answer\]/);
+      sse(res, { role: 'assistant', content: 'counted\nSTRATEGY: text field\nFILES_MODIFIED: out.txt\nCOMMANDS_SUCCEEDED: count\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
+    } else {
+      sse(res, { role: 'assistant', content: 'count: measured=42 expected=42 [PASS]\nACK' });
+    }
+  };
+  const result = await runMi(['-g', 'count tokens', '-c', 'check count']);
+  assert.strictEqual(result.status, 0);
+});
+
+test('goal without DECISION lines emits no DECISIONS block', async () => {
+  const prompts = [];
+  requestHandler = (req, res, body) => {
+    const prompt = body.messages.at(-1).content;
+    prompts.push(prompt);
+    if (prompts.length === 1) {
+      sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- done\nAMBIGUITIES: none\nVERIFIER_SHAPE_CONTRACT\n- checked\nVERIFICATION_PLAN\n- run\nCURRENT_STATE\n- empty' });
+    } else if (prompts.length === 2) {
+      sse(res, { role: 'assistant', content: 'not done [FAIL]\nNACK' });
+    } else if (prompts.length === 3) {
+      assert.doesNotMatch(prompt, /DECISIONS \(interpretation forks/);
+      sse(res, { role: 'assistant', content: 'done\nSTRATEGY: direct\nFILES_MODIFIED: x\nCOMMANDS_SUCCEEDED: y\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
+    } else {
+      sse(res, { role: 'assistant', content: 'done: measured=1 expected=1 [PASS]\nACK' });
+    }
+  };
+  const result = await runMi(['-g', 'simple task', '-c', 'check it']);
+  assert.strictEqual(result.status, 0);
+});
+
+test('goal DECISIONS block echoed into fast-lane surgical brief', async () => {
+  const prompts = [];
+  const dl = Math.floor(Date.now() / 1000) - 100; // past deadline → fast lane on single FAIL
+  requestHandler = (req, res, body) => {
+    const prompt = body.messages.at(-1).content;
+    prompts.push(prompt);
+    if (prompts.length === 1) {
+      sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- ok\nAMBIGUITIES\nDECISION: edge orientation → A->B BECAUSE "A causes B" [DERIVED]\nVERIFIER_SHAPE_CONTRACT\n- check\nVERIFICATION_PLAN\n- run\nCURRENT_STATE\n- off' });
+    } else if (prompts.length === 2) {
+      sse(res, { role: 'assistant', content: 'edge: measured=B->A expected=A->B [FAIL]\nNACK' });
+    } else if (prompts.length === 3) {
+      assert.match(prompt, /SINGLE-BLOCKER FAST LANE/);
+      assert.match(prompt, /DECISION: edge orientation → A->B BECAUSE "A causes B" \[DERIVED\]/);
+      sse(res, { role: 'assistant', content: 'flipped edge\nSTRATEGY: fix\nFILES_MODIFIED: g\nCOMMANDS_SUCCEEDED: c\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
+    } else {
+      sse(res, { role: 'assistant', content: 'edge: measured=A->B expected=A->B [PASS]\nACK' });
+    }
+  };
+  const result = await runMi(['-g', 'orient edges', '-c', 'check edges', '-d', String(dl)]);
+  assert.strictEqual(result.status, 0);
+});
+
+test('goal DECISIONS block echoed into salvage brief', async () => {
+  const prompts = [];
+  const dl = Math.floor(Date.now() / 1000) - 100; // past deadline, multi-FAIL → salvage
+  requestHandler = (req, res, body) => {
+    const prompt = body.messages.at(-1).content;
+    prompts.push(prompt);
+    if (prompts.length === 1) {
+      sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- done\nAMBIGUITIES\nDECISION: prompt usage → use model prompts BECAUSE "model config declares query prompts" [DERIVED]\nVERIFIER_SHAPE_CONTRACT\n- checked\nVERIFICATION_PLAN\n- run\nCURRENT_STATE\n- empty' });
+    } else if (prompts.length === 2) {
+      sse(res, { role: 'assistant', content: 'not ready [FAIL]\nalso broken [FAIL]\nNACK' });
+    } else if (prompts.length === 3) {
+      assert.match(prompt, /FINAL SALVAGE/);
+      assert.match(prompt, /DECISION: prompt usage → use model prompts BECAUSE "model config declares query prompts" \[DERIVED\]/);
+      sse(res, { role: 'assistant', content: 'salvaged' });
+    } else {
+      sse(res, { role: 'assistant', content: 'incomplete [FAIL]\nNACK' });
+    }
+  };
+  const result = await runMi(['-g', 'encode corpus', '-c', 'check', '-d', String(dl)]);
+  assert.strictEqual(result.status, 0);
+  assert.strictEqual(prompts.length, 4);
+});
+
 test('goal budget phase shows in console output', async () => {
   let calls = 0;
   const dl = Math.floor(Date.now() / 1000) + 600;
