@@ -352,6 +352,11 @@ test('goal workers do work instead of receiving judge criteria', async () => {
       assert.match(prompt, /measured=X expected=Y/);
       assert.match(prompt, /INVARIANTS commands against the PRISTINE input/);
       assert.match(prompt, /self-referential/);
+      assert.match(prompt, /HYPOTHESIS, not a spec/);
+      assert.match(prompt, /matches the GOAL", never "matches the plan/);
+      assert.match(prompt, /plan-asserted=X vs goal-derived=Y/);
+      assert.match(prompt, /\[ASSUMED\] decisions MUST be re-derived/);
+      assert.match(prompt, /method different IN KIND from the worker's/);
       assert.match(prompt, /do not invent criteria/);
       sse(res, { role: 'assistant', content: 'missing files [FAIL]\nNACK' });
     } else if (prompts.length === 3) {
@@ -375,6 +380,8 @@ test('goal workers do work instead of receiving judge criteria', async () => {
       assert.match(prompt, /STRICTLY READ-ONLY/);
       assert.match(prompt, /NEVER run git write operations/);
       assert.match(prompt, /so the WORKER performs the repair/);
+      assert.match(prompt, /method different IN KIND/);
+      assert.match(prompt, /state which method you used/);
       assert.doesNotMatch(prompt, /plan and verifier contract/);
       sse(res, { role: 'assistant', content: 'independently verified — all files exist [PASS]\nACK' });
     }

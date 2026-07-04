@@ -1,3 +1,6 @@
+- label: goal judge treats the plan as a HYPOTHESIS not a spec: PASS means matches the GOAL never the plan; plan-asserted concrete values not quoted from goal/test files are re-derived, contradictions NACK citing both values (plan-asserted=X vs goal-derived=Y); [DERIVED] decisions are spot-checked, [ASSUMED] re-derived; judge and blind recheck verify single-answer deliverables by a method different in kind and state it
+  command: grep -qF 'HYPOTHESIS, not a spec' tools/goal.mjs && grep -qF 'plan-asserted=X vs goal-derived=Y' tools/goal.mjs && grep -qF '[ASSUMED] decisions MUST be re-derived' tools/goal.mjs && test "$(grep -c 'different IN KIND' tools/goal.mjs)" -ge 2 && grep -qF 'state which method you used' tools/goal.mjs
+  tags: [implemented]
 # project
 
 - label: all tests pass
