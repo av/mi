@@ -932,6 +932,153 @@ test('goal strategy escalation after 2+ failures', async () => {
   assert.strictEqual(prompts.length, 8);
 });
 
+// Helpers for the strategy-ladder pivot tests: fake-time preload lets tests advance the goal
+// loop's clock mid-run by writing a ms offset to a file (re-read on every Date.now call).
+const FAKE_TIME = join(__dirname, 'fake-time.cjs');
+const fakeTimeEnv = (offsetFile) => ({ NODE_OPTIONS: `--require ${FAKE_TIME}`, MI_FAKE_NOW_OFFSET_FILE: offsetFile });
+const LADDER_PLAN = (artifact) => `STRATEGY_LADDER\nprimary: build Coq via apt packages\nfallback: install Coq toolchain via opam and build from there\nswitch trigger: apt Coq version incompatible with Flocq proofs\nEXIT_CRITERIA\n- built\nARTIFACTS: ${artifact}\nVERIFIER_SHAPE_CONTRACT\n- check\nVERIFICATION_PLAN\n- run\nCURRENT_STATE\n- empty`;
+
+test('goal pivot mandate fires once past 40% budget with missing artifact', async () => {
+  const prompts = [];
+  const artifact = `/tmp/mi-test-pivot-${process.pid}.out`;
+  const offsetFile = `/tmp/mi-test-pivot-off-${process.pid}`;
+  writeFileSync(offsetFile, '0');
+  const dl = Math.floor(Date.now() / 1000) + 1000; // totalS ~1000s
+  requestHandler = (req, res, body) => {
+    const prompt = body.messages.at(-1).content;
+    prompts.push(prompt);
+    if (prompts.length === 1) {
+      // Planner prompt must mandate the STRATEGY_LADDER section
+      assert.match(prompt, /STRATEGY_LADDER: exactly three lines/);
+      // Advance the clock 450s → 45% elapsed before iteration 1 (past 40% pivot gate, below 50% escalation gate)
+      writeFileSync(offsetFile, '450000');
+      sse(res, { role: 'assistant', content: LADDER_PLAN(artifact) });
+    } else if (prompts.length === 2) {
+      // Worker 1 — pivot mandate with fallback quoted verbatim; replaces escalation this iteration
+      assert.match(prompt, /PIVOT MANDATE: >40% budget spent with no artifact — abandon the current toolchain\/approach entirely/);
+      assert.match(prompt, /"install Coq toolchain via opam and build from there"/);
+      assert.doesNotMatch(prompt, /ARTIFACT ESCALATION/);
+      // slice-9 integration clause: judge feedback overrides contradicted DECISION lines
+      assert.match(prompt, /judge feedback contradicts a DECISION line with a concrete goal-derived value, the judge feedback WINS/);
+      sse(res, { role: 'assistant', content: 'tried opam\nSTRATEGY: opam\nFILES_MODIFIED: none\nCOMMANDS_SUCCEEDED: opam init\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: build' });
+    } else if (prompts.length === 3) {
+      // Worker 2 — pivot is one-shot: must NOT fire again
+      assert.doesNotMatch(prompt, /PIVOT MANDATE/);
+      writeFileSync(artifact, 'built');
+      sse(res, { role: 'assistant', content: 'built it\nSTRATEGY: opam build\nFILES_MODIFIED: out\nCOMMANDS_SUCCEEDED: make\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
+    } else {
+      sse(res, { role: 'assistant', content: 'built: measured=yes expected=yes [PASS]\nACK' });
+    }
+  };
+  try {
+    const result = await runMi(['-g', 'build compcert', '-c', 'check build', '-d', String(dl)], fakeTimeEnv(offsetFile));
+    assert.strictEqual(result.status, 0);
+    // planner + worker1(pivot) + worker2 + judge + skeptical recheck; prechecks/iteration-1 judge were mechanical NACKs (no LLM call)
+    assert.strictEqual(prompts.length, 5);
+  } finally { rmSync(artifact, { force: true }); rmSync(offsetFile, { force: true }); }
+});
+
+test('goal pivot precedence: 40% pivot replaces escalation, escalation fires later', async () => {
+  const prompts = [];
+  const artifact = `/tmp/mi-test-pivprec-${process.pid}.out`;
+  const offsetFile = `/tmp/mi-test-pivprec-off-${process.pid}`;
+  writeFileSync(offsetFile, '0');
+  const dl = Math.floor(Date.now() / 1000) + 1000;
+  requestHandler = (req, res, body) => {
+    const prompt = body.messages.at(-1).content;
+    prompts.push(prompt);
+    if (prompts.length === 1) {
+      // 55% elapsed → both pivot (40%) and escalation (50%) gates are open; pivot must win
+      writeFileSync(offsetFile, '550000');
+      sse(res, { role: 'assistant', content: LADDER_PLAN(artifact) });
+    } else if (prompts.length === 2) {
+      assert.match(prompt, /PIVOT MANDATE/);
+      assert.doesNotMatch(prompt, /ARTIFACT ESCALATION/);
+      sse(res, { role: 'assistant', content: 'pivoted\nSTRATEGY: opam\nFILES_MODIFIED: none\nCOMMANDS_SUCCEEDED: none\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: build' });
+    } else if (prompts.length === 3) {
+      // Iteration 2: pivot spent → draft-gate escalation still available
+      assert.match(prompt, /ARTIFACT ESCALATION/);
+      assert.doesNotMatch(prompt, /PIVOT MANDATE/);
+      writeFileSync(artifact, 'built');
+      sse(res, { role: 'assistant', content: 'built\nSTRATEGY: opam build\nFILES_MODIFIED: out\nCOMMANDS_SUCCEEDED: make\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
+    } else {
+      sse(res, { role: 'assistant', content: 'built: measured=yes expected=yes [PASS]\nACK' });
+    }
+  };
+  try {
+    const result = await runMi(['-g', 'build compcert', '-c', 'check build', '-d', String(dl)], fakeTimeEnv(offsetFile));
+    assert.strictEqual(result.status, 0);
+    assert.strictEqual(prompts.length, 5);
+  } finally { rmSync(artifact, { force: true }); rmSync(offsetFile, { force: true }); }
+});
+
+test('goal pivot suppressed: no deadline, artifact exists, or live jobs', async () => {
+  // (a) no deadline → no pivot
+  let prompts = [];
+  const artifactA = `/tmp/mi-test-noPivA-${process.pid}.out`;
+  requestHandler = (req, res, body) => {
+    const prompt = body.messages.at(-1).content;
+    prompts.push(prompt);
+    if (prompts.length === 1) sse(res, { role: 'assistant', content: LADDER_PLAN(artifactA) });
+    else if (prompts.length === 2) {
+      assert.doesNotMatch(prompt, /PIVOT MANDATE/);
+      writeFileSync(artifactA, 'done');
+      sse(res, { role: 'assistant', content: 'done\nSTRATEGY: direct\nFILES_MODIFIED: out\nCOMMANDS_SUCCEEDED: make\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
+    } else sse(res, { role: 'assistant', content: 'done: measured=1 expected=1 [PASS]\nACK' });
+  };
+  try {
+    assert.strictEqual((await runMi(['-g', 'build', '-c', 'check'])).status, 0);
+  } finally { rmSync(artifactA, { force: true }); }
+
+  // (b) artifact already exists → no pivot even past 40%
+  prompts = [];
+  const artifactB = `/tmp/mi-test-noPivB-${process.pid}.out`;
+  const offsetFileB = `/tmp/mi-test-noPivB-off-${process.pid}`;
+  writeFileSync(artifactB, 'already here');
+  writeFileSync(offsetFileB, '0');
+  const dlB = Math.floor(Date.now() / 1000) + 1000;
+  requestHandler = (req, res, body) => {
+    const prompt = body.messages.at(-1).content;
+    prompts.push(prompt);
+    if (prompts.length === 1) { writeFileSync(offsetFileB, '450000'); sse(res, { role: 'assistant', content: LADDER_PLAN(artifactB) }); }
+    else if (prompts.length === 2) sse(res, { role: 'assistant', content: 'wrong [FAIL]\nbroken [FAIL]\nNACK' }); // real precheck judge (artifact exists)
+    else if (prompts.length === 3) {
+      assert.doesNotMatch(prompt, /PIVOT MANDATE/);
+      sse(res, { role: 'assistant', content: 'fixed\nSTRATEGY: repair\nFILES_MODIFIED: out\nCOMMANDS_SUCCEEDED: make\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
+    } else sse(res, { role: 'assistant', content: 'ok: measured=1 expected=1 [PASS]\nACK' });
+  };
+  try {
+    assert.strictEqual((await runMi(['-g', 'build', '-c', 'check', '-d', String(dlB)], fakeTimeEnv(offsetFileB))).status, 0);
+  } finally { rmSync(artifactB, { force: true }); rmSync(offsetFileB, { force: true }); }
+
+  // (c) live background job → no pivot even past 40% with artifact missing
+  prompts = [];
+  const artifactC = `/tmp/mi-test-noPivC-${process.pid}.out`;
+  const offsetFileC = `/tmp/mi-test-noPivC-off-${process.pid}`;
+  const sid = `pivtest-${process.pid}`;
+  const jobsFile = `/tmp/mi-jobs-${sid}.jsonl`;
+  const jobLog = `/tmp/mi-test-noPivC-log-${process.pid}`;
+  writeFileSync(offsetFileC, '0');
+  writeFileSync(jobLog, 'static log');
+  writeFileSync(jobsFile, JSON.stringify({ pid: process.pid, log: jobLog, command: 'long build' }) + '\n');
+  const dlC = Math.floor(Date.now() / 1000) + 1000;
+  requestHandler = (req, res, body) => {
+    const prompt = body.messages.at(-1).content;
+    prompts.push(prompt);
+    if (prompts.length === 1) { writeFileSync(offsetFileC, '450000'); sse(res, { role: 'assistant', content: LADDER_PLAN(artifactC) }); }
+    else if (prompts.length === 2) {
+      assert.doesNotMatch(prompt, /PIVOT MANDATE/); // live job suppresses pivot
+      writeFileSync(artifactC, 'built');
+      rmSync(jobsFile, { force: true }); // job "finishes" so monitor exits fast
+      sse(res, { role: 'assistant', content: 'built\nSTRATEGY: wait\nFILES_MODIFIED: out\nCOMMANDS_SUCCEEDED: make\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
+    } else sse(res, { role: 'assistant', content: 'built: measured=1 expected=1 [PASS]\nACK' });
+  };
+  try {
+    const r = await runMi(['-g', 'build', '-c', 'check', '-d', String(dlC)], { ...fakeTimeEnv(offsetFileC), MI_SESSION_ID: sid, MI_JOB_POLL_MS: '50' });
+    assert.strictEqual(r.status, 0);
+  } finally { rmSync(artifactC, { force: true }); rmSync(offsetFileC, { force: true }); rmSync(jobsFile, { force: true }); rmSync(jobLog, { force: true }); }
+});
+
 test('environment variables', async () => {
   requestHandler = (req, res, body) => {
     assert.strictEqual(body.model, 'custom-model-123');
