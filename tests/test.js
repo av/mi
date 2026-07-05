@@ -339,10 +339,10 @@ test('goal workers do work instead of receiving judge criteria', async () => {
       assert.match(prompt, /goal: create files/);
       assert.match(prompt, /criteria: inspect state/);
       assert.match(prompt, /ARTIFACTS/);
-      assert.match(prompt, /SECTIONS FIRST — MANDATORY OUTPUT ORDER/);
-      assert.match(prompt, /within your first response tokens/);
-      assert.match(prompt, /discovery output comes after/);
-      assert.match(prompt, /discovery \(AFTER the section block is emitted\)/);
+      assert.match(prompt, /PROVISIONAL GUARD — VERY FIRST output/);
+      assert.match(prompt, /one or two lines ONLY/);
+      assert.match(prompt, /DISCOVERY NEXT — evidence before contract/);
+      assert.match(prompt, /THEN emit the FULL section block, grounded in the discovery evidence/);
       assert.match(prompt, /VERIFIER_SHAPE_CONTRACT/);
       assert.match(prompt, /INVARIANTS:.*transforms\/extracts\/converts/);
       assert.match(prompt, /do not invent requirements/);
@@ -1011,8 +1011,11 @@ test('goal pivot mandate fires once past 40% budget with missing artifact', asyn
     const prompt = body.messages.at(-1).content;
     prompts.push(prompt);
     if (prompts.length === 1) {
-      // Planner prompt must mandate the STRATEGY_LADDER section
+      // Planner prompt must mandate the STRATEGY_LADDER section with anti-lock-in wording
       assert.match(prompt, /STRATEGY_LADDER: exactly three lines/);
+      assert.match(prompt, /STRUCTURALLY different tool\/algorithm\/approach CLASS/);
+      assert.match(prompt, /starting hypothesis, not a commitment/);
+      assert.match(prompt, /two consecutive attempts on the primary fail the same criterion, switch class/);
       // Advance the clock 450s → 45% elapsed before iteration 1 (past 40% pivot gate, below 50% escalation gate)
       writeFileSync(offsetFile, '450000');
       sse(res, { role: 'assistant', content: LADDER_PLAN(artifact) });
