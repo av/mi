@@ -225,6 +225,12 @@
 - label: mi_harbor/passrate.py aggregates all attempts per task across run dirs into pass rates with Wilson 95% CIs, expected score ± SE, stable-pass/stable-fail/flaky sets, exception failure-mode annotations, and a --json mode
   command: ./mi_harbor/passrate.py --json bench/terminal-bench-2.1-subset/deepseek_deepseek-v4-flash/20260705-232414 | python3 -c 'import json,sys; d=json.load(sys.stdin); s=d["summary"]; assert s["n_tasks"]==22 and s["expected_score"]==12.0'
   tags: [implemented]
+- label: mi_harbor/compare-runs.py compares two eval variants (--a/--b run dir sets, reusing passrate.py parsing): per-task Fisher exact table for differing tasks, smoothed-variance z-test verdict (SIGNAL/NOISE with 12-vs-18 single-run pair judged NOISE), 80%-power trial-count hint, --json mode, exit 0 on success regardless of verdict
+  command: ./mi_harbor/compare-runs.py --a bench/terminal-bench-2.1-subset/deepseek_deepseek-v4-flash/20260705-232414 --b bench/terminal-bench-2.1-subset/deepseek_deepseek-v4-flash/20260705-232414 | grep -q "verdict: NOISE"
+  tags: [implemented]
+- label: compare-runs.py Fisher exact implementation matches published two-sided values (e.g. [[3,0],[0,3]] p=0.1, [[5,0],[0,5]] p~=0.00794)
+  command: python3 -c "import sys,importlib; sys.path.insert(0,\"mi_harbor\"); cr=importlib.import_module(\"compare-runs\"); assert abs(cr.fisher_exact_two_sided(3,0,0,3)-0.1)<1e-9; assert abs(cr.fisher_exact_two_sided(5,0,0,5)-2/252)<1e-9"
+  tags: [implemented]
 
 # benchmark
 - label: 2026-06-18 Terminal-Bench 2.1 full mi vs terminus-2 comparison is stored under docs
