@@ -112,6 +112,15 @@
 - label: goal draft-gate escalates one-shot past 50% elapsed budget with no live jobs: worker prompt becomes an artifacts-first salvage-style directive whose NACK is exempt from strategy/blockerSig accounting
   command: grep -q 'ARTIFACT ESCALATION' tools/goal.mjs && grep -q 'escalated' tools/goal.mjs
   tags: [implemented]
+- label: goal judge executes script deliverables with the plainest task-implied interpreter (python file.py, not venv/alias) before ACK — crash/import error is NACK; skips execution only when running would mutate state, stating why
+  command: grep -q 'PLAINEST interpreter invocation' tools/goal.mjs
+  tags: [implemented]
+- label: goal judge NACKs un-re-derivable single-value answers unless the worker log shows a second independent derivation method agreeing (cross-validation demand)
+  command: grep -q 'second independent method and show both agree' tools/goal.mjs
+  tags: [implemented]
+- label: goal judge runs a final-state sweep before ACK: every goal-stated end-state property is re-measured NOW, goal-quoted literals compared byte-for-byte, never against memory of an earlier check
+  command: grep -q 'FINAL-STATE SWEEP' tools/goal.mjs
+  tags: [implemented]
 
 # agent-loop
 - agent loop streams OpenAI chat completions via SSE, executes tool calls, repeats until text response
