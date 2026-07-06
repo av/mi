@@ -12,6 +12,7 @@
 #   HARNESS=both ./run-tb21-subset.sh    # mi + terminus-2
 #   LIMIT=1 ./run-tb21-subset.sh         # first task only (smoke)
 #   N_CONCURRENT=4 ./run-tb21-subset.sh
+#   K_TRIALS=3 ./run-tb21-subset.sh      # 3 attempts per task (harbor --n-attempts)
 #
 # Per-task timeouts come from task.toml via the adapter — do NOT set MI_TASK_TIMEOUT here.
 set -euo pipefail
@@ -24,6 +25,7 @@ MI_DIR="$(dirname "$SCRIPT_DIR")"
 : "${HARNESS:=mi}"
 : "${LIMIT:=all}"
 : "${N_CONCURRENT:=4}"
+: "${K_TRIALS:=1}"
 : "${RUN_ID:=$(date +%Y%m%d-%H%M%S)}"
 : "${OUT_ROOT:=bench/terminal-bench-2.1-subset/${MODEL//\//_}/${RUN_ID}}"
 
@@ -77,6 +79,11 @@ for task in "${TASKS[@]:0:$COUNT}"; do
   include_args+=(--include-task-name "terminal-bench/$task")
 done
 
+attempt_args=()
+if (( K_TRIALS > 1 )); then
+  attempt_args+=(--n-attempts "$K_TRIALS")
+fi
+
 harbor_cmd() {
   if [[ "${DRY_RUN:-0}" == "1" ]]; then
     echo "DRY_RUN: MI_API_PARAMS=${MI_API_PARAMS:-<unset>}"
@@ -101,6 +108,7 @@ run_harness() {
       --n-concurrent "$N_CONCURRENT" \
       --jobs-dir "$jobs_dir" \
       --yes \
+      "${attempt_args[@]}" \
       "${include_args[@]}"
   else
     harbor_cmd uvx --from harbor harbor run \
@@ -111,6 +119,7 @@ run_harness() {
       --n-concurrent "$N_CONCURRENT" \
       --jobs-dir "$jobs_dir" \
       --yes \
+      "${attempt_args[@]}" \
       "${include_args[@]}"
   fi
 }

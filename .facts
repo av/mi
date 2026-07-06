@@ -219,6 +219,12 @@
 - label: eval determinism pins are overridable via MI_API_PARAMS/MI_JUDGE_PARAMS env and fully disabled by NO_PIN=1
   command: DRY_RUN=1 LIMIT=1 NO_PIN=1 ./mi_harbor/run-tb21-subset.sh 2>/dev/null | grep -q 'MI_API_PARAMS=<unset>' && DRY_RUN=1 LIMIT=1 MI_API_PARAMS='{"seed":7}' ./mi_harbor/run-tb21-subset.sh 2>/dev/null | grep -q 'MI_API_PARAMS={"seed":7}'
   tags: [implemented]
+- label: run-tb21-subset.sh supports K_TRIALS env (default 1) passing --n-attempts to harbor for both mi and terminus harnesses
+  command: DRY_RUN=1 K_TRIALS=3 LIMIT=1 OUT_ROOT=/tmp/mi-facts-dryrun ./mi_harbor/run-tb21-subset.sh 2>/dev/null | grep -q -- '--n-attempts 3' && ! (DRY_RUN=1 LIMIT=1 OUT_ROOT=/tmp/mi-facts-dryrun ./mi_harbor/run-tb21-subset.sh 2>/dev/null | grep -q -- '--n-attempts')
+  tags: [implemented]
+- label: mi_harbor/passrate.py aggregates all attempts per task across run dirs into pass rates with Wilson 95% CIs, expected score ± SE, stable-pass/stable-fail/flaky sets, exception failure-mode annotations, and a --json mode
+  command: ./mi_harbor/passrate.py --json bench/terminal-bench-2.1-subset/deepseek_deepseek-v4-flash/20260705-232414 | python3 -c 'import json,sys; d=json.load(sys.stdin); s=d["summary"]; assert s["n_tasks"]==22 and s["expected_score"]==12.0'
+  tags: [implemented]
 
 # benchmark
 - label: 2026-06-18 Terminal-Bench 2.1 full mi vs terminus-2 comparison is stored under docs
