@@ -192,10 +192,16 @@ if [[ ! -f AGENTS.md ]]; then
 fi
 
 # Run mi goal loop with timestamped output, separate stderr
-"${MI_RUNNER[@]}" -g "$1" -c "$MI_GOAL_CHECK" \
-    > >(timestamp_output | tee "$STDOUT_LOG") \
-    2> >(timestamp_output | tee "$STDERR_LOG" >&2)
+exec 3> >(timestamp_output | tee "$STDOUT_LOG")
+STDOUT_PS_PID=$!
+exec 4> >(timestamp_output | tee "$STDERR_LOG" >&2)
+STDERR_PS_PID=$!
+"${MI_RUNNER[@]}" -g "$1" -c "$MI_GOAL_CHECK" >&3 2>&4
 EXIT_CODE=$?
+# Close FDs and wait for the log writers to flush — otherwise the script can
+# exit before tee finishes, leaving mi-output.txt/mi-stderr.txt empty/truncated.
+exec 3>&- 4>&-
+wait "$STDOUT_PS_PID" "$STDERR_PS_PID" 2>/dev/null || true
 
 echo "end=$(date +%s.%N)" >> "$TIMING_LOG"
 echo "exit_code=$EXIT_CODE" >> "$TIMING_LOG"

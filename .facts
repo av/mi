@@ -247,3 +247,11 @@
 - label: goal planner is discovery-first with a provisional guard: the very first output is a minimal provisional ARTIFACTS line plus a one-line AMBIGUITIES (so a planner timeout still leaves a parseable plan), then discovery runs, then the FULL section block (ARTIFACTS, AMBIGUITIES, STRATEGY_LADDER with structurally-different fallback and switch-class-after-two-same-criterion-failures mandate, VERIFIER_SHAPE_CONTRACT, ...) is derived from discovered evidence; ARTIFACTS parsing is lenient (last inline ARTIFACTS: line wins, markdown/bare header form with paths on following lines accepted, 'none' → no artifacts) and DECISION lines are parsed from anywhere in a line, verbatim from DECISION: onward
   command: grep -qF 'PROVISIONAL GUARD — VERY FIRST output' tools/goal.mjs && grep -qF 'DISCOVERY NEXT — evidence before contract' tools/goal.mjs && grep -qF 'THEN emit the FULL section block' tools/goal.mjs && grep -qF 'STRUCTURALLY different tool/algorithm/approach CLASS' tools/goal.mjs && grep -qF 'starting hypothesis, not a commitment' tools/goal.mjs && grep -qF 'matchAll(/ARTIFACTS:' tools/goal.mjs && grep -qF 'DECISION:.*$' tools/goal.mjs
   tags: [implemented]
+
+# observability
+- label: SSE parser prints '[provider] Name (model)' to stderr once per distinct provider value per process when chunks carry a top-level provider field (OpenRouter); no-op when absent
+  command: grep -q 'seenProviders' index.mjs && grep -q '\[provider\]' index.mjs
+  tags: [implemented]
+- label: mi_harbor/provider-report.sh <run-dir> prints per-task provider counts from trial agent/mi-stderr.txt and mi-output.txt logs
+  command: test -x mi_harbor/provider-report.sh && grep -q '\[provider\]' mi_harbor/provider-report.sh
+  tags: [implemented]
