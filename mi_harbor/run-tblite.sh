@@ -27,6 +27,9 @@ if [[ -z "${OPENAI_API_KEY}" ]]; then
   exit 1
 fi
 
+# shellcheck source=determinism-env.sh
+source "$SCRIPT_DIR/determinism-env.sh"
+
 echo "Running mi against OpenThoughts-TBLite (100 tasks)"
 echo "  Model:       $MODEL"
 echo "  Endpoint:    $OPENAI_BASE_URL"

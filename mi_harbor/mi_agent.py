@@ -455,6 +455,12 @@ class MiAgent(BaseInstalledAgent):
                 model = model.split("/", 1)[-1]
             env["MODEL"] = model
 
+        # Sampling/routing determinism pins (set by run scripts via determinism-env.sh)
+        for var in ("MI_API_PARAMS", "MI_JUDGE_PARAMS", "MI_JUDGE_MODEL"):
+            value = self._get_env(var)
+            if value:
+                env[var] = value
+
         # System prompt: use eval-optimized prompt by default, allow override
         system_prompt = self._get_env("MI_SYSTEM_PROMPT")
         env["SYSTEM_PROMPT"] = system_prompt or EVAL_SYSTEM_PROMPT

@@ -210,6 +210,15 @@
   command: test -f docs/harness-comparison-2026-05-24.md && grep -q 'mi-eval-cache:7f709b1c6fda50c1' docs/harness-comparison-2026-05-24.md && grep -q 'terminus-2' docs/harness-comparison-2026-05-24.md
 - label: AGENTS.md documents Harbor eval launch commands
   command: grep -q 'Harbor eval launch commands' AGENTS.md && grep -q './mi_harbor/run-smoke.sh' AGENTS.md && grep -q -- '--agent terminus-2' AGENTS.md
+- label: eval runners default MI_API_PARAMS and MI_JUDGE_PARAMS to temperature 0 and seed 42
+  command: DRY_RUN=1 LIMIT=1 ./mi_harbor/run-tb21-subset.sh 2>/dev/null | grep -q '"temperature":0,"seed":42'
+  tags: [implemented]
+- label: eval runners pin a single OpenRouter provider with allow_fallbacks false, only when OPENAI_BASE_URL targets openrouter.ai
+  command: DRY_RUN=1 LIMIT=1 ./mi_harbor/run-tb21-subset.sh 2>/dev/null | grep -q '"provider":{"order":\["alibaba"\],"allow_fallbacks":false}' && ! DRY_RUN=1 LIMIT=1 OPENAI_BASE_URL=http://localhost:1 OPENAI_API_KEY=dummy ./mi_harbor/run-tb21-subset.sh 2>/dev/null | grep -q provider
+  tags: [implemented]
+- label: eval determinism pins are overridable via MI_API_PARAMS/MI_JUDGE_PARAMS env and fully disabled by NO_PIN=1
+  command: DRY_RUN=1 LIMIT=1 NO_PIN=1 ./mi_harbor/run-tb21-subset.sh 2>/dev/null | grep -q 'MI_API_PARAMS=<unset>' && DRY_RUN=1 LIMIT=1 MI_API_PARAMS='{"seed":7}' ./mi_harbor/run-tb21-subset.sh 2>/dev/null | grep -q 'MI_API_PARAMS={"seed":7}'
+  tags: [implemented]
 
 # benchmark
 - label: 2026-06-18 Terminal-Bench 2.1 full mi vs terminus-2 comparison is stored under docs

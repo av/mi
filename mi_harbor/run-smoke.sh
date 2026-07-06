@@ -20,6 +20,9 @@ if [[ -z "${OPENAI_API_KEY}" ]]; then
   exit 1
 fi
 
+# shellcheck source=determinism-env.sh
+source "$SCRIPT_DIR/determinism-env.sh"
+
 echo "Running mi smoke eval"
 echo "  Task:      $TASK"
 echo "  Model:     $MODEL"

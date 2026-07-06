@@ -16,6 +16,9 @@ MI_DIR="$(dirname "$SCRIPT_DIR")"
 : "${MODEL:=unsloth/Qwen3.6-35B-A3B-GGUF:Q4_K_XL}"
 : "${N_TASKS:=3}"
 
+# shellcheck source=determinism-env.sh
+source "$SCRIPT_DIR/determinism-env.sh"
+
 echo "Running mi on $N_TASKS Terminal-Bench tasks"
 echo "  Model: $MODEL"
 [[ -n "${OPENAI_BASE_URL:-}" ]] && echo "  Endpoint: $OPENAI_BASE_URL"
