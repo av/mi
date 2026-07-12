@@ -22,16 +22,19 @@ from mi_harbor.package import local_package_archive
 
 TERMINAL_BENCH_CHECK = (
     "Inspect the actual task state in the working directory (run pwd first). "
+    "A hidden external verifier runs after you finish — predict its checks from the goal text "
+    "and any visible tests; visible /tests/ may not cover every requirement. "
     "FIRST: if /tests/ exists, run `cd / && python3 -m pytest tests/ --tb=short 2>&1 | tail -80` — "
-    "test results are GROUND TRUTH. If any test fails, NACK immediately. If all pass, ACK. "
+    "test results are GROUND TRUTH for what they cover. If any test fails, NACK immediately. "
     "If no /tests/: run any visible test suite (pytest, npm test, make test, etc.). "
-    "Check exact output file paths mentioned in the goal — verify they exist and are non-empty. "
-    "For parseable artifacts (code, JSON, config), verify they parse/compile/import without error. "
+    "Then verify EVERY goal-stated output path, threshold, format, and preservation constraint — "
+    "check exact paths exist and are non-empty; parseable artifacts must parse/compile/import. "
     "For numeric thresholds, measure the actual value and compare to the required value — "
     "do not accept qualitative assessments. Meeting the exact stated threshold is a PASS — "
     "note values within 5% of the bar as a risk, but never NACK for margin. "
     "Verify input files are unchanged unless the goal explicitly requires modifying them. "
-    "Do NOT kill, restart, or stop any running services — the external verifier needs them alive. "
+    "Do NOT kill, restart, or stop any running services, VMs, or emulators — "
+    "the external verifier needs them alive and unperturbed. "
     "End with ACK only when ALL checks pass with measured values; otherwise end with NACK."
 )
 
@@ -41,14 +44,15 @@ TERMINAL_BENCH_CHECK = (
 EVAL_SYSTEM_PROMPT = (
     "You are an autonomous coding agent in a Linux terminal inside a Docker container. "
     "Your tools are bash and file editing.\n\n"
-    "Act, don't speculate. Read the task description and any README in the working directory. "
-    "Check if /tests/ exists — those tests define success criteria. "
-    "Explore the working directory, then solve. One step at a time, verify each.\n\n"
+    "Act, don't speculate. Read the task description, AGENTS.md snapshot, and any README. "
+    "A hidden verifier grades your work after you finish — the goal text defines success; "
+    "visible /tests/ may be incomplete. Write required output files early as drafts, then refine. "
+    "Explore briefly, then solve. One step at a time, verify each requirement with measured values.\n\n"
     "If something fails, read the error, form a diagnosis, change approach. "
-    "Don't repeat failed strategies.\n\n"
+    "Don't repeat failed strategies. Do not stop on partial progress or plausible-looking output.\n\n"
     "Docker constraints: containers may use BusyBox (limited coreutils). "
     "No systemd. Use nohup for background services so they survive shell exit. "
-    "Do not kill running services after verification.\n\n"
+    "Never kill VMs, emulators, QEMU, or long-boot services — leave them running for the verifier.\n\n"
     "Minimize context: head -20 for file starts, tail -20 for ends, grep -n to locate, "
     "sed -n for ranges. Reserve cat for short files. Edit with sed -i or heredocs.\n\n"
     "Do not fake tool output."
@@ -139,7 +143,11 @@ echo "start=$(date +%s.%N)" > "$TIMING_LOG"
 if [[ -n "$MI_TASK_TIMEOUT" ]]; then
     DEADLINE=$(echo "$START_TIME + $MI_TASK_TIMEOUT - 60" | bc | cut -d. -f1)
     export MI_DEADLINE="$DEADLINE"
-    log_diag "Budget: ${MI_TASK_TIMEOUT}s task timeout, deadline=$DEADLINE (60s verifier buffer)"
+    GOAL_MAX=$(( MI_TASK_TIMEOUT / 150 ))
+    (( GOAL_MAX < 4 )) && GOAL_MAX=4
+    (( GOAL_MAX > 12 )) && GOAL_MAX=12
+    export MI_GOAL_MAX="$GOAL_MAX"
+    log_diag "Budget: ${MI_TASK_TIMEOUT}s task timeout, deadline=$DEADLINE (60s verifier buffer), max_iter=$GOAL_MAX"
 fi
 
 if [[ -f /opt/mi/index.mjs ]]; then
@@ -174,28 +182,37 @@ WORKDIR=$(detect_workdir)
 log_diag "Workdir: $WORKDIR"
 cd "$WORKDIR" || cd / || exit 1
 
-# Inject task README into AGENTS.md for auto-ingestion by mi subagents.
-# Only if AGENTS.md doesn't already exist and a README is found.
-if [[ ! -f AGENTS.md ]]; then
+# Build AGENTS.md for mi auto-ingestion: README + workspace snapshot (reduces planner burn).
+{
+    echo "# Task Context"
+    echo ""
     README=""
     for rf in README.md README.txt README readme.md; do
         if [[ -f "$rf" ]]; then README="$rf"; break; fi
     done
-    if [[ -n "$README" ]]; then
-        {
-            echo "# Task Context"
-            echo ""
-            head -100 "$README"
-        } > AGENTS.md
-        log_diag "Injected $README into AGENTS.md for mi context"
-    fi
-fi
+    if [[ -n "$README" ]]; then head -100 "$README"; fi
+    echo ""
+    echo "## Workspace Snapshot"
+    echo '```'
+    pwd
+    ls -la . 2>/dev/null | head -30
+    if [[ -d /tests ]]; then echo "--- /tests/ ---"; ls -la /tests/ 2>/dev/null | head -20; fi
+    find . -maxdepth 2 -type f 2>/dev/null | head -40
+    echo '```'
+} > AGENTS.md
+log_diag "Wrote AGENTS.md with task context and workspace snapshot"
 
 # Run mi goal loop with timestamped output, separate stderr
-"${MI_RUNNER[@]}" -g "$1" -c "$MI_GOAL_CHECK" \
-    > >(timestamp_output | tee "$STDOUT_LOG") \
-    2> >(timestamp_output | tee "$STDERR_LOG" >&2)
+exec 3> >(timestamp_output | tee "$STDOUT_LOG")
+STDOUT_PS_PID=$!
+exec 4> >(timestamp_output | tee "$STDERR_LOG" >&2)
+STDERR_PS_PID=$!
+"${MI_RUNNER[@]}" -g "$1" -c "$MI_GOAL_CHECK" >&3 2>&4
 EXIT_CODE=$?
+# Close FDs and wait for the log writers to flush — otherwise the script can
+# exit before tee finishes, leaving mi-output.txt/mi-stderr.txt empty/truncated.
+exec 3>&- 4>&-
+wait "$STDOUT_PS_PID" "$STDERR_PS_PID" 2>/dev/null || true
 
 echo "end=$(date +%s.%N)" >> "$TIMING_LOG"
 echo "exit_code=$EXIT_CODE" >> "$TIMING_LOG"
@@ -454,6 +471,12 @@ class MiAgent(BaseInstalledAgent):
             if "/" in model:
                 model = model.split("/", 1)[-1]
             env["MODEL"] = model
+
+        # Sampling/routing determinism pins (set by run scripts via determinism-env.sh)
+        for var in ("MI_API_PARAMS", "MI_JUDGE_PARAMS", "MI_JUDGE_MODEL"):
+            value = self._get_env(var)
+            if value:
+                env[var] = value
 
         # System prompt: use eval-optimized prompt by default, allow override
         system_prompt = self._get_env("MI_SYSTEM_PROMPT")

@@ -66,6 +66,9 @@ if [[ -z "${OPENAI_API_KEY}" ]]; then
     exit 1
 fi
 
+# shellcheck source=../determinism-env.sh
+source "$SCRIPT_DIR/../determinism-env.sh"
+
 # The 10 tasks chosen for best full-benchmark extrapolation (see header for rationale)
 TASKS=(
     count-dataset-tokens

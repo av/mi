@@ -12,6 +12,7 @@
 #   HARNESS=both ./run-tb21-subset.sh    # mi + terminus-2
 #   LIMIT=1 ./run-tb21-subset.sh         # first task only (smoke)
 #   N_CONCURRENT=4 ./run-tb21-subset.sh
+#   K_TRIALS=3 ./run-tb21-subset.sh      # 3 attempts per task (harbor --n-attempts)
 #
 # Per-task timeouts come from task.toml via the adapter — do NOT set MI_TASK_TIMEOUT here.
 set -euo pipefail
@@ -24,6 +25,7 @@ MI_DIR="$(dirname "$SCRIPT_DIR")"
 : "${HARNESS:=mi}"
 : "${LIMIT:=all}"
 : "${N_CONCURRENT:=4}"
+: "${K_TRIALS:=1}"
 : "${RUN_ID:=$(date +%Y%m%d-%H%M%S)}"
 : "${OUT_ROOT:=bench/terminal-bench-2.1-subset/${MODEL//\//_}/${RUN_ID}}"
 
@@ -32,6 +34,9 @@ if [[ -z "$OPENAI_API_KEY" ]]; then
   echo "ERROR: OPENAI_API_KEY not set and OPENROUTER_API_KEY not found in ~/.hermes/.env" >&2
   exit 1
 fi
+
+# shellcheck source=determinism-env.sh
+source "$SCRIPT_DIR/determinism-env.sh"
 
 TASKS=(
   # mi-only wins in the 2026-06-17 full run — regression guards
@@ -74,13 +79,28 @@ for task in "${TASKS[@]:0:$COUNT}"; do
   include_args+=(--include-task-name "terminal-bench/$task")
 done
 
+attempt_args=()
+if (( K_TRIALS > 1 )); then
+  attempt_args+=(--n-attempts "$K_TRIALS")
+fi
+
+harbor_cmd() {
+  if [[ "${DRY_RUN:-0}" == "1" ]]; then
+    echo "DRY_RUN: MI_API_PARAMS=${MI_API_PARAMS:-<unset>}"
+    echo "DRY_RUN: MI_JUDGE_PARAMS=${MI_JUDGE_PARAMS:-<unset>}"
+    printf 'DRY_RUN:'; printf ' %q' "$@"; printf '\n'
+  else
+    "$@"
+  fi
+}
+
 run_harness() {
   local harness="$1"
   local jobs_dir="$MI_DIR/$OUT_ROOT/$harness"
   mkdir -p "$jobs_dir"
   echo "=== $harness: TB 2.1 subset ($COUNT tasks), n=$N_CONCURRENT, model=$MODEL ==="
   if [[ "$harness" == "mi" ]]; then
-    uvx --from harbor harbor run \
+    harbor_cmd uvx --from harbor harbor run \
       --dataset terminal-bench/terminal-bench-2-1 \
       --agent-import-path mi_harbor.mi_agent:MiAgent \
       --environment-import-path mi_harbor.cached_docker_environment:MiCachedDockerEnvironment \
@@ -88,9 +108,10 @@ run_harness() {
       --n-concurrent "$N_CONCURRENT" \
       --jobs-dir "$jobs_dir" \
       --yes \
+      "${attempt_args[@]}" \
       "${include_args[@]}"
   else
-    uvx --from harbor harbor run \
+    harbor_cmd uvx --from harbor harbor run \
       --dataset terminal-bench/terminal-bench-2-1 \
       --agent terminus-2 \
       --model "openai/$MODEL" \
@@ -98,6 +119,7 @@ run_harness() {
       --n-concurrent "$N_CONCURRENT" \
       --jobs-dir "$jobs_dir" \
       --yes \
+      "${attempt_args[@]}" \
       "${include_args[@]}"
   fi
 }

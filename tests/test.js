@@ -319,7 +319,7 @@ test('-g goal mode takes precedence over non-tty stdin', async () => {
     } else {
       assert.match(prompt, /you are a judge for a goal loop/);
       assert.match(prompt, /do not invent criteria/);
-      sse(res, { role: 'assistant', content: 'already done\nACK' });
+      sse(res, { role: 'assistant', content: 'already done [PASS]\nACK' });
     }
   };
 
@@ -338,7 +338,13 @@ test('goal workers do work instead of receiving judge criteria', async () => {
       assert.match(prompt, /you are the planner for a goal loop/);
       assert.match(prompt, /goal: create files/);
       assert.match(prompt, /criteria: inspect state/);
+      assert.match(prompt, /ARTIFACTS/);
+      assert.match(prompt, /PROVISIONAL GUARD — VERY FIRST output/);
+      assert.match(prompt, /one or two lines ONLY/);
+      assert.match(prompt, /DISCOVERY NEXT — evidence before contract/);
+      assert.match(prompt, /THEN emit the FULL section block, grounded in the discovery evidence/);
       assert.match(prompt, /VERIFIER_SHAPE_CONTRACT/);
+      assert.match(prompt, /INVARIANTS:.*transforms\/extracts\/converts/);
       assert.match(prompt, /do not invent requirements/);
       sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- files exist\nVERIFIER_SHAPE_CONTRACT\n- exact files exist\nVERIFICATION_PLAN\n- inspect files\nCURRENT_STATE\n- missing files' });
     } else if (prompts.length === 2) {
@@ -348,8 +354,15 @@ test('goal workers do work instead of receiving judge criteria', async () => {
       assert.match(prompt, /event log:/);
       assert.match(prompt, /NEVER trust worker-reported values/);
       assert.match(prompt, /measured=X expected=Y/);
+      assert.match(prompt, /INVARIANTS commands against the PRISTINE input/);
+      assert.match(prompt, /self-referential/);
+      assert.match(prompt, /HYPOTHESIS, not a spec/);
+      assert.match(prompt, /matches the GOAL", never "matches the plan/);
+      assert.match(prompt, /plan-asserted=X vs goal-derived=Y/);
+      assert.match(prompt, /\[ASSUMED\] decisions MUST be re-derived/);
+      assert.match(prompt, /method different IN KIND from the worker's/);
       assert.match(prompt, /do not invent criteria/);
-      sse(res, { role: 'assistant', content: 'missing files\nNACK' });
+      sse(res, { role: 'assistant', content: 'missing files [FAIL]\nNACK' });
     } else if (prompts.length === 3) {
       assert.match(prompt, /you are worker 1\/128/);
       assert.match(prompt, /complete the goal now/);
@@ -365,11 +378,16 @@ test('goal workers do work instead of receiving judge criteria', async () => {
     } else if (prompts.length === 4) {
       assert.match(prompt, /you are a judge for a goal loop/);
       assert.match(prompt, /criteria: inspect state/);
-      sse(res, { role: 'assistant', content: 'all files exist\nACK' });
+      sse(res, { role: 'assistant', content: 'all files exist [PASS]\nACK' });
     } else {
-      assert.match(prompt, /you are a judge for a goal loop/);
-      assert.match(prompt, /SKEPTICAL RECHECK/);
-      sse(res, { role: 'assistant', content: 'independently verified — all files exist\nACK' });
+      assert.match(prompt, /BLIND SKEPTICAL RECHECK/);
+      assert.match(prompt, /STRICTLY READ-ONLY/);
+      assert.match(prompt, /NEVER run git write operations/);
+      assert.match(prompt, /so the WORKER performs the repair/);
+      assert.match(prompt, /method different IN KIND/);
+      assert.match(prompt, /state which method you used/);
+      assert.doesNotMatch(prompt, /plan and verifier contract/);
+      sse(res, { role: 'assistant', content: 'independently verified — all files exist [PASS]\nACK' });
     }
   };
 
@@ -377,6 +395,167 @@ test('goal workers do work instead of receiving judge criteria', async () => {
   assert.strictEqual(result.status, 0);
   assert.strictEqual(prompts.length, 5);
   assert.match(result.stdout, /independently verified/);
+});
+
+test('MI_JUDGE_MODEL overrides model for judge and recheck only', async () => {
+  const seen = [];
+  requestHandler = (req, res, body) => {
+    const prompt = body.messages.at(-1).content;
+    seen.push({ prompt, model: body.model });
+    if (seen.length === 1) {
+      sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- files exist\nARTIFACTS: none\nVERIFIER_SHAPE_CONTRACT\n- files\nVERIFICATION_PLAN\n- inspect\nCURRENT_STATE\n- missing' });
+    } else if (seen.length === 2) {
+      sse(res, { role: 'assistant', content: 'missing files [FAIL]\nNACK' });
+    } else if (seen.length === 3) {
+      sse(res, { role: 'assistant', content: 'created files' });
+    } else {
+      sse(res, { role: 'assistant', content: 'verified [PASS]\nACK' });
+    }
+  };
+
+  const result = await runMi(['-g', 'create files', '-c', 'inspect; ACK or NACK'], { MODEL: 'worker-model', MI_JUDGE_MODEL: 'judge-model' });
+  assert.strictEqual(result.status, 0);
+  assert.strictEqual(seen.length, 5);
+  assert.strictEqual(seen[0].model, 'worker-model');   // planner
+  assert.strictEqual(seen[1].model, 'judge-model');    // pre-check judge
+  assert.strictEqual(seen[2].model, 'worker-model');   // worker
+  assert.strictEqual(seen[3].model, 'judge-model');    // judge
+  assert.strictEqual(seen[4].model, 'judge-model');    // blind skeptical recheck
+  assert.match(seen[4].prompt, /BLIND SKEPTICAL RECHECK/);
+});
+
+test('goal loop monitors live background jobs from shared registry before judging', async () => {
+  const sid = `test-monitor-${Date.now()}`;
+  const jobsFile = `/tmp/mi-jobs-${sid}.jsonl`, jobLog = `/tmp/mi-test-job-${sid}.log`;
+  writeFileSync(jobLog, 'working\n');
+  const bg = spawn('sleep', ['5'], { detached: true, stdio: 'ignore' }); bg.unref();
+  writeFileSync(jobsFile, JSON.stringify({ id: 'j1', pid: bg.pid, pgid: bg.pid, log: jobLog, started_at: Date.now(), command: 'long compute' }) + '\n');
+  const prompts = [];
+  requestHandler = (req, res, body) => {
+    prompts.push(body.messages.at(-1).content);
+    if (prompts.length === 1) {
+      sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- done\nARTIFACTS: none\nVERIFIER_SHAPE_CONTRACT\n- out\nVERIFICATION_PLAN\n- inspect\nCURRENT_STATE\n- running' });
+    } else if (prompts.length === 2) {
+      sse(res, { role: 'assistant', content: 'not done [FAIL]\nNACK' });
+    } else if (prompts.length === 3) {
+      assert.match(prompts[2], /check for running background jobs from previous iterations/);
+      assert.match(prompts[2], /do NOT restart or duplicate it/);
+      sse(res, { role: 'assistant', content: 'job still running, waiting' });
+    } else {
+      assert.match(prompts[3], /a live background job .* is work in progress/);
+      sse(res, { role: 'assistant', content: 'done [PASS]\nACK' });
+    }
+  };
+  try {
+    const result = await runMi(['-g', 'finish compute', '-c', 'inspect; ACK or NACK'], { MI_SESSION_ID: sid, MI_JOB_POLL_MS: '100' });
+    assert.strictEqual(result.status, 0);
+    // monitor detected the live registered job and polled it (stall guard: log never grew → 3 polls then judge)
+    assert.match(result.stdout, /waiting on 1 live bg job/);
+  } finally {
+    try { process.kill(bg.pid); } catch {}
+    try { unlinkSync(jobsFile); } catch {}
+    try { unlinkSync(jobLog); } catch {}
+  }
+});
+
+test('goal skips judge with mechanical NACK while declared artifacts are missing', async () => {
+  const art = `/tmp/mi-test-artifact-${Date.now()}.txt`;
+  const prompts = [];
+  requestHandler = (req, res, body) => {
+    const prompt = body.messages.at(-1).content;
+    prompts.push(prompt);
+    if (prompts.length === 1) {
+      sse(res, { role: 'assistant', content: `EXIT_CRITERIA\n- file written\nARTIFACTS: ${art}\nVERIFIER_SHAPE_CONTRACT\n- file exists\nVERIFICATION_PLAN\n- inspect file\nCURRENT_STATE\n- missing` });
+    } else if (prompts.length === 2) {
+      // pre-check judge was skipped (mechanical NACK) — this is already worker 1
+      assert.match(prompt, /you are worker 1\/128/);
+      assert.match(prompt, /artifact\(s\) still missing:/);
+      assert.match(prompt, /implementation does not exist yet; write the artifact first/);
+      sse(res, { role: 'assistant', content: 'attempted but wrote nothing\nSTRATEGY: approach A' });
+    } else if (prompts.length === 3) {
+      // artifact still missing → iteration judge skipped again, straight to worker 2
+      assert.match(prompt, /you are worker 2\/128/);
+      assert.match(prompt, /implementation does not exist yet/);
+      // mechanical NACKs are progress-neutral: no strategy/blocker accounting
+      assert.doesNotMatch(prompt, /failed strategies \(do NOT repeat\)/);
+      assert.doesNotMatch(prompt, /BLOCKED: 3 iterations failed/);
+      writeFileSync(art, 'content'); // worker writes the artifact this time
+      sse(res, { role: 'assistant', content: 'wrote the file\nSTRATEGY: approach B' });
+    } else if (prompts.length === 4) {
+      // artifact exists now → the skip stops, real judge runs
+      assert.match(prompt, /you are a judge for a goal loop/);
+      sse(res, { role: 'assistant', content: 'file exists and passes [PASS]\nACK' });
+    } else {
+      assert.match(prompt, /BLIND SKEPTICAL RECHECK/);
+      sse(res, { role: 'assistant', content: 'independently verified [PASS]\nACK' });
+    }
+  };
+  try {
+    const result = await runMi(['-g', 'write the file', '-c', 'inspect; ACK or NACK']);
+    assert.strictEqual(result.status, 0);
+    assert.strictEqual(prompts.length, 5);
+    // exactly one judge model call, and only after the artifact existed
+    assert.strictEqual(prompts.filter(p => /you are a judge for a goal loop/.test(p)).length, 1);
+  } finally { try { unlinkSync(art); } catch {} }
+});
+
+test('goal parses header-form ARTIFACTS section (paths on following lines)', async () => {
+  const art = `/tmp/mi-test-hdr-artifact-${Date.now()}.txt`;
+  const prompts = [];
+  requestHandler = (req, res, body) => {
+    const prompt = body.messages.at(-1).content;
+    prompts.push(prompt);
+    if (prompts.length === 1) {
+      // markdown-header ARTIFACTS form with bulleted absolute paths, terminated by next section header
+      sse(res, { role: 'assistant', content: `## ARTIFACTS\n- ${art}\n\n## EXIT_CRITERIA\n- file written\nVERIFIER_SHAPE_CONTRACT\n- file exists\nVERIFICATION_PLAN\n- inspect\nCURRENT_STATE\n- missing` });
+    } else if (prompts.length === 2) {
+      // header-form artifact was parsed → pre-check judge skipped via mechanical NACK
+      assert.match(prompt, /you are worker 1\/128/);
+      assert.match(prompt, new RegExp(`artifact\\(s\\) still missing: ${art}`));
+      writeFileSync(art, 'content');
+      sse(res, { role: 'assistant', content: 'wrote the file\nSTRATEGY: direct write' });
+    } else if (prompts.length === 3) {
+      assert.match(prompt, /you are a judge for a goal loop/);
+      sse(res, { role: 'assistant', content: 'file exists [PASS]\nACK' });
+    } else {
+      sse(res, { role: 'assistant', content: 'verified [PASS]\nACK' });
+    }
+  };
+  try {
+    const result = await runMi(['-g', 'write the file', '-c', 'inspect; ACK or NACK']);
+    assert.strictEqual(result.status, 0);
+    assert.strictEqual(prompts.length, 4);
+  } finally { try { unlinkSync(art); } catch {} }
+});
+
+test('goal parses inline-refined and mid-line DECISION forms', async () => {
+  const prompts = [];
+  requestHandler = (req, res, body) => {
+    const prompt = body.messages.at(-1).content;
+    prompts.push(prompt);
+    if (prompts.length === 1) {
+      // later inline ARTIFACTS refinement wins ('none' overrides earlier list); DECISION appears mid-line
+      sse(res, { role: 'assistant', content: 'ARTIFACTS: /tmp/never-checked-stale.txt\nAMBIGUITIES\nafter reading the tests, DECISION: units → seconds BECAUSE "timeout is given in seconds" [DERIVED]\nEXIT_CRITERIA\n- done\nrefinement after discovery — ARTIFACTS: none\nVERIFIER_SHAPE_CONTRACT\n- ok\nVERIFICATION_PLAN\n- inspect\nCURRENT_STATE\n- clean' });
+    } else if (prompts.length === 2) {
+      // 'ARTIFACTS: none' refinement won → no mechanical NACK, real pre-check judge runs
+      assert.match(prompt, /you are a judge for a goal loop/);
+      sse(res, { role: 'assistant', content: 'not done [FAIL]\nNACK' });
+    } else if (prompts.length === 3) {
+      // mid-line DECISION parsed verbatim from DECISION: onward
+      assert.match(prompt, /you are worker 1\/128/);
+      assert.match(prompt, /DECISIONS \(interpretation forks already resolved/);
+      // DECISIONS block carries the line starting at DECISION: (prose prefix stripped) — anchored match only satisfiable by the block, not the echoed plan
+      assert.match(prompt, /^DECISION: units → seconds BECAUSE "timeout is given in seconds" \[DERIVED\]$/m);
+      sse(res, { role: 'assistant', content: 'done\nSTRATEGY: fix units' });
+    } else if (prompts.length === 4) {
+      sse(res, { role: 'assistant', content: 'done [PASS]\nACK' });
+    } else {
+      sse(res, { role: 'assistant', content: 'verified [PASS]\nACK' });
+    }
+  };
+  const result = await runMi(['-g', 'convert units', '-c', 'inspect; ACK or NACK']);
+  assert.strictEqual(result.status, 0);
+  assert.strictEqual(prompts.length, 5);
 });
 
 test('goal mode passes deadline from -d flag and MI_DEADLINE env', async () => {
@@ -391,7 +570,7 @@ test('goal mode passes deadline from -d flag and MI_DEADLINE env', async () => {
       // Judge should see budget info when deadline is set
       assert.match(prompt, /you are a judge for a goal loop/);
       assert.match(prompt, /budget:.*remaining of.*total/);
-      sse(res, { role: 'assistant', content: 'done\nACK' });
+      sse(res, { role: 'assistant', content: 'done [PASS]\nACK' });
     }
   };
 
@@ -418,7 +597,7 @@ test('goal NACK iteration includes strategy fingerprint and diversity warning in
       sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- tests pass\nVERIFIER_SHAPE_CONTRACT\n- npm test\nVERIFICATION_PLAN\n- run tests\nCURRENT_STATE\n- failing' });
     } else if (prompts.length === 2) {
       // Pre-check judge → NACK
-      sse(res, { role: 'assistant', content: 'tests fail\nNACK' });
+      sse(res, { role: 'assistant', content: 'tests fail [FAIL]\nNACK' });
     } else if (prompts.length === 3) {
       // Worker 1 — no strategy warning yet (first iteration)
       assert.match(prompt, /you are worker 1/);
@@ -426,7 +605,7 @@ test('goal NACK iteration includes strategy fingerprint and diversity warning in
       sse(res, { role: 'assistant', content: 'tried fixing imports\n\n1. STRATEGY: fixed import paths\n2. FILES_MODIFIED: src/index.js\n3. COMMANDS_SUCCEEDED: npm install\n4. COMMANDS_FAILED: npm test (3 failures)\n5. BLOCKERS: type errors\n6. REMAINING: fix types' });
     } else if (prompts.length === 4) {
       // Judge 1 → NACK
-      sse(res, { role: 'assistant', content: '3 tests still fail\nNACK' });
+      sse(res, { role: 'assistant', content: '3 tests still fail [FAIL]\nNACK' });
     } else if (prompts.length === 5) {
       // Worker 2 — should have strategy warning with fingerprint from iteration 1
       assert.match(prompt, /you are worker 2/);
@@ -436,7 +615,7 @@ test('goal NACK iteration includes strategy fingerprint and diversity warning in
       sse(res, { role: 'assistant', content: 'rewrote module\n\n1. STRATEGY: complete rewrite\n2. FILES_MODIFIED: src/index.js\n3. COMMANDS_SUCCEEDED: npm test\n4. COMMANDS_FAILED: none\n5. BLOCKERS: none\n6. REMAINING: none' });
     } else {
       // Judge 2 → ACK
-      sse(res, { role: 'assistant', content: 'all tests pass\nACK' });
+      sse(res, { role: 'assistant', content: 'all tests pass [PASS]\nACK' });
     }
   };
 
@@ -454,13 +633,13 @@ test('goal NACK iteration passes structured checkpoint to next worker', async ()
     if (prompts.length === 1) {
       sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- done\nVERIFIER_SHAPE_CONTRACT\n- checked\nVERIFICATION_PLAN\n- inspect\nCURRENT_STATE\n- empty' });
     } else if (prompts.length === 2) {
-      sse(res, { role: 'assistant', content: 'not done\nNACK' });
+      sse(res, { role: 'assistant', content: 'not done [FAIL]\nNACK' });
     } else if (prompts.length === 3) {
       // Worker 1 returns structured summary
       sse(res, { role: 'assistant', content: 'did work\n\n1. STRATEGY: built from scratch\n2. FILES_MODIFIED: app.py, config.json\n3. COMMANDS_SUCCEEDED: python setup.py\n4. COMMANDS_FAILED: pytest (2 errors)\n5. BLOCKERS: missing dependency\n6. REMAINING: install deps and rerun' });
     } else if (prompts.length === 4) {
       // Judge 1 → NACK
-      sse(res, { role: 'assistant', content: 'still broken\nNACK' });
+      sse(res, { role: 'assistant', content: 'still broken [FAIL]\nNACK' });
     } else if (prompts.length === 5) {
       // Worker 2 should receive structured checkpoint, not raw judge output
       assert.match(prompt, /FILES_MODIFIED:.*app\.py/);
@@ -468,7 +647,7 @@ test('goal NACK iteration passes structured checkpoint to next worker', async ()
       assert.match(prompt, /BLOCKERS:.*missing dependency/);
       sse(res, { role: 'assistant', content: 'fixed it\n\nSTRATEGY: installed deps\nFILES_MODIFIED: requirements.txt\nCOMMANDS_SUCCEEDED: pip install, pytest\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
     } else {
-      sse(res, { role: 'assistant', content: 'all good\nACK' });
+      sse(res, { role: 'assistant', content: 'all good [PASS]\nACK' });
     }
   };
 
@@ -476,6 +655,83 @@ test('goal NACK iteration passes structured checkpoint to next worker', async ()
   assert.strictEqual(result.status, 0);
   // 1 planner + 1 precheck + 1 worker1 + 1 judge1(NACK) + 1 worker2 + 1 judge2(ACK) + 1 skeptical(ACK) = 7
   assert.strictEqual(prompts.length, 7);
+});
+
+test('goal measured/expected ledger surfaces PARAMETER HISTORY after oscillating NACKs', async () => {
+  const prompts = [];
+  requestHandler = (req, res, body) => {
+    const prompt = body.messages.at(-1).content;
+    prompts.push(prompt);
+    if (prompts.length === 1) {
+      sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- sim stable\nVERIFIER_SHAPE_CONTRACT\n- check timestep\nVERIFICATION_PLAN\n- run sim\nCURRENT_STATE\n- unstable' });
+    } else if (prompts.length === 2) {
+      // Pre-check NACK, no measured pairs
+      sse(res, { role: 'assistant', content: 'sim unstable [FAIL]\nNACK' });
+    } else if (prompts.length === 3) {
+      // Worker 1 — single NACK so far, no history table yet
+      assert.doesNotMatch(prompt, /PARAMETER HISTORY/);
+      sse(res, { role: 'assistant', content: '1. STRATEGY: guessed timestep 0.004\n2. FILES_MODIFIED: model.xml\n3. COMMANDS_SUCCEEDED: sim\n4. COMMANDS_FAILED: check\n5. BLOCKERS: unstable\n6. REMAINING: tune' });
+    } else if (prompts.length === 4) {
+      // Judge 1 → NACK with measured pair
+      sse(res, { role: 'assistant', content: 'timestep drift: measured=0.004 expected=0.001 [FAIL]\nNACK' });
+    } else if (prompts.length === 5) {
+      // Worker 2 — one ledger entry only, still no table
+      assert.doesNotMatch(prompt, /PARAMETER HISTORY/);
+      sse(res, { role: 'assistant', content: '1. STRATEGY: guessed timestep 0.0005\n2. FILES_MODIFIED: model.xml\n3. COMMANDS_SUCCEEDED: sim\n4. COMMANDS_FAILED: check\n5. BLOCKERS: unstable\n6. REMAINING: tune' });
+    } else if (prompts.length === 6) {
+      // Judge 2 → NACK, same criterion, DIFFERENT measured value
+      sse(res, { role: 'assistant', content: 'timestep drift: measured=0.0005 expected=0.001 [FAIL]\nNACK' });
+    } else if (prompts.length === 7) {
+      // Worker 3 — oscillation detected, history table appears
+      assert.match(prompt, /PARAMETER HISTORY timestep drift: tried→got: \[0\.004, 0\.0005\]; expected 0\.001/);
+      assert.match(prompt, /interpolate\/bisect/);
+      sse(res, { role: 'assistant', content: '1. STRATEGY: bisected to 0.001\n2. FILES_MODIFIED: model.xml\n3. COMMANDS_SUCCEEDED: sim, check\n4. COMMANDS_FAILED: none\n5. BLOCKERS: none\n6. REMAINING: none' });
+    } else {
+      sse(res, { role: 'assistant', content: 'timestep drift: measured=0.001 expected=0.001 [PASS]\nACK' });
+    }
+  };
+
+  const result = await runMi(['-g', 'tune sim', '-c', 'check timestep']);
+  assert.strictEqual(result.status, 0);
+  // planner + precheck + w1 + j1 + w2 + j2 + w3 + j3(ACK) = 8 (skeptical skipped: i>2, no deadline)
+  assert.strictEqual(prompts.length, 8);
+});
+
+test('goal ledger harvests markdown-table FAIL rows into PARAMETER HISTORY', async () => {
+  const prompts = [];
+  requestHandler = (req, res, body) => {
+    const prompt = body.messages.at(-1).content;
+    prompts.push(prompt);
+    if (prompts.length === 1) {
+      sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- tm in range\nVERIFIER_SHAPE_CONTRACT\n- check tm\nVERIFICATION_PLAN\n- run\nCURRENT_STATE\n- off' });
+    } else if (prompts.length === 2) {
+      // Pre-check NACK, no measured pairs
+      sse(res, { role: 'assistant', content: 'off [FAIL]\nNACK' });
+    } else if (prompts.length === 3) {
+      assert.doesNotMatch(prompt, /PARAMETER HISTORY/);
+      sse(res, { role: 'assistant', content: '1. STRATEGY: primer A\n2. FILES_MODIFIED: p.txt\n3. COMMANDS_SUCCEEDED: sim\n4. COMMANDS_FAILED: check\n5. BLOCKERS: hot\n6. REMAINING: tune' });
+    } else if (prompts.length === 4) {
+      // Judge 1 → NACK as markdown table row only (no canonical line)
+      sse(res, { role: 'assistant', content: '| Criterion | Measured | Required | Status |\n| --- | --- | --- | --- |\n| Melting temperature (forward) | 74.35°C | 58-72°C | FAIL |\nNACK' });
+    } else if (prompts.length === 5) {
+      assert.doesNotMatch(prompt, /PARAMETER HISTORY/);
+      sse(res, { role: 'assistant', content: '1. STRATEGY: primer B\n2. FILES_MODIFIED: p.txt\n3. COMMANDS_SUCCEEDED: sim\n4. COMMANDS_FAILED: check\n5. BLOCKERS: cold\n6. REMAINING: tune' });
+    } else if (prompts.length === 6) {
+      // Judge 2 → NACK as table row, same criterion, DIFFERENT measured value
+      sse(res, { role: 'assistant', content: '| Melting temperature (forward) | 55.10°C | 58-72°C | FAIL |\nNACK' });
+    } else if (prompts.length === 7) {
+      // Worker 3 — oscillation across table rows → history appears
+      assert.match(prompt, /PARAMETER HISTORY melting temperature \(forward\): tried→got: \[74\.35°C, 55\.10°C\]; expected 58-72°C/);
+      assert.match(prompt, /interpolate\/bisect/);
+      sse(res, { role: 'assistant', content: '1. STRATEGY: primer C\n2. FILES_MODIFIED: p.txt\n3. COMMANDS_SUCCEEDED: sim, check\n4. COMMANDS_FAILED: none\n5. BLOCKERS: none\n6. REMAINING: none' });
+    } else {
+      sse(res, { role: 'assistant', content: 'melting temperature (forward): measured=65 expected=58-72 [PASS]\nACK' });
+    }
+  };
+
+  const result = await runMi(['-g', 'design primer', '-c', 'check tm']);
+  assert.strictEqual(result.status, 0);
+  assert.strictEqual(prompts.length, 8);
 });
 
 test('goal salvage triggers when deadline is near', async () => {
@@ -490,7 +746,7 @@ test('goal salvage triggers when deadline is near', async () => {
       sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- file exists\nVERIFIER_SHAPE_CONTRACT\n- /app/out.txt\nVERIFICATION_PLAN\n- check file\nCURRENT_STATE\n- missing' });
     } else if (prompts.length === 2) {
       // Pre-check judge → NACK
-      sse(res, { role: 'assistant', content: 'file missing\nNACK' });
+      sse(res, { role: 'assistant', content: 'file missing [FAIL]\nNACK' });
     } else if (prompts.length === 3) {
       // Should be salvage prompt (budget < 60s)
       assert.match(prompt, /FINAL SALVAGE/);
@@ -498,7 +754,7 @@ test('goal salvage triggers when deadline is near', async () => {
       sse(res, { role: 'assistant', content: 'wrote /app/out.txt' });
     } else {
       // Judge after salvage
-      sse(res, { role: 'assistant', content: 'file exists\nACK' });
+      sse(res, { role: 'assistant', content: 'file exists [PASS]\nACK' });
     }
   };
 
@@ -519,20 +775,166 @@ test('goal with past deadline triggers immediate salvage', async () => {
       // Planner
       sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- done\nVERIFIER_SHAPE_CONTRACT\n- checked\nVERIFICATION_PLAN\n- run\nCURRENT_STATE\n- empty' });
     } else if (prompts.length === 2) {
-      // Pre-check judge → NACK
-      sse(res, { role: 'assistant', content: 'not ready\nNACK' });
+      // Pre-check judge → NACK with TWO failing criteria (multi-FAIL → not fast lane, stays salvage)
+      sse(res, { role: 'assistant', content: 'not ready [FAIL]\nalso broken [FAIL]\nNACK' });
     } else if (prompts.length === 3) {
       // Should be salvage (budget is 0, past deadline)
       assert.match(prompt, /FINAL SALVAGE/);
       sse(res, { role: 'assistant', content: 'salvaged something' });
     } else {
       // Judge after salvage → NACK (doesn't matter for test)
-      sse(res, { role: 'assistant', content: 'incomplete\nNACK' });
+      sse(res, { role: 'assistant', content: 'incomplete [FAIL]\nNACK' });
     }
   };
 
   const result = await runMi(['-g', 'past deadline', '-c', 'check', '-d', String(dl)]);
   // Should exit (NACK after salvage breaks the loop)
+  assert.strictEqual(result.status, 0);
+  assert.strictEqual(prompts.length, 4);
+});
+
+test('goal single-blocker fast lane: low budget + one FAIL → surgical brief', async () => {
+  const prompts = [];
+  const dl = Math.floor(Date.now() / 1000) - 100; // past deadline → budget fraction 0 < 0.3
+  requestHandler = (req, res, body) => {
+    const prompt = body.messages.at(-1).content;
+    prompts.push(prompt);
+    if (prompts.length === 1) {
+      sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- constant right\nVERIFIER_SHAPE_CONTRACT\n- check R\nVERIFICATION_PLAN\n- run\nCURRENT_STATE\n- off' });
+    } else if (prompts.length === 2) {
+      // Pre-check judge → NACK with exactly ONE failing criterion
+      sse(res, { role: 'assistant', content: 'R integration constant: measured=0.5 expected=1.0 [FAIL]\nNACK' });
+    } else if (prompts.length === 3) {
+      // Worker should get the SURGICAL brief, not salvage/strategy scaffolding
+      assert.match(prompt, /SINGLE-BLOCKER FAST LANE/);
+      assert.match(prompt, /fix ONLY this criterion/);
+      assert.match(prompt, /R integration constant: measured=0.5 expected=1.0 \[FAIL\]/);
+      assert.doesNotMatch(prompt, /FINAL SALVAGE/);
+      assert.doesNotMatch(prompt, /failed strategies/);
+      assert.doesNotMatch(prompt, /BLOCKED/);
+      sse(res, { role: 'assistant', content: 'fixed the constant\nSTRATEGY: one-line fix\nFILES_MODIFIED: r.py\nCOMMANDS_SUCCEEDED: check\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
+    } else {
+      sse(res, { role: 'assistant', content: 'R integration constant: measured=1.0 expected=1.0 [PASS]\nACK' });
+    }
+  };
+  const result = await runMi(['-g', 'fix sampler', '-c', 'check R', '-d', String(dl)]);
+  assert.strictEqual(result.status, 0);
+  // planner + precheck + surgical worker + judge(ACK); recheck skipped (budget < 180s)
+  assert.strictEqual(prompts.length, 4);
+});
+
+test('goal fast lane suppressed: high budget one FAIL → normal worker prompt', async () => {
+  const prompts = [];
+  const dl = Math.floor(Date.now() / 1000) + 600; // budget fraction ~1.0 > 0.3 → no fast lane
+  requestHandler = (req, res, body) => {
+    const prompt = body.messages.at(-1).content;
+    prompts.push(prompt);
+    if (prompts.length === 1) {
+      sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- ok\nVERIFIER_SHAPE_CONTRACT\n- check\nVERIFICATION_PLAN\n- run\nCURRENT_STATE\n- off' });
+    } else if (prompts.length === 2) {
+      sse(res, { role: 'assistant', content: 'one thing: measured=2 expected=3 [FAIL]\nNACK' });
+    } else if (prompts.length === 3) {
+      // High budget → normal worker scaffolding, NOT the fast lane
+      assert.match(prompt, /you are worker/);
+      assert.doesNotMatch(prompt, /SINGLE-BLOCKER FAST LANE/);
+      sse(res, { role: 'assistant', content: 'did it\nSTRATEGY: normal\nFILES_MODIFIED: x\nCOMMANDS_SUCCEEDED: y\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
+    } else {
+      sse(res, { role: 'assistant', content: 'one thing: measured=3 expected=3 [PASS]\nACK' });
+    }
+  };
+  const result = await runMi(['-g', 'fix it', '-c', 'check', '-d', String(dl)]);
+  assert.strictEqual(result.status, 0);
+});
+
+test('goal DECISION lines from plan are echoed verbatim into worker prompts', async () => {
+  const prompts = [];
+  requestHandler = (req, res, body) => {
+    const prompt = body.messages.at(-1).content;
+    prompts.push(prompt);
+    if (prompts.length === 1) {
+      // Planner prompt must mandate the AMBIGUITIES section and the DECISION format
+      assert.match(prompt, /AMBIGUITIES/);
+      assert.match(prompt, /DECISION: <fork> → <choice> BECAUSE/);
+      assert.match(prompt, /\[DERIVED\]/);
+      assert.match(prompt, /\[ASSUMED — verify both branches/);
+      sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- count right\nARTIFACTS: none\nAMBIGUITIES\n- DECISION: which fields to tokenize → text field only BECAUSE "count tokens in the text column" [DERIVED]\nDECISION: tokenizer variant → cl100k_base [ASSUMED — verify both branches before final answer]\nVERIFIER_SHAPE_CONTRACT\n- check count\nVERIFICATION_PLAN\n- run\nCURRENT_STATE\n- empty' });
+    } else if (prompts.length === 2) {
+      sse(res, { role: 'assistant', content: 'count wrong [FAIL]\nNACK' });
+    } else if (prompts.length === 3) {
+      // Worker prompt carries the DECISIONS block with both lines verbatim (bullet prefix stripped)
+      assert.match(prompt, /DECISIONS \(interpretation forks already resolved/);
+      assert.match(prompt, /DECISION: which fields to tokenize → text field only BECAUSE "count tokens in the text column" \[DERIVED\]/);
+      assert.match(prompt, /DECISION: tokenizer variant → cl100k_base \[ASSUMED — verify both branches before final answer\]/);
+      sse(res, { role: 'assistant', content: 'counted\nSTRATEGY: text field\nFILES_MODIFIED: out.txt\nCOMMANDS_SUCCEEDED: count\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
+    } else {
+      sse(res, { role: 'assistant', content: 'count: measured=42 expected=42 [PASS]\nACK' });
+    }
+  };
+  const result = await runMi(['-g', 'count tokens', '-c', 'check count']);
+  assert.strictEqual(result.status, 0);
+});
+
+test('goal without DECISION lines emits no DECISIONS block', async () => {
+  const prompts = [];
+  requestHandler = (req, res, body) => {
+    const prompt = body.messages.at(-1).content;
+    prompts.push(prompt);
+    if (prompts.length === 1) {
+      sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- done\nAMBIGUITIES: none\nVERIFIER_SHAPE_CONTRACT\n- checked\nVERIFICATION_PLAN\n- run\nCURRENT_STATE\n- empty' });
+    } else if (prompts.length === 2) {
+      sse(res, { role: 'assistant', content: 'not done [FAIL]\nNACK' });
+    } else if (prompts.length === 3) {
+      assert.doesNotMatch(prompt, /DECISIONS \(interpretation forks/);
+      sse(res, { role: 'assistant', content: 'done\nSTRATEGY: direct\nFILES_MODIFIED: x\nCOMMANDS_SUCCEEDED: y\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
+    } else {
+      sse(res, { role: 'assistant', content: 'done: measured=1 expected=1 [PASS]\nACK' });
+    }
+  };
+  const result = await runMi(['-g', 'simple task', '-c', 'check it']);
+  assert.strictEqual(result.status, 0);
+});
+
+test('goal DECISIONS block echoed into fast-lane surgical brief', async () => {
+  const prompts = [];
+  const dl = Math.floor(Date.now() / 1000) - 100; // past deadline → fast lane on single FAIL
+  requestHandler = (req, res, body) => {
+    const prompt = body.messages.at(-1).content;
+    prompts.push(prompt);
+    if (prompts.length === 1) {
+      sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- ok\nAMBIGUITIES\nDECISION: edge orientation → A->B BECAUSE "A causes B" [DERIVED]\nVERIFIER_SHAPE_CONTRACT\n- check\nVERIFICATION_PLAN\n- run\nCURRENT_STATE\n- off' });
+    } else if (prompts.length === 2) {
+      sse(res, { role: 'assistant', content: 'edge: measured=B->A expected=A->B [FAIL]\nNACK' });
+    } else if (prompts.length === 3) {
+      assert.match(prompt, /SINGLE-BLOCKER FAST LANE/);
+      assert.match(prompt, /DECISION: edge orientation → A->B BECAUSE "A causes B" \[DERIVED\]/);
+      sse(res, { role: 'assistant', content: 'flipped edge\nSTRATEGY: fix\nFILES_MODIFIED: g\nCOMMANDS_SUCCEEDED: c\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
+    } else {
+      sse(res, { role: 'assistant', content: 'edge: measured=A->B expected=A->B [PASS]\nACK' });
+    }
+  };
+  const result = await runMi(['-g', 'orient edges', '-c', 'check edges', '-d', String(dl)]);
+  assert.strictEqual(result.status, 0);
+});
+
+test('goal DECISIONS block echoed into salvage brief', async () => {
+  const prompts = [];
+  const dl = Math.floor(Date.now() / 1000) - 100; // past deadline, multi-FAIL → salvage
+  requestHandler = (req, res, body) => {
+    const prompt = body.messages.at(-1).content;
+    prompts.push(prompt);
+    if (prompts.length === 1) {
+      sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- done\nAMBIGUITIES\nDECISION: prompt usage → use model prompts BECAUSE "model config declares query prompts" [DERIVED]\nVERIFIER_SHAPE_CONTRACT\n- checked\nVERIFICATION_PLAN\n- run\nCURRENT_STATE\n- empty' });
+    } else if (prompts.length === 2) {
+      sse(res, { role: 'assistant', content: 'not ready [FAIL]\nalso broken [FAIL]\nNACK' });
+    } else if (prompts.length === 3) {
+      assert.match(prompt, /FINAL SALVAGE/);
+      assert.match(prompt, /DECISION: prompt usage → use model prompts BECAUSE "model config declares query prompts" \[DERIVED\]/);
+      sse(res, { role: 'assistant', content: 'salvaged' });
+    } else {
+      sse(res, { role: 'assistant', content: 'incomplete [FAIL]\nNACK' });
+    }
+  };
+  const result = await runMi(['-g', 'encode corpus', '-c', 'check', '-d', String(dl)]);
   assert.strictEqual(result.status, 0);
   assert.strictEqual(prompts.length, 4);
 });
@@ -545,11 +947,11 @@ test('goal budget phase shows in console output', async () => {
     if (calls === 1) {
       sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- done\nVERIFIER_SHAPE_CONTRACT\n- ok\nVERIFICATION_PLAN\n- check\nCURRENT_STATE\n- ready' });
     } else if (calls === 2) {
-      sse(res, { role: 'assistant', content: 'not ready\nNACK' });
+      sse(res, { role: 'assistant', content: 'not ready [FAIL]\nNACK' });
     } else if (calls === 3) {
       sse(res, { role: 'assistant', content: 'did work\nSTRATEGY: fixed it\nFILES_MODIFIED: x\nCOMMANDS_SUCCEEDED: y\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
     } else {
-      sse(res, { role: 'assistant', content: 'all good\nACK' });
+      sse(res, { role: 'assistant', content: 'all good [PASS]\nACK' });
     }
   };
 
@@ -566,17 +968,17 @@ test('goal strategy escalation after 2+ failures', async () => {
     if (prompts.length === 1) {
       sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- pass\nVERIFIER_SHAPE_CONTRACT\n- tests\nVERIFICATION_PLAN\n- run\nCURRENT_STATE\n- failing' });
     } else if (prompts.length === 2) {
-      sse(res, { role: 'assistant', content: 'fail\nNACK' });
+      sse(res, { role: 'assistant', content: 'fail [FAIL]\nNACK' });
     } else if (prompts.length === 3) {
       // Worker 1
       sse(res, { role: 'assistant', content: 'attempt 1\nSTRATEGY: patched config\nFILES_MODIFIED: config.json\nCOMMANDS_SUCCEEDED: none\nCOMMANDS_FAILED: test\nBLOCKERS: config wrong\nREMAINING: fix config' });
     } else if (prompts.length === 4) {
-      sse(res, { role: 'assistant', content: 'still broken\nNACK' });
+      sse(res, { role: 'assistant', content: 'still broken [FAIL]\nNACK' });
     } else if (prompts.length === 5) {
       // Worker 2
       sse(res, { role: 'assistant', content: 'attempt 2\nSTRATEGY: rewrote config parser\nFILES_MODIFIED: parser.js\nCOMMANDS_SUCCEEDED: none\nCOMMANDS_FAILED: test\nBLOCKERS: parser bug\nREMAINING: fix parser' });
     } else if (prompts.length === 6) {
-      sse(res, { role: 'assistant', content: 'still broken\nNACK' });
+      sse(res, { role: 'assistant', content: 'still broken [FAIL]\nNACK' });
     } else if (prompts.length === 7) {
       // Worker 3 — should have escalated language (2+ prior strategies)
       assert.match(prompt, /abandon this solution family/);
@@ -584,13 +986,163 @@ test('goal strategy escalation after 2+ failures', async () => {
       assert.match(prompt, /rewrote config parser/);
       sse(res, { role: 'assistant', content: 'complete rewrite\nSTRATEGY: new architecture\nFILES_MODIFIED: all\nCOMMANDS_SUCCEEDED: test\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
     } else {
-      sse(res, { role: 'assistant', content: 'pass\nACK' });
+      sse(res, { role: 'assistant', content: 'pass [PASS]\nACK' });
     }
   };
 
   const result = await runMi(['-g', 'fix everything', '-c', 'test it']);
   assert.strictEqual(result.status, 0);
   assert.strictEqual(prompts.length, 8);
+});
+
+// Helpers for the strategy-ladder pivot tests: fake-time preload lets tests advance the goal
+// loop's clock mid-run by writing a ms offset to a file (re-read on every Date.now call).
+const FAKE_TIME = join(__dirname, 'fake-time.cjs');
+const fakeTimeEnv = (offsetFile) => ({ NODE_OPTIONS: `--require ${FAKE_TIME}`, MI_FAKE_NOW_OFFSET_FILE: offsetFile });
+const LADDER_PLAN = (artifact) => `STRATEGY_LADDER\nprimary: build Coq via apt packages\nfallback: install Coq toolchain via opam and build from there\nswitch trigger: apt Coq version incompatible with Flocq proofs\nEXIT_CRITERIA\n- built\nARTIFACTS: ${artifact}\nVERIFIER_SHAPE_CONTRACT\n- check\nVERIFICATION_PLAN\n- run\nCURRENT_STATE\n- empty`;
+
+test('goal pivot mandate fires once past 30% budget with missing artifact', async () => {
+  const prompts = [];
+  const artifact = `/tmp/mi-test-pivot-${process.pid}.out`;
+  const offsetFile = `/tmp/mi-test-pivot-off-${process.pid}`;
+  writeFileSync(offsetFile, '0');
+  const dl = Math.floor(Date.now() / 1000) + 1000; // totalS ~1000s
+  requestHandler = (req, res, body) => {
+    const prompt = body.messages.at(-1).content;
+    prompts.push(prompt);
+    if (prompts.length === 1) {
+      // Planner prompt must mandate the STRATEGY_LADDER section with anti-lock-in wording
+      assert.match(prompt, /STRATEGY_LADDER: exactly three lines/);
+      assert.match(prompt, /STRUCTURALLY different tool\/algorithm\/approach CLASS/);
+      assert.match(prompt, /starting hypothesis, not a commitment/);
+      assert.match(prompt, /two consecutive attempts on the primary fail the same criterion, switch class/);
+      // Advance the clock 350s → 35% elapsed before iteration 1 (past 30% pivot gate, below 40% escalation gate)
+      writeFileSync(offsetFile, '350000');
+      sse(res, { role: 'assistant', content: LADDER_PLAN(artifact) });
+    } else if (prompts.length === 2) {
+      // Worker 1 — pivot mandate with fallback quoted verbatim; replaces escalation this iteration
+      assert.match(prompt, /PIVOT MANDATE: >30% budget spent with no artifact — abandon the current toolchain\/approach entirely/);
+      assert.match(prompt, /"install Coq toolchain via opam and build from there"/);
+      assert.doesNotMatch(prompt, /ARTIFACT ESCALATION/);
+      // slice-9 integration clause: judge feedback overrides contradicted DECISION lines
+      assert.match(prompt, /judge feedback contradicts a DECISION line with a concrete goal-derived value, the judge feedback WINS/);
+      sse(res, { role: 'assistant', content: 'tried opam\nSTRATEGY: opam\nFILES_MODIFIED: none\nCOMMANDS_SUCCEEDED: opam init\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: build' });
+    } else if (prompts.length === 3) {
+      // Worker 2 — pivot is one-shot: must NOT fire again
+      assert.doesNotMatch(prompt, /PIVOT MANDATE/);
+      writeFileSync(artifact, 'built');
+      sse(res, { role: 'assistant', content: 'built it\nSTRATEGY: opam build\nFILES_MODIFIED: out\nCOMMANDS_SUCCEEDED: make\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
+    } else {
+      sse(res, { role: 'assistant', content: 'built: measured=yes expected=yes [PASS]\nACK' });
+    }
+  };
+  try {
+    const result = await runMi(['-g', 'build compcert', '-c', 'check build', '-d', String(dl)], fakeTimeEnv(offsetFile));
+    assert.strictEqual(result.status, 0);
+    // planner + worker1(pivot) + worker2 + judge + skeptical recheck; prechecks/iteration-1 judge were mechanical NACKs (no LLM call)
+    assert.strictEqual(prompts.length, 5);
+  } finally { rmSync(artifact, { force: true }); rmSync(offsetFile, { force: true }); }
+});
+
+test('goal pivot precedence: 30% pivot replaces escalation, escalation fires later', async () => {
+  const prompts = [];
+  const artifact = `/tmp/mi-test-pivprec-${process.pid}.out`;
+  const offsetFile = `/tmp/mi-test-pivprec-off-${process.pid}`;
+  writeFileSync(offsetFile, '0');
+  const dl = Math.floor(Date.now() / 1000) + 1000;
+  requestHandler = (req, res, body) => {
+    const prompt = body.messages.at(-1).content;
+    prompts.push(prompt);
+    if (prompts.length === 1) {
+      // 45% elapsed → both pivot (30%) and escalation (40%) gates are open; pivot must win
+      writeFileSync(offsetFile, '450000');
+      sse(res, { role: 'assistant', content: LADDER_PLAN(artifact) });
+    } else if (prompts.length === 2) {
+      assert.match(prompt, /PIVOT MANDATE/);
+      assert.doesNotMatch(prompt, /ARTIFACT ESCALATION/);
+      sse(res, { role: 'assistant', content: 'pivoted\nSTRATEGY: opam\nFILES_MODIFIED: none\nCOMMANDS_SUCCEEDED: none\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: build' });
+    } else if (prompts.length === 3) {
+      // Iteration 2: pivot spent → draft-gate escalation still available
+      assert.match(prompt, /ARTIFACT ESCALATION/);
+      assert.doesNotMatch(prompt, /PIVOT MANDATE/);
+      writeFileSync(artifact, 'built');
+      sse(res, { role: 'assistant', content: 'built\nSTRATEGY: opam build\nFILES_MODIFIED: out\nCOMMANDS_SUCCEEDED: make\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
+    } else {
+      sse(res, { role: 'assistant', content: 'built: measured=yes expected=yes [PASS]\nACK' });
+    }
+  };
+  try {
+    const result = await runMi(['-g', 'build compcert', '-c', 'check build', '-d', String(dl)], fakeTimeEnv(offsetFile));
+    assert.strictEqual(result.status, 0);
+    assert.strictEqual(prompts.length, 5);
+  } finally { rmSync(artifact, { force: true }); rmSync(offsetFile, { force: true }); }
+});
+
+test('goal pivot suppressed: no deadline, artifact exists, or live jobs', async () => {
+  // (a) no deadline → no pivot
+  let prompts = [];
+  const artifactA = `/tmp/mi-test-noPivA-${process.pid}.out`;
+  requestHandler = (req, res, body) => {
+    const prompt = body.messages.at(-1).content;
+    prompts.push(prompt);
+    if (prompts.length === 1) sse(res, { role: 'assistant', content: LADDER_PLAN(artifactA) });
+    else if (prompts.length === 2) {
+      assert.doesNotMatch(prompt, /PIVOT MANDATE/);
+      writeFileSync(artifactA, 'done');
+      sse(res, { role: 'assistant', content: 'done\nSTRATEGY: direct\nFILES_MODIFIED: out\nCOMMANDS_SUCCEEDED: make\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
+    } else sse(res, { role: 'assistant', content: 'done: measured=1 expected=1 [PASS]\nACK' });
+  };
+  try {
+    assert.strictEqual((await runMi(['-g', 'build', '-c', 'check'])).status, 0);
+  } finally { rmSync(artifactA, { force: true }); }
+
+  // (b) artifact already exists → no pivot even past 40%
+  prompts = [];
+  const artifactB = `/tmp/mi-test-noPivB-${process.pid}.out`;
+  const offsetFileB = `/tmp/mi-test-noPivB-off-${process.pid}`;
+  writeFileSync(artifactB, 'already here');
+  writeFileSync(offsetFileB, '0');
+  const dlB = Math.floor(Date.now() / 1000) + 1000;
+  requestHandler = (req, res, body) => {
+    const prompt = body.messages.at(-1).content;
+    prompts.push(prompt);
+    if (prompts.length === 1) { writeFileSync(offsetFileB, '450000'); sse(res, { role: 'assistant', content: LADDER_PLAN(artifactB) }); }
+    else if (prompts.length === 2) sse(res, { role: 'assistant', content: 'wrong [FAIL]\nbroken [FAIL]\nNACK' }); // real precheck judge (artifact exists)
+    else if (prompts.length === 3) {
+      assert.doesNotMatch(prompt, /PIVOT MANDATE/);
+      sse(res, { role: 'assistant', content: 'fixed\nSTRATEGY: repair\nFILES_MODIFIED: out\nCOMMANDS_SUCCEEDED: make\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
+    } else sse(res, { role: 'assistant', content: 'ok: measured=1 expected=1 [PASS]\nACK' });
+  };
+  try {
+    assert.strictEqual((await runMi(['-g', 'build', '-c', 'check', '-d', String(dlB)], fakeTimeEnv(offsetFileB))).status, 0);
+  } finally { rmSync(artifactB, { force: true }); rmSync(offsetFileB, { force: true }); }
+
+  // (c) live background job → no pivot even past 40% with artifact missing
+  prompts = [];
+  const artifactC = `/tmp/mi-test-noPivC-${process.pid}.out`;
+  const offsetFileC = `/tmp/mi-test-noPivC-off-${process.pid}`;
+  const sid = `pivtest-${process.pid}`;
+  const jobsFile = `/tmp/mi-jobs-${sid}.jsonl`;
+  const jobLog = `/tmp/mi-test-noPivC-log-${process.pid}`;
+  writeFileSync(offsetFileC, '0');
+  writeFileSync(jobLog, 'static log');
+  writeFileSync(jobsFile, JSON.stringify({ pid: process.pid, log: jobLog, command: 'long build' }) + '\n');
+  const dlC = Math.floor(Date.now() / 1000) + 1000;
+  requestHandler = (req, res, body) => {
+    const prompt = body.messages.at(-1).content;
+    prompts.push(prompt);
+    if (prompts.length === 1) { writeFileSync(offsetFileC, '450000'); sse(res, { role: 'assistant', content: LADDER_PLAN(artifactC) }); }
+    else if (prompts.length === 2) {
+      assert.doesNotMatch(prompt, /PIVOT MANDATE/); // live job suppresses pivot
+      writeFileSync(artifactC, 'built');
+      rmSync(jobsFile, { force: true }); // job "finishes" so monitor exits fast
+      sse(res, { role: 'assistant', content: 'built\nSTRATEGY: wait\nFILES_MODIFIED: out\nCOMMANDS_SUCCEEDED: make\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
+    } else sse(res, { role: 'assistant', content: 'built: measured=1 expected=1 [PASS]\nACK' });
+  };
+  try {
+    const r = await runMi(['-g', 'build', '-c', 'check', '-d', String(dlC)], { ...fakeTimeEnv(offsetFileC), MI_SESSION_ID: sid, MI_JOB_POLL_MS: '50' });
+    assert.strictEqual(r.status, 0);
+  } finally { rmSync(artifactC, { force: true }); rmSync(offsetFileC, { force: true }); rmSync(jobsFile, { force: true }); rmSync(jobLog, { force: true }); }
 });
 
 test('environment variables', async () => {
@@ -2387,6 +2939,9 @@ test('Harbor adapter routes Terminal-Bench through goal mode', async () => {
   const adapter = readFileSync(join(__dirname, '../mi_harbor/mi_agent.py'), 'utf8');
   assert.match(adapter, /TERMINAL_BENCH_CHECK/);
   assert.match(adapter, /-g "\$1" -c "\$MI_GOAL_CHECK"/);
+  assert.match(adapter, /MI_GOAL_MAX/);
+  assert.match(adapter, /Workspace Snapshot/);
+  assert.match(adapter, /hidden external verifier/);
   assert.match(adapter, /working directory/);
   assert.match(adapter, /"PAGER": "cat"/);
   assert.match(adapter, /"GIT_PAGER": "cat"/);
@@ -2415,11 +2970,11 @@ test('goal 402 credit exhaustion aborts immediately with fatal event', async () 
     if (prompts.length === 1) {
       sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- done\nVERIFIER_SHAPE_CONTRACT\n- check\nVERIFICATION_PLAN\n- verify\nCURRENT_STATE\n- not started' });
     } else if (prompts.length === 2) {
-      sse(res, { role: 'assistant', content: 'not done\nNACK' });
+      sse(res, { role: 'assistant', content: 'not done [FAIL]\nNACK' });
     } else if (prompts.length === 3) {
       sse(res, { role: 'assistant', content: 'Error: This request requires more credits, or fewer max_tokens. You requested up to 65536 tokens, but can only afford 3858.' });
     } else {
-      sse(res, { role: 'assistant', content: 'should not reach\nACK' });
+      sse(res, { role: 'assistant', content: 'should not reach [PASS]\nACK' });
     }
   };
 
@@ -2440,13 +2995,13 @@ test('goal pivot mandate arms after 2 identical NACKs', async () => {
       sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- done\nVERIFIER_SHAPE_CONTRACT\n- check\nVERIFICATION_PLAN\n- verify\nCURRENT_STATE\n- not started' });
     } else if (prompts.length === 2) {
       // Precheck judge → NACK
-      sse(res, { role: 'assistant', content: 'error: port 8080 still in use\nNACK' });
+      sse(res, { role: 'assistant', content: 'error: port 8080 still in use [FAIL]\nNACK' });
     } else if (prompts.length <= 5 && prompts.length % 2 === 1) {
       // Workers 1-2 (positions 3, 5)
       sse(res, { role: 'assistant', content: `attempt\nSTRATEGY: tried something\nFILES_MODIFIED: none\nCOMMANDS_SUCCEEDED: none\nCOMMANDS_FAILED: start\nBLOCKERS: port\nREMAINING: fix port` });
     } else if (prompts.length <= 6 && prompts.length % 2 === 0) {
       // Judges 1-2 (positions 4, 6) → same NACK
-      sse(res, { role: 'assistant', content: 'error: port 8080 still in use\nNACK' });
+      sse(res, { role: 'assistant', content: 'error: port 8080 still in use [FAIL]\nNACK' });
     } else if (prompts.length === 7) {
       // Worker 3: pivot mandate armed after 2 identical blocker sigs
       assert.match(prompt, /PIVOT MANDATE/i);
@@ -2454,7 +3009,7 @@ test('goal pivot mandate arms after 2 identical NACKs', async () => {
       sse(res, { role: 'assistant', content: 'fixed\nSTRATEGY: new approach\nFILES_MODIFIED: config\nCOMMANDS_SUCCEEDED: start\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
     } else {
       // Judge 3 → ACK
-      sse(res, { role: 'assistant', content: 'done\nACK' });
+      sse(res, { role: 'assistant', content: 'done [PASS]\nACK' });
     }
   };
   const result = await runMi(['-g', 'start server', '-c', 'check port']);
@@ -2470,7 +3025,7 @@ test('goal spawn error skips judge call', async () => {
     if (prompts.length === 1) {
       sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- done\nVERIFIER_SHAPE_CONTRACT\n- check\nVERIFICATION_PLAN\n- verify\nCURRENT_STATE\n- not started' });
     } else if (prompts.length === 2) {
-      sse(res, { role: 'assistant', content: 'not done\nNACK' });
+      sse(res, { role: 'assistant', content: 'not done [FAIL]\nNACK' });
     } else if (prompts.length === 3) {
       // Worker 1 returns spawn error
       sse(res, { role: 'assistant', content: '[spawn error: ENOMEM]' });
@@ -2479,7 +3034,7 @@ test('goal spawn error skips judge call', async () => {
       assert.match(prompts[3], /worker 2/i);
       sse(res, { role: 'assistant', content: 'fixed\nSTRATEGY: worked\nFILES_MODIFIED: f\nCOMMANDS_SUCCEEDED: ok\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
     } else {
-      sse(res, { role: 'assistant', content: 'done\nACK' });
+      sse(res, { role: 'assistant', content: 'done [PASS]\nACK' });
     }
   };
   const result = await runMi(['-g', 'build', '-c', 'check']);
@@ -2501,7 +3056,7 @@ test('goal forced salvage after 5 identical blockers in deadline mode', async ()
       sse(res, { role: 'assistant', content: 'wrote best artifact\nSTRATEGY: salvage\nFILES_MODIFIED: out.txt' });
     } else if (prompts.length % 2 === 0) {
       // All judges → same NACK
-      sse(res, { role: 'assistant', content: 'missing output.json\nNACK' });
+      sse(res, { role: 'assistant', content: 'missing output.json [FAIL]\nNACK' });
     } else {
       // Workers
       sse(res, { role: 'assistant', content: `attempt\nSTRATEGY: tried\nFILES_MODIFIED: none\nCOMMANDS_SUCCEEDED: none\nCOMMANDS_FAILED: gen\nBLOCKERS: missing data\nREMAINING: gen` });
@@ -2524,7 +3079,7 @@ test('goal first iteration capped to 1/3 budget with partition hint', async () =
       sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- done\nVERIFIER_SHAPE_CONTRACT\n- checked\nVERIFICATION_PLAN\n- inspect\nCURRENT_STATE\n- empty' });
     } else if (prompts.length === 2) {
       // Pre-check judge → NACK
-      sse(res, { role: 'assistant', content: 'not done\nNACK' });
+      sse(res, { role: 'assistant', content: 'not done [FAIL]\nNACK' });
     } else if (prompts.length === 3) {
       // Worker 1 — should have time partition hint
       assert.match(prompt, /you are worker 1/);
@@ -2533,7 +3088,7 @@ test('goal first iteration capped to 1/3 budget with partition hint', async () =
       sse(res, { role: 'assistant', content: 'did work\nSTRATEGY: attempt 1\nFILES_MODIFIED: x\nCOMMANDS_SUCCEEDED: y\nCOMMANDS_FAILED: z\nBLOCKERS: b\nREMAINING: r' });
     } else if (prompts.length === 4) {
       // Judge 1 → NACK
-      sse(res, { role: 'assistant', content: 'still broken\nNACK' });
+      sse(res, { role: 'assistant', content: 'still broken [FAIL]\nNACK' });
     } else if (prompts.length === 5) {
       // Worker 2 — should NOT have partition hint (only applies to iteration 1)
       assert.match(prompt, /you are worker 2/);
@@ -2541,7 +3096,7 @@ test('goal first iteration capped to 1/3 budget with partition hint', async () =
       sse(res, { role: 'assistant', content: 'fixed\nSTRATEGY: attempt 2\nFILES_MODIFIED: x\nCOMMANDS_SUCCEEDED: all\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
     } else {
       // Judge 2 → ACK
-      sse(res, { role: 'assistant', content: 'all good\nACK' });
+      sse(res, { role: 'assistant', content: 'all good [PASS]\nACK' });
     }
   };
 
@@ -2550,6 +3105,100 @@ test('goal first iteration capped to 1/3 budget with partition hint', async () =
   assert.strictEqual(result.status, 0);
   // 1 planner + 1 precheck + 1 worker1 + 1 judge1(NACK) + 1 worker2 + 1 judge2(ACK) + 1 skeptical(ACK) = 7
   assert.strictEqual(prompts.length, 7);
+});
+
+test('goal garbled recheck output keeps primary ACK', async () => {
+  const prompts = [];
+  requestHandler = (req, res, body) => {
+    const prompt = body.messages.at(-1).content;
+    prompts.push(prompt);
+    if (prompts.length === 1) {
+      sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- done\nARTIFACTS: none\nVERIFIER_SHAPE_CONTRACT\n- ok\nVERIFICATION_PLAN\n- inspect\nCURRENT_STATE\n- empty' });
+    } else if (prompts.length === 2) {
+      sse(res, { role: 'assistant', content: 'not done [FAIL]\nNACK' });
+    } else if (prompts.length === 3) {
+      sse(res, { role: 'assistant', content: 'did work\nSTRATEGY: built it\nFILES_MODIFIED: x\nCOMMANDS_SUCCEEDED: y\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
+    } else if (prompts.length === 4) {
+      sse(res, { role: 'assistant', content: 'criterion: measured=ok expected=ok [PASS]\nACK' });
+    } else {
+      // Skeptical recheck returns garbled refusal — no ACK/NACK token, no evidence
+      assert.match(prompt, /BLIND SKEPTICAL RECHECK/);
+      sse(res, { role: 'assistant', content: 'I am sorry, I cannot help with verifying this request.' });
+    }
+  };
+  const result = await runMi(['-g', 'build it', '-c', 'check it']);
+  assert.strictEqual(result.status, 0);
+  // invalid recheck output must not flip the primary ACK into a NACK loop: no worker 2, no recheck-NACK marker
+  assert.strictEqual(prompts.length, 5);
+  assert.doesNotMatch(result.stdout, /✗ skeptical recheck/);
+});
+
+test('goal verdict parses front-loaded ACK followed by long rationale', async () => {
+  let calls = 0;
+  const rationale = 'the artifact was inspected in depth and every criterion was measured against the stated contract. '.repeat(7); // >600 chars after the ACK token
+  requestHandler = (req, res, body) => {
+    calls++;
+    if (calls === 1) {
+      sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- done\nARTIFACTS: none\nVERIFIER_SHAPE_CONTRACT\n- ok\nVERIFICATION_PLAN\n- inspect\nCURRENT_STATE\n- clean' });
+    } else {
+      sse(res, { role: 'assistant', content: `criterion: measured=1 expected=1 [PASS]\n**ACK**\n${rationale}` });
+    }
+  };
+  const result = await runMi(['-g', 'verdict test', '-c', 'check it']);
+  assert.strictEqual(result.status, 0);
+  // precheck ACK despite the token sitting >500 chars from the end — goal already met, no worker spawned
+  assert.strictEqual(calls, 2);
+});
+
+test('goal garbled judge output triggers exactly one retry then counts as NACK', async () => {
+  const prompts = [];
+  requestHandler = (req, res, body) => {
+    const prompt = body.messages.at(-1).content;
+    prompts.push(prompt);
+    if (prompts.length === 1) {
+      sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- done\nARTIFACTS: none\nVERIFIER_SHAPE_CONTRACT\n- ok\nVERIFICATION_PLAN\n- inspect\nCURRENT_STATE\n- empty' });
+    } else if (prompts.length === 2 || prompts.length === 3) {
+      // Pre-check judge garbled twice: primary + exactly one retry, then treated as NACK
+      assert.match(prompt, /you are a judge for a goal loop/);
+      sse(res, { role: 'assistant', content: 'As an AI model I cannot comply.' });
+    } else if (prompts.length === 4) {
+      assert.match(prompt, /you are worker 1/);
+      sse(res, { role: 'assistant', content: 'did work\nSTRATEGY: built it\nFILES_MODIFIED: x\nCOMMANDS_SUCCEEDED: y\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
+    } else if (prompts.length === 5) {
+      assert.match(prompt, /you are a judge for a goal loop/);
+      sse(res, { role: 'assistant', content: 'criterion: measured=ok expected=ok [PASS]\nACK' });
+    } else {
+      sse(res, { role: 'assistant', content: 'element: measured=ok required=ok [PASS]\nACK' });
+    }
+  };
+  const result = await runMi(['-g', 'build it', '-c', 'check it']);
+  assert.strictEqual(result.status, 0);
+  // 1 planner + 2 precheck judge (garbled + 1 retry) + 1 worker + 1 judge + 1 recheck = 6
+  assert.strictEqual(prompts.length, 6);
+});
+
+test('goal skips skeptical recheck when budget is under 180s', async () => {
+  const prompts = [];
+  const dl = Math.floor(Date.now() / 1000) + 170; // >60s (no salvage), <180s (recheck banked)
+  requestHandler = (req, res, body) => {
+    const prompt = body.messages.at(-1).content;
+    prompts.push(prompt);
+    if (prompts.length === 1) {
+      sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- done\nARTIFACTS: none\nVERIFIER_SHAPE_CONTRACT\n- ok\nVERIFICATION_PLAN\n- inspect\nCURRENT_STATE\n- empty' });
+    } else if (prompts.length === 2) {
+      sse(res, { role: 'assistant', content: 'not done [FAIL]\nNACK' });
+    } else if (prompts.length === 3) {
+      sse(res, { role: 'assistant', content: 'did work\nSTRATEGY: built it\nFILES_MODIFIED: x\nCOMMANDS_SUCCEEDED: y\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
+    } else {
+      assert.match(prompt, /you are a judge for a goal loop/);
+      assert.doesNotMatch(prompt, /BLIND SKEPTICAL RECHECK/);
+      sse(res, { role: 'assistant', content: 'criterion: measured=ok expected=ok [PASS]\nACK' });
+    }
+  };
+  const result = await runMi(['-g', 'build it', '-c', 'check it', '-d', String(dl)]);
+  assert.strictEqual(result.status, 0);
+  // ACK banked at the wall: no 5th recheck call
+  assert.strictEqual(prompts.length, 4);
 });
 
 test('bash tool truncates output exceeding 50KB', async () => {

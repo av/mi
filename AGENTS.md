@@ -8,7 +8,7 @@ No build step, no transpilation, no lint config.
 Tool modules hot-load from `tools/*.mjs` before each model call and must default-export `{ name, description, parameters, handler }`.
 Bundled skills and user skills are loaded through the `skill` tool from `skills/` and `~/.agents/skills/`.
 
-The `goal` tool (`tools/goal.mjs`) uses a planner/worker/judge loop. It supports budget-aware iteration via `deadline` (unix timestamp): phases shift from EXPLORE → COMMIT → URGENT → SALVAGE as time runs out, with a forced artifact-write salvage pass before timeout. The judge uses a strict adversarial verification protocol (5% margin on thresholds, measured values, edge-case probing). Workers receive structured checkpoints and strategy diversity enforcement to avoid repeating failed approaches.
+The `goal` tool (`tools/goal.mjs`) uses a planner/worker/judge loop. It supports budget-aware iteration via `deadline` (unix timestamp): phases shift from EXPLORE → COMMIT → URGENT → SALVAGE as time runs out, with a forced artifact-write salvage pass before timeout. The planner emits an `ARTIFACTS:` line (driving a draft-first worker directive when required outputs are still missing past 25% of budget) and an `INVARIANTS` section of input-derived conservation checks that the judge executes against the pristine input before ACK. The judge uses a strict adversarial verification protocol (exact thresholds with 5%-margin risk notes, measured values, edge-case probing) with observational-only probes — it never kills services or writes to service control channels. ACKs are confirmed by a blind skeptical recheck (task text only, no plan context, element-by-element measurement) when idle budget remains. Workers receive structured checkpoints and strategy diversity enforcement to avoid repeating failed approaches; background jobs in the shared per-session registry (`MI_SESSION_ID`) are polled without LLM calls between worker and judge, capped at 50% of total budget.
 
 `scripts/count-lines.mjs` is a dev utility — not part of the published package (`files` in `package.json` is `index.mjs`, `tools/`, and `skills/`).
 `tests/`, `assets/`, docs, CI config, `scripts/`, and `mi_harbor/` are also excluded from the npm package by `.npmignore` / `package.json` publishing rules.
@@ -130,6 +130,9 @@ Requires Node 24.x in CI. `index.mjs`, `tools/`, and `skills/` are the published
 | `MI_HOME` | `~/.mi` (config directory; reads `config.json`) |
 | `MI_DEADLINE` | unset (unix timestamp; enables budget-aware goal loop with salvage policy) |
 | `MI_TASK_TIMEOUT` | unset (seconds; Harbor adapter computes `MI_DEADLINE` from this with 60s verifier buffer) |
+| `MI_JUDGE_MODEL` | unset (overrides `MODEL` for goal judge and skeptical-recheck delegates only) |
+| `MI_JUDGE_PARAMS` | unset (overrides `MI_API_PARAMS` for goal judge and skeptical-recheck delegates only) |
+| `MI_JOB_POLL_MS` | `30000` (goal loop poll interval for live background jobs) |
 
 ## AGENTS.md auto-ingestion
 

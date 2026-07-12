@@ -81,6 +81,9 @@ if [[ -z "${OPENAI_API_KEY}" ]]; then
     exit 1
 fi
 
+# shellcheck source=../determinism-env.sh
+source "$SCRIPT_DIR/../determinism-env.sh"
+
 # The 30 tasks (stratified 10 + 20 for diversity and better estimate)
 TASKS=(
     count-dataset-tokens
