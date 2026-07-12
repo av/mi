@@ -18,6 +18,9 @@ MI_DIR="$(dirname "$SCRIPT_DIR")"
 : "${OPENAI_BASE_URL:=http://localhost:33831}"
 : "${MODEL:=unsloth/Qwen3.6-35B-A3B-GGUF:Q4_K_XL}"
 
+# shellcheck source=determinism-env.sh
+source "$SCRIPT_DIR/determinism-env.sh"
+
 echo "Running mi against Terminal-Bench 2.0 with local LLM"
 echo "  Model: $MODEL"
 echo "  Endpoint: $OPENAI_BASE_URL"

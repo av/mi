@@ -22,6 +22,9 @@ if [[ -z "$OPENAI_API_KEY" ]]; then
   exit 1
 fi
 
+# shellcheck source=../mi_harbor/determinism-env.sh
+source "$ROOT/mi_harbor/determinism-env.sh"
+
 TASKS=(
   count-dataset-tokens
   train-fasttext

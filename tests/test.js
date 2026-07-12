@@ -1001,7 +1001,7 @@ const FAKE_TIME = join(__dirname, 'fake-time.cjs');
 const fakeTimeEnv = (offsetFile) => ({ NODE_OPTIONS: `--require ${FAKE_TIME}`, MI_FAKE_NOW_OFFSET_FILE: offsetFile });
 const LADDER_PLAN = (artifact) => `STRATEGY_LADDER\nprimary: build Coq via apt packages\nfallback: install Coq toolchain via opam and build from there\nswitch trigger: apt Coq version incompatible with Flocq proofs\nEXIT_CRITERIA\n- built\nARTIFACTS: ${artifact}\nVERIFIER_SHAPE_CONTRACT\n- check\nVERIFICATION_PLAN\n- run\nCURRENT_STATE\n- empty`;
 
-test('goal pivot mandate fires once past 40% budget with missing artifact', async () => {
+test('goal pivot mandate fires once past 30% budget with missing artifact', async () => {
   const prompts = [];
   const artifact = `/tmp/mi-test-pivot-${process.pid}.out`;
   const offsetFile = `/tmp/mi-test-pivot-off-${process.pid}`;
@@ -1016,12 +1016,12 @@ test('goal pivot mandate fires once past 40% budget with missing artifact', asyn
       assert.match(prompt, /STRUCTURALLY different tool\/algorithm\/approach CLASS/);
       assert.match(prompt, /starting hypothesis, not a commitment/);
       assert.match(prompt, /two consecutive attempts on the primary fail the same criterion, switch class/);
-      // Advance the clock 450s → 45% elapsed before iteration 1 (past 40% pivot gate, below 50% escalation gate)
-      writeFileSync(offsetFile, '450000');
+      // Advance the clock 350s → 35% elapsed before iteration 1 (past 30% pivot gate, below 40% escalation gate)
+      writeFileSync(offsetFile, '350000');
       sse(res, { role: 'assistant', content: LADDER_PLAN(artifact) });
     } else if (prompts.length === 2) {
       // Worker 1 — pivot mandate with fallback quoted verbatim; replaces escalation this iteration
-      assert.match(prompt, /PIVOT MANDATE: >40% budget spent with no artifact — abandon the current toolchain\/approach entirely/);
+      assert.match(prompt, /PIVOT MANDATE: >30% budget spent with no artifact — abandon the current toolchain\/approach entirely/);
       assert.match(prompt, /"install Coq toolchain via opam and build from there"/);
       assert.doesNotMatch(prompt, /ARTIFACT ESCALATION/);
       // slice-9 integration clause: judge feedback overrides contradicted DECISION lines
@@ -1044,7 +1044,7 @@ test('goal pivot mandate fires once past 40% budget with missing artifact', asyn
   } finally { rmSync(artifact, { force: true }); rmSync(offsetFile, { force: true }); }
 });
 
-test('goal pivot precedence: 40% pivot replaces escalation, escalation fires later', async () => {
+test('goal pivot precedence: 30% pivot replaces escalation, escalation fires later', async () => {
   const prompts = [];
   const artifact = `/tmp/mi-test-pivprec-${process.pid}.out`;
   const offsetFile = `/tmp/mi-test-pivprec-off-${process.pid}`;
@@ -1054,8 +1054,8 @@ test('goal pivot precedence: 40% pivot replaces escalation, escalation fires lat
     const prompt = body.messages.at(-1).content;
     prompts.push(prompt);
     if (prompts.length === 1) {
-      // 55% elapsed → both pivot (40%) and escalation (50%) gates are open; pivot must win
-      writeFileSync(offsetFile, '550000');
+      // 45% elapsed → both pivot (30%) and escalation (40%) gates are open; pivot must win
+      writeFileSync(offsetFile, '450000');
       sse(res, { role: 'assistant', content: LADDER_PLAN(artifact) });
     } else if (prompts.length === 2) {
       assert.match(prompt, /PIVOT MANDATE/);
@@ -2939,6 +2939,9 @@ test('Harbor adapter routes Terminal-Bench through goal mode', async () => {
   const adapter = readFileSync(join(__dirname, '../mi_harbor/mi_agent.py'), 'utf8');
   assert.match(adapter, /TERMINAL_BENCH_CHECK/);
   assert.match(adapter, /-g "\$1" -c "\$MI_GOAL_CHECK"/);
+  assert.match(adapter, /MI_GOAL_MAX/);
+  assert.match(adapter, /Workspace Snapshot/);
+  assert.match(adapter, /hidden external verifier/);
   assert.match(adapter, /working directory/);
   assert.match(adapter, /"PAGER": "cat"/);
   assert.match(adapter, /"GIT_PAGER": "cat"/);

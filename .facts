@@ -89,8 +89,8 @@
   command: test $(grep -c 'STRICTLY READ-ONLY' tools/goal.mjs) -eq 2 && grep -q 'commit/merge/cherry-pick/rebase/checkout/reset/branch/clean/stash/apply' tools/goal.mjs && grep -q 'so the WORKER performs the repair' tools/goal.mjs
 - label: goal worker restart-before-ACK guidance carves out VMs/emulators/long-boot systems — never restart those
   command: grep -q 'VM/emulator/long-boot system — never restart those' tools/goal.mjs
-- label: goal planner emits ARTIFACTS: line; draft gate prefixes worker with draft-first directive when artifacts missing past 25% budget, without producing NACKs or feeding blockerSigs
-  command: grep -q 'ARTIFACTS:' tools/goal.mjs && grep -q 'draftGate' tools/goal.mjs && grep -qF '> 0.25' tools/goal.mjs && grep -q 'DRAFT FIRST' tools/goal.mjs && grep -q "emit('draft_gate'" tools/goal.mjs
+- label: goal planner emits ARTIFACTS: line; draft gate prefixes worker with draft-first directive when artifacts missing past 15% budget, without producing NACKs or feeding blockerSigs
+  command: grep -q 'ARTIFACTS:' tools/goal.mjs && grep -q 'draftGate' tools/goal.mjs && grep -qF '> 0.15' tools/goal.mjs && grep -q 'DRAFT FIRST' tools/goal.mjs && grep -q "emit('draft_gate'" tools/goal.mjs
 - label: MI_JUDGE_MODEL and MI_JUDGE_PARAMS optionally override model/params for judge and skeptical recheck delegates only
   command: grep -q 'MI_JUDGE_MODEL' tools/goal.mjs && grep -q 'MI_JUDGE_PARAMS' tools/goal.mjs && test $(grep -c 'env: jenv' tools/goal.mjs) -eq 2
 - label: goal loop shares one bg-jobs registry per session (MI_SESSION_ID) and polls live jobs without LLM calls — MI_JOB_POLL_MS interval, stall guard, cumulative 50%-of-budget cap
@@ -109,8 +109,8 @@
 - label: goal salvage/urgent phases trigger adaptively from an EMA of iteration duration (SALVAGE at max(60, 1.3*EMA); URGENT at max(2.5*EMA, 20% total)), EMA contribution clamped to 25% of total budget
   command: grep -q '1.3 \* e' tools/goal.mjs && grep -q '2.5 \* e' tools/goal.mjs
   tags: [implemented]
-- label: goal draft-gate escalates one-shot past 50% elapsed budget with no live jobs: worker prompt becomes an artifacts-first salvage-style directive whose NACK is exempt from strategy/blockerSig accounting
-  command: grep -q 'ARTIFACT ESCALATION' tools/goal.mjs && grep -q 'escalated' tools/goal.mjs
+- label: goal draft-gate escalates one-shot past 40% elapsed budget with no live jobs: worker prompt becomes an artifacts-first salvage-style directive whose NACK is exempt from strategy/blockerSig accounting
+  command: grep -q 'ARTIFACT ESCALATION' tools/goal.mjs && grep -q 'escalated' tools/goal.mjs && grep -qF '> 0.4' tools/goal.mjs
   tags: [implemented]
 - label: goal judge executes script deliverables with the plainest task-implied interpreter (python file.py, not venv/alias) before ACK — crash/import error is NACK; skips execution only when running would mutate state, stating why
   command: grep -q 'PLAINEST interpreter invocation' tools/goal.mjs
@@ -207,8 +207,14 @@
   command: grep -q 'TERMINAL_BENCH_CHECK' mi_harbor/mi_agent.py && grep -q -- '-g "$1" -c "$MI_GOAL_CHECK"' mi_harbor/mi_agent.py
 - label: harbor adapter computes MI_DEADLINE from MI_TASK_TIMEOUT with 60s verifier buffer
   command: grep -q 'MI_TASK_TIMEOUT' mi_harbor/mi_agent.py && grep -q 'MI_DEADLINE' mi_harbor/mi_agent.py && grep -q 'TASK_TIMEOUT - 60' mi_harbor/mi_agent.py
-- label: harbor TERMINAL_BENCH_CHECK treats /tests/ results as ground truth, requires exact file paths and measured thresholds, never NACKs for margin
-  command: grep -q 'test results are GROUND TRUTH' mi_harbor/mi_agent.py && grep -q 'exact output file paths' mi_harbor/mi_agent.py && grep -q 'numeric thresholds, measure the actual value' mi_harbor/mi_agent.py && grep -q 'never NACK for margin' mi_harbor/mi_agent.py
+- label: harbor TERMINAL_BENCH_CHECK treats /tests/ results as ground truth for what they cover, requires every goal-stated path/threshold with measured values, never NACKs for margin, and warns about the hidden external verifier
+  command: grep -q 'test results are GROUND TRUTH' mi_harbor/mi_agent.py && grep -q 'hidden external verifier' mi_harbor/mi_agent.py && grep -q 'EVERY goal-stated output path' mi_harbor/mi_agent.py && grep -q 'numeric thresholds, measure the actual value' mi_harbor/mi_agent.py && grep -q 'never NACK for margin' mi_harbor/mi_agent.py
+- label: harbor adapter derives MI_GOAL_MAX from MI_TASK_TIMEOUT (4-12 iterations) and writes AGENTS.md workspace snapshot before the goal loop
+  command: grep -q 'MI_GOAL_MAX' mi_harbor/mi_agent.py && grep -q 'Workspace Snapshot' mi_harbor/mi_agent.py && grep -q 'MI_GOAL_MAX' tools/goal.mjs
+  tags: [implemented]
+- label: goal loop honors MI_GOAL_MAX env as iteration cap when max param is unset
+  command: grep -q 'process.env.MI_GOAL_MAX' tools/goal.mjs
+  tags: [implemented]
 - label: harbor smoke eval script runs one Terminal-Bench task through the cached Docker environment
   command: test -x mi_harbor/run-smoke.sh && grep -q 'MiCachedDockerEnvironment' mi_harbor/run-smoke.sh && grep -q 'fix-git' mi_harbor/run-smoke.sh
 - label: cached Docker environment builds mi-eval-cache images from Terminal-Bench task images
@@ -262,8 +268,8 @@
 - label: goal planner mandates an AMBIGUITIES section resolving every interpretation fork as a DECISION line with verbatim quoted evidence ([DERIVED]) or an [ASSUMED — verify both branches] tag; DECISION lines are parsed from the plan and echoed verbatim as a DECISIONS block into every worker prompt, the fast-lane surgical brief, and the salvage brief
   command: grep -qF 'AMBIGUITIES' tools/goal.mjs && grep -qF 'DECISION: <fork> → <choice> BECAUSE' tools/goal.mjs && grep -qF 'ASSUMED — verify both branches' tools/goal.mjs && test "$(grep -c 'decBlock}' tools/goal.mjs)" -ge 3 && grep -qF 'DECISIONS (interpretation forks already resolved' tools/goal.mjs
   tags: [implemented]
-- label: goal loop strategy-ladder pivot: planner emits STRATEGY_LADDER (primary/fallback/switch trigger); past 40% budget with declared artifacts still missing and no live jobs, a one-shot PIVOT MANDATE quoting the fallback verbatim prefixes the next worker prompt and emits a pivot event — it replaces that iteration's 50% draft-gate escalation (escalation stays available later), is mech-NACK/blockerSig exempt, and workers are told judge feedback WINS over contradicted DECISION lines
-  command: grep -qF 'STRATEGY_LADDER' tools/goal.mjs && grep -qF 'PIVOT MANDATE: >40% budget spent with no artifact' tools/goal.mjs && grep -qF "emit('pivot'" tools/goal.mjs && grep -qF '(totalS - budget()) / totalS > 0.4' tools/goal.mjs && grep -qF '!fastLane && !piv && !escalated' tools/goal.mjs && grep -qF '!last.mech && !esc && !piv' tools/goal.mjs && grep -qF 'judge feedback WINS' tools/goal.mjs
+- label: goal loop strategy-ladder pivot: planner emits STRATEGY_LADDER (primary/fallback/switch trigger); past 30% budget with declared artifacts still missing and no live jobs, a one-shot PIVOT MANDATE quoting the fallback verbatim prefixes the next worker prompt and emits a pivot event — it replaces that iteration's 40% draft-gate escalation (escalation stays available later), is mech-NACK/blockerSig exempt, and workers are told judge feedback WINS over contradicted DECISION lines
+  command: grep -qF 'STRATEGY_LADDER' tools/goal.mjs && grep -qF 'PIVOT MANDATE: >30% budget spent with no artifact' tools/goal.mjs && grep -qF "emit('pivot'" tools/goal.mjs && grep -qF '(totalS - budget()) / totalS > 0.3' tools/goal.mjs && grep -qF '!fastLane && !piv && !escalated' tools/goal.mjs && grep -qF '!last.mech && !esc && !piv' tools/goal.mjs && grep -qF 'judge feedback WINS' tools/goal.mjs
   tags: [implemented]
 - label: goal planner is discovery-first with a provisional guard: the very first output is a minimal provisional ARTIFACTS line plus a one-line AMBIGUITIES (so a planner timeout still leaves a parseable plan), then discovery runs, then the FULL section block (ARTIFACTS, AMBIGUITIES, STRATEGY_LADDER with structurally-different fallback and switch-class-after-two-same-criterion-failures mandate, VERIFIER_SHAPE_CONTRACT, ...) is derived from discovered evidence; ARTIFACTS parsing is lenient (last inline ARTIFACTS: line wins, markdown/bare header form with paths on following lines accepted, 'none' → no artifacts) and DECISION lines are parsed from anywhere in a line, verbatim from DECISION: onward
   command: grep -qF 'PROVISIONAL GUARD — VERY FIRST output' tools/goal.mjs && grep -qF 'DISCOVERY NEXT — evidence before contract' tools/goal.mjs && grep -qF 'THEN emit the FULL section block' tools/goal.mjs && grep -qF 'STRUCTURALLY different tool/algorithm/approach CLASS' tools/goal.mjs && grep -qF 'starting hypothesis, not a commitment' tools/goal.mjs && grep -qF 'matchAll(/ARTIFACTS:' tools/goal.mjs && grep -qF 'DECISION:.*$' tools/goal.mjs
