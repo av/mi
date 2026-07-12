@@ -118,8 +118,29 @@
 - label: goal judge NACKs un-re-derivable single-value answers unless the worker log shows a second independent derivation method agreeing (cross-validation demand)
   command: grep -q 'second independent method and show both agree' tools/goal.mjs
   tags: [implemented]
+- label: goal judge re-derives any spec-recipe quantity (defined via an explicit recipe/region/subset/window/formula) strictly from the goal's LITERAL scope not the worker's chosen basis, treats that named scope as a CONSTRAINT measured against the goal's stated bound, and NACKs a worker-basis vs goal-literal-basis divergence naming it
+  command: grep -qF 'MEASUREMENT-BASIS:' tools/goal.mjs && grep -qF "goal's LITERAL scope" tools/goal.mjs && grep -qF 'worker-basis=' tools/goal.mjs
+  tags: [implemented]
 - label: goal judge runs a final-state sweep before ACK: every goal-stated end-state property is re-measured NOW, goal-quoted literals compared byte-for-byte, never against memory of an earlier check
   command: grep -q 'FINAL-STATE SWEEP' tools/goal.mjs
+  tags: [implemented]
+- label: goal planner emits a CONSTRAINTS section quoting every goal-stated bound/enumerated item/format rule verbatim as CONSTRAINT lines; judge must emit a MEASURED line per CONSTRAINT or NACK
+  command: grep -qF 'prefixed "CONSTRAINT:"' tools/goal.mjs && grep -qF 'EVERY "CONSTRAINT:" line in the plan' tools/goal.mjs
+  tags: [implemented]
+- label: goal judge and salvage carry a mechanical kill-verb ban (kill/pkill/killall/kill %/QEMU quit/system_powerdown); salvage output mentioning kill verbs emits a salvage_kill_violation event
+  command: grep -qF 'banned: kill, pkill, killall' tools/goal.mjs && grep -qF 'MECHANICAL BAN' tools/goal.mjs && grep -qF "emit('salvage_kill_violation'" tools/goal.mjs
+  tags: [implemented]
+- label: goal judge runs a grader-perspective probe — named module/script/CLI deliverables must import/execute under the goal-stated name from a neutral cwd; placement/import failure is NACK even if in-place checks pass
+  command: grep -qF 'grader-perspective probe' tools/goal.mjs && grep -qF 'NEUTRAL cwd' tools/goal.mjs
+  tags: [implemented]
+- label: goal pivot mandate arms on 2 consecutive identical judge-NACK signatures regardless of artifacts — repairing in place with the same method is banned for that iteration and a pivot_armed event is emitted
+  command: grep -qF 'pivotArmed' tools/goal.mjs && grep -qF "emit('pivot_armed'" tools/goal.mjs && grep -qF 'blockerSigs.slice(-2)' tools/goal.mjs
+  tags: [implemented]
+- label: goal judge runs an external-client runtime probe for service/API tasks — every goal-documented endpoint/RPC exercised with a fresh curl/grpcurl/client call asserting goal-stated status/response; worker transcript claims are never evidence; destructive endpoints probed only on disposable fixtures or verified statically
+  command: grep -qF 'external-client runtime probe' tools/goal.mjs && grep -qF 'FRESH external client' tools/goal.mjs && grep -qF 'disposable fixture data' tools/goal.mjs
+  tags: [implemented]
+- label: goal planner, worker, and judge enforce a verbatim-identifier guard — goal-named identifiers (fields, endpoints, files, flags, message/service names) are used character-for-character, unstated names default to the conventional/spec-standard choice recorded as an AMBIGUITIES DECISION, and the judge audits declared identifiers byte-for-byte against the goal text
+  command: test $(grep -c 'character-for-character' tools/goal.mjs) -ge 2 && grep -qF 'identifier naming is a fork class' tools/goal.mjs && grep -qF 'identifier audit' tools/goal.mjs && test $(grep -c 'value not val' tools/goal.mjs) -ge 2
   tags: [implemented]
 
 # agent-loop

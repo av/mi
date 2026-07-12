@@ -2985,7 +2985,7 @@ test('goal 402 credit exhaustion aborts immediately with fatal event', async () 
   assert.strictEqual(prompts.length, 3);
 });
 
-test('goal blocker detection warns after 3 identical NACKs', async () => {
+test('goal pivot mandate arms after 2 identical NACKs', async () => {
   const prompts = [];
   requestHandler = (req, res, body) => {
     const prompt = body.messages.at(-1).content;
@@ -2996,26 +2996,26 @@ test('goal blocker detection warns after 3 identical NACKs', async () => {
     } else if (prompts.length === 2) {
       // Precheck judge → NACK
       sse(res, { role: 'assistant', content: 'error: port 8080 still in use [FAIL]\nNACK' });
-    } else if (prompts.length <= 7 && prompts.length % 2 === 1) {
-      // Workers 1-3 (odd positions: 3,5,7)
+    } else if (prompts.length <= 5 && prompts.length % 2 === 1) {
+      // Workers 1-2 (positions 3, 5)
       sse(res, { role: 'assistant', content: `attempt\nSTRATEGY: tried something\nFILES_MODIFIED: none\nCOMMANDS_SUCCEEDED: none\nCOMMANDS_FAILED: start\nBLOCKERS: port\nREMAINING: fix port` });
-    } else if (prompts.length <= 8 && prompts.length % 2 === 0) {
-      // Judges 1-3 (even positions: 4,6,8) → same NACK
+    } else if (prompts.length <= 6 && prompts.length % 2 === 0) {
+      // Judges 1-2 (positions 4, 6) → same NACK
       sse(res, { role: 'assistant', content: 'error: port 8080 still in use [FAIL]\nNACK' });
-    } else if (prompts.length === 9) {
-      // Worker 4: should have BLOCKED warning after 3 identical blocker sigs
-      assert.match(prompt, /BLOCKED/i);
-      assert.match(prompt, /port 8080/i, 'BLOCKED warning should cite the repeated blocker');
+    } else if (prompts.length === 7) {
+      // Worker 3: pivot mandate armed after 2 identical blocker sigs
+      assert.match(prompt, /PIVOT MANDATE/i);
+      assert.match(prompt, /port 8080/i, 'pivot mandate should cite the repeated blocker');
       sse(res, { role: 'assistant', content: 'fixed\nSTRATEGY: new approach\nFILES_MODIFIED: config\nCOMMANDS_SUCCEEDED: start\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
     } else {
-      // Judge 4 → ACK
+      // Judge 3 → ACK
       sse(res, { role: 'assistant', content: 'done [PASS]\nACK' });
     }
   };
   const result = await runMi(['-g', 'start server', '-c', 'check port']);
   assert.strictEqual(result.status, 0);
-  // 1 planner + 1 precheck + 3*(worker+judge) + 1 worker4 + 1 judge4 = 10
-  assert.strictEqual(prompts.length, 10);
+  // 1 planner + 1 precheck + 2*(worker+judge) + 1 worker3 + 1 judge3 = 8
+  assert.strictEqual(prompts.length, 8);
 });
 
 test('goal spawn error skips judge call', async () => {
