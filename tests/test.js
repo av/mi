@@ -3143,6 +3143,54 @@ test('goal EXPLORE iterations keep full remaining budget (verification-cost cap 
   assert.ok(iters[1].iter_timeout_ms > iters[0].iter_timeout_ms * 2, `EXPLORE iter2 (${iters[1].iter_timeout_ms}) not full vs iter1 (${iters[0].iter_timeout_ms})`);
 });
 
+test('goal COMMIT/URGENT iterations cap the verification cost at 50% of remaining budget', async () => {
+  // Regression guard for the 0.5 side of the phase-gated iterFrac: past EXPLORE, a later iteration's
+  // per-iteration worker timeout must be bounded to ~half of (budget-120)*1000. Reaching COMMIT in the
+  // instant-mock harness requires advancing the loop clock: fake-time preloads a Date.now offset that we
+  // bump on the iteration-1 judge response so iteration 2's phase computes with ~45% of budget elapsed
+  // (r/totalS < 0.5) without tripping the 60s SALVAGE floor. NB: the fake-time jump inflates the measured
+  // iteration-1 duration, so `ema` grows and the loop reports URGENT rather than COMMIT — both share the same
+  // 0.5 iterFrac, which is exactly the branch under test.
+  const prompts = [];
+  const offsetFile = `/tmp/mi-test-commitcap-off-${process.pid}`;
+  writeFileSync(offsetFile, '0');
+  requestHandler = (req, res, body) => {
+    const prompt = body.messages.at(-1).content;
+    prompts.push(prompt);
+    if (prompts.length === 1) {
+      sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- done\nARTIFACTS: none\nVERIFIER_SHAPE_CONTRACT\n- ok\nVERIFICATION_PLAN\n- inspect\nCURRENT_STATE\n- empty' });
+    } else if (prompts.length === 2) {
+      sse(res, { role: 'assistant', content: 'not done [FAIL]\nNACK' }); // precheck NACK (EXPLORE, offset 0)
+    } else if (prompts.length === 3) {
+      sse(res, { role: 'assistant', content: 'did work\nSTRATEGY: attempt 1\nFILES_MODIFIED: x\nCOMMANDS_SUCCEEDED: y\nCOMMANDS_FAILED: z\nBLOCKERS: b\nREMAINING: r' });
+    } else if (prompts.length === 4) {
+      // judge 1 NACK — advance clock to 550s elapsed of ~1000s so iteration 2 lands in COMMIT (0.45 < 0.5)
+      writeFileSync(offsetFile, '550000');
+      sse(res, { role: 'assistant', content: 'still broken [FAIL]\nNACK' });
+    } else if (prompts.length === 5) {
+      sse(res, { role: 'assistant', content: 'did more\nSTRATEGY: attempt 2\nFILES_MODIFIED: x\nCOMMANDS_SUCCEEDED: y\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
+    } else {
+      sse(res, { role: 'assistant', content: 'all good [PASS]\nACK' }); // judge 2 ACK (+ skeptical recheck)
+    }
+  };
+  const deadline = Math.floor(Date.now() / 1000) + 1000; // totalS ~1000s
+  const t0 = Date.now();
+  try {
+    const result = await runMi(['-g', 'long task', '-c', 'check it', '-d', String(deadline)], fakeTimeEnv(offsetFile));
+    assert.strictEqual(result.status, 0);
+    assert.match(result.stdout, /left, (COMMIT|URGENT)/); // iteration 2 ran past EXPLORE (0.5 cap branch)
+    const events = readdirSync('/tmp').filter(f => /^mi-goal-\d+\.jsonl$/.test(f)).map(f => `/tmp/${f}`).filter(p => statSync(p).mtimeMs >= t0).sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs)[0];
+    assert.ok(events && existsSync(events), 'event log present');
+    const iters = readFileSync(events, 'utf8').trim().split('\n').map(l => JSON.parse(l)).filter(e => e.type === 'iteration');
+    assert.strictEqual(iters.length, 2);
+    // iteration 2 (COMMIT) is capped at 0.5 * (budget-120)*1000 — distinct from the EXPLORE-full case above.
+    const b2 = iters[1].budget_remaining_s, expected = 0.5 * (b2 - 120) * 1000;
+    assert.ok(Math.abs(iters[1].iter_timeout_ms - expected) < 4000, `COMMIT iter2 cap ${iters[1].iter_timeout_ms} not ~half of (${b2}-120)*1000 = ${expected}`);
+    // and it must be strictly below iteration 1's cap (EXPLORE-full frac would have kept it far higher).
+    assert.ok(iters[1].iter_timeout_ms < iters[0].iter_timeout_ms, `COMMIT iter2 (${iters[1].iter_timeout_ms}) not below iter1 (${iters[0].iter_timeout_ms})`);
+  } finally { rmSync(offsetFile, { force: true }); }
+});
+
 test('goal garbled recheck output keeps primary ACK', async () => {
   const prompts = [];
   requestHandler = (req, res, body) => {
