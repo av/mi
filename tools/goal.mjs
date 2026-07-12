@@ -37,7 +37,8 @@ export default {
     const budgetGuidance = () => { const phase = budgetPhase(), r = budget(); if (!phase) return ''; const lines = [`\nbudget: ${r}s remaining of ${totalS}s total (phase: ${phase}).`]; if (phase === 'EXPLORE') lines.push('explore freely, try your best approach.'); else if (phase === 'COMMIT') lines.push('commit to the most promising path. stop exploring alternatives. refine and fix existing implementation only — do not start a new approach or rewrite from scratch.'); else if (phase === 'URGENT') lines.push('write your best-effort artifact NOW. do not start new exploration.'); else lines.push('FINAL SALVAGE: write the best artifact you can from current state immediately. do not debug, do not explore, just produce the deliverable.'); return lines.join(' '); };
     const strategies = [], blockerSigs = [];
     const blockerSig = s => (s.match(/NACK[:\s.]*(.*)/i)?.[1] || s.split('\n').filter(l => /fail|block|error|missing/i.test(l))[0] || '').trim().slice(0, 120).toLowerCase();
-    const blockerWarning = () => { if (blockerSigs.length < 3) return ''; const last3 = blockerSigs.slice(-3); if (last3[0] === last3[1] && last3[1] === last3[2] && last3[0]) return `BLOCKED: 3 iterations failed on: "${last3[0]}". current strategy is not working. `; return ''; };
+    const pivotArmed = () => { const [a, b] = blockerSigs.slice(-2); return blockerSigs.length >= 2 && a && a === b; };
+    const blockerWarning = () => pivotArmed() ? `PIVOT MANDATE: repeated consecutive judge NACKs on the same criterion: "${blockerSigs.at(-1)}". your current method cannot satisfy it — even though artifacts exist, repairing them in place with the same method is BANNED this iteration. you MUST switch to a structurally different method (different tool, algorithm, or architecture) targeting that exact criterion. ` : '';
     let checkpoint = '', fatal = false;
     const isFatal = s => /requires more credits|insufficient.{0,20}(credits|balance|funds)|payment required|HTTP 402/i.test(s?.slice?.(-2000) || '');
     writeFileSync(log, `# Goal\n${goal}\n\n# User Criteria\n${check}\n${deadline ? `\n# Budget\n- total: ${totalS}s\n- deadline: ${new Date(deadline * 1000).toISOString()}\n` : ''}\n# Logs\n- markdown: ${log}\n- events: ${events}\n\n# Log\n`);
@@ -81,6 +82,7 @@ export default {
         break;
       }
       console.log(gray(`── goal ${i}/${limit}${budget() !== null ? ` (${budget()}s left, ${phase})` : ''} ──`));
+      if (pivotArmed()) emit('pivot_armed', { iteration: i, blocker: blockerSigs.at(-1) });
       const recentStrats = strategies.slice(-5);
       const strategyWarning = recentStrats.length ? `\nfailed strategies (do NOT repeat):\n${recentStrats.map((s, j) => `${j + 1}. ${s}`).join('\n')}\n${recentStrats.length >= 2 ? 'abandon this solution family entirely. ' : ''}${blockerWarning()}before starting, write ONE LINE explaining what is different about your new approach. if you cannot, switch method (different language, algorithm, or architecture).` : '';
       const started = Date.now();
