@@ -133,6 +133,12 @@
 - label: goal pivot mandate arms on 2 consecutive identical judge-NACK signatures regardless of artifacts — repairing in place with the same method is banned for that iteration and a pivot_armed event is emitted
   command: grep -qF 'pivotArmed' tools/goal.mjs && grep -qF "emit('pivot_armed'" tools/goal.mjs && grep -qF 'blockerSigs.slice(-2)' tools/goal.mjs
   tags: [implemented]
+- label: goal judge runs an external-client runtime probe for service/API tasks — every goal-documented endpoint/RPC exercised with a fresh curl/grpcurl/client call asserting goal-stated status/response; worker transcript claims are never evidence; destructive endpoints probed only on disposable fixtures or verified statically
+  command: grep -qF 'external-client runtime probe' tools/goal.mjs && grep -qF 'FRESH external client' tools/goal.mjs && grep -qF 'disposable fixture data' tools/goal.mjs
+  tags: [implemented]
+- label: goal planner, worker, and judge enforce a verbatim-identifier guard — goal-named identifiers (fields, endpoints, files, flags, message/service names) are used character-for-character, unstated names default to the conventional/spec-standard choice recorded as an AMBIGUITIES DECISION, and the judge audits declared identifiers byte-for-byte against the goal text
+  command: test $(grep -c 'character-for-character' tools/goal.mjs) -ge 2 && grep -qF 'identifier naming is a fork class' tools/goal.mjs && grep -qF 'identifier audit' tools/goal.mjs && test $(grep -c 'value not val' tools/goal.mjs) -ge 2
+  tags: [implemented]
 
 # agent-loop
 - agent loop streams OpenAI chat completions via SSE, executes tool calls, repeats until text response
