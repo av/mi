@@ -256,3 +256,72 @@ one eval gate) → C5+C7 (near-zero-risk one-liners, same gate) → C3 → C6 �
 C8/C9/C10 as follow-ups if their clusters persist in k-trial data. Every
 change gates on `K_TRIALS>=3` + `passrate.py` + `compare-runs.py` per the
 stream-4 protocol — never single-run deltas.
+
+## Validation Results — 2026-07-12
+
+Audit trail for what was actually implemented and validated in this session.
+The candidate list above was the plan; this section is the record of what
+landed on master and how far each item was validated.
+
+### What landed on master
+
+- **Bundle** — `b9e2bcf`. The pending uncommitted worktree bundle
+  (mi_agent.py, presets, tests, tools/goal.mjs, etc.), gated per C4 before
+  commit. TB2.1 discriminative 22-task subset: **17/22 vs baseline 15/22**.
+  `compare-runs.py` verdict: **NOISE but strictly-not-worse** (+2, ±3.1 SE).
+  Its 2 regressions (kv-store-grpc interpretation fork, tune-mjcf over-explore
+  timeout) are exactly the archetypes the judge changes target.
+- **Judge improvements** — merged at `640692a` (merge of `judge-merged`;
+  `git diff b9e2bcf..master` is judge-delta only, no bundle reversion):
+  - C1 — different-method cross-validation + measurement-basis literal-scope
+    re-derivation (rule 2c).
+  - C2 — mechanical constraint checklist (planner → judge).
+  - C3 — external-client endpoint probe for service tasks (rule 6f).
+  - C5 — salvage/judge kill-verb ban + `salvage_kill_violation` lint.
+  - C7 — grader-perspective neutral-cwd import/exec probe (rule 6d).
+  - Signature-based pivot arming (2 consecutive identical NACK signatures →
+    PIVOT MANDATE, `pivot_armed` event).
+  - Verbatim-identifier guard (rule 6g + planner AMBIGUITIES fork class).
+- **Verification-cost cap** — `1d15220`. Worker per-iteration timeout is now
+  phase-gated: EXPLORE keeps full remaining budget; COMMIT/URGENT capped at
+  50% of remaining (symmetry with the judge's existing 50% wall cap), banking
+  budget for SALVAGE instead of a mid-grind SIGKILL.
+
+Current state on master (HEAD `1d15220`): **npm test 109/109**, **facts check
+114 pass**, `npm run lines` 29, clean tree. Not pushed.
+
+### Candidate-by-candidate status
+
+| Candidate | Implemented? | Eval-validated? | Evidence |
+|---|---|---|---|
+| C1 (cross-validation + measurement-basis) | Yes | **EVAL-VALIDATED** | judge-merged mini-eval 5/6; count-dataset-tokens recovered via 79586-vs-79585 different-method reconciliation |
+| C2 (constraint checklist) | Yes | **EVAL-VALIDATED** | mini-eval; CONSTRAINT/MEASURED lines fired in fix-git smoke |
+| C3 (external-client endpoint probe) | Yes | **EVAL-VALIDATED** | kv-store-grpc recovered (correct `value` schema via external-client probe) |
+| Verbatim-identifier guard | Yes | **EVAL-VALIDATED** | kv-store-grpc recovered via verbatim `value` schema + rule-6f probe |
+| C5 (salvage kill-verb ban + lint) | Yes | Partial | no `salvage_kill_violation` in smoke; not adversarially exercised in eval |
+| C7 (grader-perspective probe) | Yes | Partial | merged; not isolated in a targeted eval |
+| Pivot arming (signature-based) | Yes | **IMPLEMENTED-BUT-UNEXERCISED** | no task hit 2 consecutive identical NACKs in any run; `pivot_armed` never triggered; not harmful |
+| Verification-cost cap | Yes | **IMPLEMENTED-BUT-NOT-EVAL-VALIDATED** | unit test (EXPLORE keeps full budget) only; COMMIT/URGENT branch never engaged live; no harbor run fit the budget |
+| dna-insert measurement-basis clause | Yes | **IMPLEMENTED-BUT-NOT-EVAL-VALIDATED** | rule 2c added; dna-insert still stably fails (prompt nudge, not mechanical) |
+
+Mini-eval detail (judge-merged, 5/6 pass): sparql-university and tune-mjcf
+wrong-approach loops recovered (clean/URGENT-resolved passes); nginx
+regression held. Residual miss: dna-insert (measurement-BASIS fork — agent
+measured full-primer Tm 0.003, grader measured annealing sub-region 5.44;
+C1 does not catch same-region/different-method).
+
+### Known residual gaps for the next run
+
+- **dna-insert** still stably fails — the literal-basis clause is a prompt
+  nudge, not a mechanical check.
+- **Verification-cost cap** COMMIT/URGENT branch needs a live eval to confirm
+  it flips tune-mjcf/sparql without harming long EXPLORE-heavy tasks.
+- **Pivot arming** needs a task that produces repeated identical NACKs to
+  validate live.
+- **install-windows-3.11** stable-fail untouched this session.
+
+### How to validate next
+
+Re-run `K_TRIALS>=3 ./mi_harbor/run-tb21-subset.sh` on master and
+`compare-runs.py` vs the `b9e2bcf` C4-gate run to separate the judge +
+cost-cap signal from noise.
