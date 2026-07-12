@@ -118,6 +118,9 @@
 - label: goal judge NACKs un-re-derivable single-value answers unless the worker log shows a second independent derivation method agreeing (cross-validation demand)
   command: grep -q 'second independent method and show both agree' tools/goal.mjs
   tags: [implemented]
+- label: goal judge re-derives any spec-recipe quantity (defined via an explicit recipe/region/subset/window/formula) strictly from the goal's LITERAL scope not the worker's chosen basis, treats that named scope as a CONSTRAINT measured against the goal's stated bound, and NACKs a worker-basis vs goal-literal-basis divergence naming it
+  command: grep -qF 'MEASUREMENT-BASIS:' tools/goal.mjs && grep -qF "goal's LITERAL scope" tools/goal.mjs && grep -qF 'worker-basis=' tools/goal.mjs
+  tags: [implemented]
 - label: goal judge runs a final-state sweep before ACK: every goal-stated end-state property is re-measured NOW, goal-quoted literals compared byte-for-byte, never against memory of an earlier check
   command: grep -q 'FINAL-STATE SWEEP' tools/goal.mjs
   tags: [implemented]
