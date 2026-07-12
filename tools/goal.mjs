@@ -134,7 +134,11 @@ export default {
       console.log(gray(`── goal ${i}/${limit}${budget() !== null ? ` (${budget()}s left, ${phase})` : ''} ──`));
       if (pivotArmed()) emit('pivot_armed', { iteration: i, blocker: blockerSigs.at(-1) });
       const recentStrats = strategies.slice(-5);
-      const strategyWarning = recentStrats.length ? `\nfailed strategies (do NOT repeat):\n${recentStrats.map((s, j) => `${j + 1}. ${s}`).join('\n')}\n${recentStrats.length >= 2 ? 'abandon this solution family entirely. ' : ''}${blockerWarning()}before starting, write ONE LINE explaining what is different about your new approach. if you cannot, switch method (different language, algorithm, or architecture).` : '';
+      const missing = draftGate();
+      // slice-10 strategy-ladder pivot (one-shot): >40% budget elapsed with declared artifacts still missing and no live jobs → mandate the plan's fallback strategy. blockerSig-blind by design (each failed attempt yields a different error string). precedence: pivot at 40% replaces that iteration's draft-gate escalation (50%) so the worker never gets two conflicting directives; escalation remains available on any later iteration. mech-NACK/blockerSig exempt like esc. computed before strategyWarning so the signature-pivot directive (blockerWarning) is suppressed when this artifact-pivot already fires — a worker never gets two PIVOT MANDATE blocks.
+      const piv = !fastLane && !pivoted && missing.length && (totalS - budget()) / totalS > 0.3 && !liveJobs().length ? (pivoted = true) : false;
+      if (piv) emit('pivot', { iteration: i, missing, fallback, budget_remaining_s: budget() });
+      const strategyWarning = recentStrats.length ? `\nfailed strategies (do NOT repeat):\n${recentStrats.map((s, j) => `${j + 1}. ${s}`).join('\n')}\n${recentStrats.length >= 2 ? 'abandon this solution family entirely. ' : ''}${piv ? '' : blockerWarning()}before starting, write ONE LINE explaining what is different about your new approach. if you cannot, switch method (different language, algorithm, or architecture).` : '';
       const started = Date.now();
       // verification-cost cap: EXPLORE iterations may spend the full usable remaining budget, but once past EXPLORE
       // (COMMIT/URGENT) a single refine/verify cycle is bounded to 50% of remaining — matching the judge's own wallT
@@ -142,10 +146,6 @@ export default {
       // instead of grinding to the wall (tune-mjcf/sparql over-explore timeouts). iteration 1 keeps its 1/3 partition.
       const iterFrac = i === 1 ? 0.333 : phase === 'EXPLORE' ? 1 : 0.5;
       const iterTimeout = deadline ? Math.min(timeout ?? Infinity, Math.max(i === 1 ? 60000 : 30000, (budget() - 120) * 1000 * iterFrac)) : timeout;
-      const missing = draftGate();
-      // slice-10 strategy-ladder pivot (one-shot): >40% budget elapsed with declared artifacts still missing and no live jobs → mandate the plan's fallback strategy. blockerSig-blind by design (each failed attempt yields a different error string). precedence: pivot at 40% replaces that iteration's draft-gate escalation (50%) so the worker never gets two conflicting directives; escalation remains available on any later iteration. mech-NACK/blockerSig exempt like esc.
-      const piv = !fastLane && !pivoted && missing.length && (totalS - budget()) / totalS > 0.3 && !liveJobs().length ? (pivoted = true) : false;
-      if (piv) emit('pivot', { iteration: i, missing, fallback, budget_remaining_s: budget() });
       const esc = !fastLane && !piv && !escalated && missing.length && (totalS - budget()) / totalS > 0.4 && !liveJobs().length ? (escalated = true) : false;
       if (missing.length) emit('draft_gate', { iteration: i, missing, escalated: esc });
       const work = fastLane ? await delegate.handler({
