@@ -4,7 +4,7 @@ import { spawn } from 'node:child_process';
 import * as http from 'node:http';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { readFileSync, writeFileSync, unlinkSync, existsSync, symlinkSync } from 'node:fs';
+import { readFileSync, writeFileSync, unlinkSync, existsSync, symlinkSync, readdirSync, statSync } from 'node:fs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const INDEX_PATH = join(__dirname, '../index.mjs');
@@ -3105,6 +3105,42 @@ test('goal first iteration capped to 1/3 budget with partition hint', async () =
   assert.strictEqual(result.status, 0);
   // 1 planner + 1 precheck + 1 worker1 + 1 judge1(NACK) + 1 worker2 + 1 judge2(ACK) + 1 skeptical(ACK) = 7
   assert.strictEqual(prompts.length, 7);
+});
+
+test('goal EXPLORE iterations keep full remaining budget (verification-cost cap only bites past EXPLORE)', async () => {
+  // Regression guard for the phase-gated iterFrac: iteration 1 is capped to ~1/3 of usable budget, but a later
+  // EXPLORE iteration must still get the FULL remaining budget (frac 1) — the 50% verification-cost cap applies
+  // only in COMMIT/URGENT, so legitimately-long many-iteration tasks are not truncated while in EXPLORE.
+  const prompts = [];
+  requestHandler = (req, res, body) => {
+    const prompt = body.messages.at(-1).content;
+    prompts.push(prompt);
+    if (prompts.length === 1) {
+      sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- done\nARTIFACTS: none\nVERIFIER_SHAPE_CONTRACT\n- ok\nVERIFICATION_PLAN\n- inspect\nCURRENT_STATE\n- empty' });
+    } else if (prompts.length === 2) {
+      sse(res, { role: 'assistant', content: 'not done [FAIL]\nNACK' }); // precheck NACK
+    } else if (prompts.length === 3) {
+      sse(res, { role: 'assistant', content: 'did work\nSTRATEGY: attempt 1\nFILES_MODIFIED: x\nCOMMANDS_SUCCEEDED: y\nCOMMANDS_FAILED: z\nBLOCKERS: b\nREMAINING: r' });
+    } else if (prompts.length === 4) {
+      sse(res, { role: 'assistant', content: 'still broken [FAIL]\nNACK' }); // judge 1 NACK
+    } else if (prompts.length === 5) {
+      sse(res, { role: 'assistant', content: 'did more\nSTRATEGY: attempt 2\nFILES_MODIFIED: x\nCOMMANDS_SUCCEEDED: y\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
+    } else {
+      sse(res, { role: 'assistant', content: 'all good [PASS]\nACK' }); // judge 2 ACK
+    }
+  };
+  const deadline = Math.floor(Date.now() / 1000) + 900; // 15 min budget → stays in EXPLORE across instant mocks
+  const t0 = Date.now();
+  const result = await runMi(['-g', 'long task', '-c', 'check it', '-d', String(deadline)]);
+  assert.strictEqual(result.status, 0);
+  // newest mi-goal event log written during this run (tool result isn't echoed to stdout)
+  const events = readdirSync('/tmp').filter(f => /^mi-goal-\d+\.jsonl$/.test(f)).map(f => `/tmp/${f}`).filter(p => statSync(p).mtimeMs >= t0).sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs)[0];
+  assert.ok(events && existsSync(events), 'event log present');
+  const iters = readFileSync(events, 'utf8').trim().split('\n').map(l => JSON.parse(l)).filter(e => e.type === 'iteration');
+  assert.strictEqual(iters.length, 2);
+  // iteration 1 is partitioned to ~1/3; iteration 2 (EXPLORE) keeps the full budget → ratio ~3, well above 2.
+  // If EXPLORE were wrongly capped to 0.5 the ratio would collapse to ~1.5.
+  assert.ok(iters[1].iter_timeout_ms > iters[0].iter_timeout_ms * 2, `EXPLORE iter2 (${iters[1].iter_timeout_ms}) not full vs iter1 (${iters[0].iter_timeout_ms})`);
 });
 
 test('goal garbled recheck output keeps primary ACK', async () => {

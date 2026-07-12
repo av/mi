@@ -136,7 +136,12 @@ export default {
       const recentStrats = strategies.slice(-5);
       const strategyWarning = recentStrats.length ? `\nfailed strategies (do NOT repeat):\n${recentStrats.map((s, j) => `${j + 1}. ${s}`).join('\n')}\n${recentStrats.length >= 2 ? 'abandon this solution family entirely. ' : ''}${blockerWarning()}before starting, write ONE LINE explaining what is different about your new approach. if you cannot, switch method (different language, algorithm, or architecture).` : '';
       const started = Date.now();
-      const iterTimeout = deadline ? Math.min(timeout ?? Infinity, Math.max(i === 1 ? 60000 : 30000, (budget() - 120) * (i === 1 ? 333 : 1000))) : timeout;
+      // verification-cost cap: EXPLORE iterations may spend the full usable remaining budget, but once past EXPLORE
+      // (COMMIT/URGENT) a single refine/verify cycle is bounded to 50% of remaining — matching the judge's own wallT
+      // 50% cap — so a runaway sweep on a working-enough artifact is cut off with budget left for a SALVAGE artifact-write
+      // instead of grinding to the wall (tune-mjcf/sparql over-explore timeouts). iteration 1 keeps its 1/3 partition.
+      const iterFrac = i === 1 ? 0.333 : phase === 'EXPLORE' ? 1 : 0.5;
+      const iterTimeout = deadline ? Math.min(timeout ?? Infinity, Math.max(i === 1 ? 60000 : 30000, (budget() - 120) * 1000 * iterFrac)) : timeout;
       const missing = draftGate();
       // slice-10 strategy-ladder pivot (one-shot): >40% budget elapsed with declared artifacts still missing and no live jobs → mandate the plan's fallback strategy. blockerSig-blind by design (each failed attempt yields a different error string). precedence: pivot at 40% replaces that iteration's draft-gate escalation (50%) so the worker never gets two conflicting directives; escalation remains available on any later iteration. mech-NACK/blockerSig exempt like esc.
       const piv = !fastLane && !pivoted && missing.length && (totalS - budget()) / totalS > 0.3 && !liveJobs().length ? (pivoted = true) : false;

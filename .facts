@@ -109,6 +109,9 @@
 - label: goal salvage/urgent phases trigger adaptively from an EMA of iteration duration (SALVAGE at max(60, 1.3*EMA); URGENT at max(2.5*EMA, 20% total)), EMA contribution clamped to 25% of total budget
   command: grep -q '1.3 \* e' tools/goal.mjs && grep -q '2.5 \* e' tools/goal.mjs
   tags: [implemented]
+- label: goal per-iteration verification-cost cap — iteration 1 gets 1/3 of usable budget, later EXPLORE iterations the full remaining, but COMMIT/URGENT iterations are bounded to 50% of remaining (matching the judge wallT cap) so a runaway refine/verify sweep on a working-enough artifact is cut off with budget left for SALVAGE
+  command: grep -qF 'iterFrac = i === 1 ? 0.333 : phase === ' tools/goal.mjs && grep -qF "* 1000 * iterFrac" tools/goal.mjs
+  tags: [implemented]
 - label: goal draft-gate escalates one-shot past 40% elapsed budget with no live jobs: worker prompt becomes an artifacts-first salvage-style directive whose NACK is exempt from strategy/blockerSig accounting
   command: grep -q 'ARTIFACT ESCALATION' tools/goal.mjs && grep -q 'escalated' tools/goal.mjs && grep -qF '> 0.4' tools/goal.mjs
   tags: [implemented]
