@@ -748,9 +748,10 @@ test('goal salvage triggers when deadline is near', async () => {
       // Pre-check judge → NACK
       sse(res, { role: 'assistant', content: 'file missing [FAIL]\nNACK' });
     } else if (prompts.length === 3) {
-      // Should be salvage prompt (budget < 60s)
+      // Should be salvage prompt (budget < 60s) with bounded pass timeout
       assert.match(prompt, /FINAL SALVAGE/);
       assert.match(prompt, /write output artifacts/);
+      assert.match(prompt, /this pass capped at/); // SALVAGE timeout is mechanically bounded when deadline is set
       sse(res, { role: 'assistant', content: 'wrote /app/out.txt' });
     } else {
       // Judge after salvage
@@ -3189,6 +3190,93 @@ test('goal COMMIT/URGENT iterations cap the verification cost at 50% of remainin
     // and it must be strictly below iteration 1's cap (EXPLORE-full frac would have kept it far higher).
     assert.ok(iters[1].iter_timeout_ms < iters[0].iter_timeout_ms, `COMMIT iter2 (${iters[1].iter_timeout_ms}) not below iter1 (${iters[0].iter_timeout_ms})`);
   } finally { rmSync(offsetFile, { force: true }); }
+});
+
+test('goal fastLane caps at one attempt — SALVAGE runs on second low-budget single-blocker NACK', async () => {
+  // Regression: fastLane used to preempt SALVAGE every iteration when budget < 30% and exactly one FAIL.
+  // A persistent single blocker would burn all remaining budget on repeated surgical-fix attempts without
+  // the final artifact-write salvage pass ever firing. Fix: fastLaneUsed flag caps fastLane at 1 attempt.
+  const prompts = [];
+  const dl = Math.floor(Date.now() / 1000) - 100; // past deadline → budget fraction 0 < 0.3, phase SALVAGE
+  requestHandler = (req, res, body) => {
+    const prompt = body.messages.at(-1).content;
+    prompts.push(prompt);
+    if (prompts.length === 1) {
+      sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- ok\nARTIFACTS: none\nVERIFIER_SHAPE_CONTRACT\n- check\nVERIFICATION_PLAN\n- run\nCURRENT_STATE\n- off' });
+    } else if (prompts.length === 2) {
+      sse(res, { role: 'assistant', content: 'criterion: measured=0.5 expected=1.0 [FAIL]\nNACK' }); // precheck single-FAIL
+    } else if (prompts.length === 3) {
+      // iter 1: fastLane surgical brief fires
+      assert.match(prompt, /SINGLE-BLOCKER FAST LANE/);
+      assert.doesNotMatch(prompt, /FINAL SALVAGE/);
+      sse(res, { role: 'assistant', content: 'tried fix\nSTRATEGY: surgical\nFILES_MODIFIED: x\nCOMMANDS_SUCCEEDED: y\nCOMMANDS_FAILED: z\nBLOCKERS: b\nREMAINING: r' });
+    } else if (prompts.length === 4) {
+      // judge after fastLane → same single FAIL (fastLane didn't fix it)
+      sse(res, { role: 'assistant', content: 'criterion: measured=0.5 expected=1.0 [FAIL]\nNACK' });
+    } else if (prompts.length === 5) {
+      // iter 2: fastLaneUsed=true → SALVAGE runs, NOT fastLane
+      assert.match(prompt, /FINAL SALVAGE/);
+      assert.doesNotMatch(prompt, /SINGLE-BLOCKER FAST LANE/);
+      sse(res, { role: 'assistant', content: 'salvaged best-effort artifact' });
+    } else {
+      // judge after salvage → NACK (loop breaks)
+      sse(res, { role: 'assistant', content: 'still broken [FAIL]\nNACK' });
+    }
+  };
+  const t0 = Date.now();
+  const result = await runMi(['-g', 'fix one thing', '-c', 'check', '-d', String(dl)]);
+  assert.strictEqual(result.status, 0);
+  assert.strictEqual(prompts.length, 6);
+  const events = readdirSync('/tmp').filter(f => /^mi-goal-\d+\.jsonl$/.test(f)).map(f => `/tmp/${f}`).filter(p => statSync(p).mtimeMs >= t0).sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs)[0];
+  assert.ok(events && existsSync(events), 'event log present');
+  const ev = readFileSync(events, 'utf8').trim().split('\n').map(l => JSON.parse(l));
+  assert.ok(ev.some(e => e.type === 'fast_lane'), 'fast_lane event fired on iter 1');
+  assert.ok(ev.some(e => e.type === 'salvage'), 'salvage event fired on iter 2');
+});
+
+test('goal blockerSig normalizes criterion name — same criterion different values arms pivot', async () => {
+  // Regression: blockerSig used to include measured values in the signature, so the same criterion failing
+  // twice with different values ("Tm 5.44 > 5" vs "Tm 5.443790 > 5") produced different signatures and the
+  // signature-pivot never armed (pivot_armed was never observed in any TB2.1 run). Fix: extract criterion
+  // NAMES from FAIL lines for a stable signature.
+  const prompts = [];
+  const dl = Math.floor(Date.now() / 1000) + 900; // far deadline → no SALVAGE, stays EXPLORE
+  requestHandler = (req, res, body) => {
+    const prompt = body.messages.at(-1).content;
+    prompts.push(prompt);
+    if (prompts.length === 1) {
+      sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- ok\nARTIFACTS: none\nVERIFIER_SHAPE_CONTRACT\n- check\nVERIFICATION_PLAN\n- run\nCURRENT_STATE\n- off' });
+    } else if (prompts.length === 2) {
+      sse(res, { role: 'assistant', content: 'Tm difference: measured=5.44 expected=5.0 [FAIL]\nNACK' }); // precheck
+    } else if (prompts.length === 3) {
+      sse(res, { role: 'assistant', content: 'iter1\nSTRATEGY: approach A\nFILES_MODIFIED: x\nCOMMANDS_SUCCEEDED: y\nCOMMANDS_FAILED: z\nBLOCKERS: b\nREMAINING: r' });
+    } else if (prompts.length === 4) {
+      // iter 1 judge: same criterion, value 5.44 → sig "tm difference"
+      sse(res, { role: 'assistant', content: 'Tm difference: measured=5.44 expected=5.0 [FAIL]\nNACK' });
+    } else if (prompts.length === 5) {
+      sse(res, { role: 'assistant', content: 'iter2\nSTRATEGY: approach B\nFILES_MODIFIED: x\nCOMMANDS_SUCCEEDED: y\nCOMMANDS_FAILED: z\nBLOCKERS: b\nREMAINING: r' });
+    } else if (prompts.length === 6) {
+      // iter 2 judge: same criterion, DIFFERENT value 5.443790 → old sig would differ, new sig same "tm difference"
+      sse(res, { role: 'assistant', content: 'Tm difference: measured=5.443790 expected=5.0 [FAIL]\nNACK' });
+    } else if (prompts.length === 7) {
+      // iter 3 worker: pivot should be armed — PIVOT MANDATE in the prompt
+      assert.match(prompt, /PIVOT MANDATE/);
+      assert.match(prompt, /tm difference/);
+      sse(res, { role: 'assistant', content: 'iter3 pivoted\nSTRATEGY: approach C\nFILES_MODIFIED: x\nCOMMANDS_SUCCEEDED: y\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
+    } else if (prompts.length === 8) {
+      sse(res, { role: 'assistant', content: 'Tm difference: measured=4.0 expected=5.0 [PASS]\nACK' });
+    } else {
+      // skeptical recheck → ACK
+      sse(res, { role: 'assistant', content: 'Tm difference: measured=4.0 expected=5.0 [PASS]\nACK' });
+    }
+  };
+  const t0 = Date.now();
+  const result = await runMi(['-g', 'design primers', '-c', 'check Tm', '-d', String(dl)]);
+  assert.strictEqual(result.status, 0);
+  const events = readdirSync('/tmp').filter(f => /^mi-goal-\d+\.jsonl$/.test(f)).map(f => `/tmp/${f}`).filter(p => statSync(p).mtimeMs >= t0).sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs)[0];
+  assert.ok(events && existsSync(events), 'event log present');
+  const ev = readFileSync(events, 'utf8').trim().split('\n').map(l => JSON.parse(l));
+  assert.ok(ev.some(e => e.type === 'pivot_armed'), 'pivot_armed event fired on iter 3 (normalized sig)');
 });
 
 test('goal garbled recheck output keeps primary ACK', async () => {
