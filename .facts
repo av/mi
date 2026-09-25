@@ -182,7 +182,7 @@
   command: grep -q 'MI_API_PARAMS.*JSON.parse' index.mjs
 - MI_DIR and MI_PATH set in process.env for tools/skills to locate package assets
 - label: OPENAI_BASE_URL accepts provider roots with or without trailing /v1
-  command: grep -q 'api = p =>' index.mjs && grep -q 'HEALTH_URL="$API_BASE/v1/models"' mi_harbor/mi_agent.py
+  command: grep -q 'api = p =>' index.mjs
 - label: CLI supports -d flag and MI_DEADLINE env var for goal deadline
   command: grep -q "getArg('-d')" index.mjs && grep -q 'MI_DEADLINE' index.mjs && grep -q 'deadline: +dl' index.mjs
 
@@ -212,76 +212,28 @@
   command: grep -q '24' .github/workflows/publish.yml
 
 # harbor
-- label: mi_harbor/ is a Python adapter for running mi against Harbor benchmarks (Terminal-Bench 2.0)
-  command: test -f mi_harbor/mi_agent.py
-- harbor adapter includes diagnostic instrumentation: pre-flight LLM check, timestamped output, network diagnostics
-- label: harbor is dev/eval infrastructure only — excluded from npm package
-  command: grep -q 'mi_harbor' .npmignore
-- label: Terminal-Bench 2.0 reference leaderboard snapshot is stored under docs
-  command: test -f docs/terminal-bench-2.0-reference.md && test -f docs/terminal-bench-2.0-reference.csv && grep -q 'https://www.tbench.ai/leaderboard/terminal-bench/2.0' docs/terminal-bench-2.0-reference.md
-- label: DeepSeek-V4-Flash Terminal-Bench reference snapshot is stored under docs
-  command: test -f docs/deepseek-v4-flash-terminal-bench.csv && grep -q 'V4-Flash Max,56.9' docs/deepseek-v4-flash-terminal-bench.csv && grep -q 'DeepSeek-V4-Flash Specific References' docs/terminal-bench-2.0-reference.md
-- label: harbor adapter copies the local mi package into eval containers instead of npm-installing it when running from a checkout
-  command: grep -q 'tar -xzf - -C /opt/mi' mi_harbor/mi_agent.py && grep -q 'node /opt/mi/index.mjs' mi_harbor/mi_agent.py
-- label: harbor diagnostics capture padded mi output timestamps
-  command: grep -Fq '[[[:space:]]*[0-9.]+s' mi_harbor/mi_agent.py
-- label: harbor timing diagnostics write one end and exit_code pair on normal completion
-  command: grep -q 'TIMING_FINALIZED=1' mi_harbor/mi_agent.py && grep -q 'TIMING_FINALIZED.*!= "1"' mi_harbor/mi_agent.py
-- label: harbor adapter routes Terminal-Bench tasks through mi goal mode
-  command: grep -q 'TERMINAL_BENCH_CHECK' mi_harbor/mi_agent.py && grep -q -- '-g "$1" -c "$MI_GOAL_CHECK"' mi_harbor/mi_agent.py
-- label: harbor adapter computes MI_DEADLINE from MI_TASK_TIMEOUT with 60s verifier buffer
-  command: grep -q 'MI_TASK_TIMEOUT' mi_harbor/mi_agent.py && grep -q 'MI_DEADLINE' mi_harbor/mi_agent.py && grep -q 'TASK_TIMEOUT - 60' mi_harbor/mi_agent.py
+- label: bench/ holds the Harbor installed agent for mi (bench.mi_agent:MiAgent), job configs, a pinned Harbor wrapper and compare.py; evaluation-only, excluded from the npm package
+  command: test -f bench/mi_agent.py && grep -q 'class MiAgent(BaseInstalledAgent)' bench/mi_agent.py && grep -q '^bench/' .npmignore
+- label: benchmark scenarios are Harbor JobConfigs stacked on bench/configs/mi.yaml and run through npm scripts (bench:smoke, bench:subset, bench:full) with Harbor pinned to 0.23.0
+  command: test -f bench/configs/smoke.yaml && test -f bench/configs/subset.yaml && test -f bench/configs/full.yaml && grep -q 'bench/configs/mi.yaml -c bench/configs/subset.yaml' package.json && grep -q 'harbor==${HARBOR_VERSION:-0.23.0}' bench/harbor.sh
+- label: tasks are pulled from the Harbor registry (terminal-bench/terminal-bench-2-1), never vendored
+  command: grep -q 'name: terminal-bench/terminal-bench-2-1' bench/configs/full.yaml && ! test -d bench/terminal-bench-2.1
+- label: harbor adapter uploads the local checkout to /opt/mi and runs mi in goal mode with TERMINAL_BENCH_CHECK and the eval system prompt
+  command: grep -q 'upload_dir(self._staged_checkout(), "/opt/mi")' bench/mi_agent.py && grep -q -- '-g "$1" -c "$MI_GOAL_CHECK"' bench/mi_agent.py && grep -q 'EVAL_SYSTEM_PROMPT' bench/mi_agent.py
+- label: harbor adapter recomputes the trial's agent timeout from config.json + task.toml and sets MI_TASK_TIMEOUT, MI_DEADLINE (60s verifier buffer) and MI_GOAL_MAX (4-12)
+  command: grep -q 'TrialConfig.model_validate_json' bench/mi_agent.py && grep -q 'MI_TASK_TIMEOUT - 60' bench/mi_agent.py && grep -q 'MI_GOAL_MAX' tools/goal.mjs
 - label: harbor TERMINAL_BENCH_CHECK treats /tests/ results as ground truth for what they cover, requires every goal-stated path/threshold with measured values, never NACKs for margin, and warns about the hidden external verifier
-  command: grep -q 'test results are GROUND TRUTH' mi_harbor/mi_agent.py && grep -q 'hidden external verifier' mi_harbor/mi_agent.py && grep -q 'EVERY goal-stated output path' mi_harbor/mi_agent.py && grep -q 'numeric thresholds, measure the actual value' mi_harbor/mi_agent.py && grep -q 'never NACK for margin' mi_harbor/mi_agent.py
-- label: harbor adapter derives MI_GOAL_MAX from MI_TASK_TIMEOUT (4-12 iterations) and writes AGENTS.md workspace snapshot before the goal loop
-  command: grep -q 'MI_GOAL_MAX' mi_harbor/mi_agent.py && grep -q 'Workspace Snapshot' mi_harbor/mi_agent.py && grep -q 'MI_GOAL_MAX' tools/goal.mjs
-  tags: [implemented]
-- label: goal loop honors MI_GOAL_MAX env as iteration cap when max param is unset
-  command: grep -q 'process.env.MI_GOAL_MAX' tools/goal.mjs
-  tags: [implemented]
-- label: harbor smoke eval script runs one Terminal-Bench task through the cached Docker environment
-  command: test -x mi_harbor/run-smoke.sh && grep -q 'MiCachedDockerEnvironment' mi_harbor/run-smoke.sh && grep -q 'fix-git' mi_harbor/run-smoke.sh
-- label: cached Docker environment builds mi-eval-cache images from Terminal-Bench task images
-  command: test -f mi_harbor/cached_docker_environment.py && grep -q 'FROM {base_image}' mi_harbor/cached_docker_environment.py && grep -q 'mi-eval-cache' mi_harbor/cached_docker_environment.py
-- label: harbor local package archive is deterministic for stable Docker cache keys
-  command: python3 -c 'from mi_harbor.package import local_package_archive; a=local_package_archive()[1]; b=local_package_archive()[1]; raise SystemExit(0 if a==b else 1)'
-- label: 2026-05-24 harness comparison snapshot is stored under docs
-  command: test -f docs/harness-comparison-2026-05-24.md && grep -q 'mi-eval-cache:7f709b1c6fda50c1' docs/harness-comparison-2026-05-24.md && grep -q 'terminus-2' docs/harness-comparison-2026-05-24.md
-- label: AGENTS.md documents Harbor eval launch commands
-  command: grep -q 'Harbor eval launch commands' AGENTS.md && grep -q './mi_harbor/run-smoke.sh' AGENTS.md && grep -q -- '--agent terminus-2' AGENTS.md
-- label: eval runners default MI_API_PARAMS and MI_JUDGE_PARAMS to temperature 0 and seed 42
-  command: DRY_RUN=1 LIMIT=1 ./mi_harbor/run-tb21-subset.sh 2>/dev/null | grep -q '"temperature":0,"seed":42'
-  tags: [implemented]
-- label: eval runners pin a single OpenRouter provider with allow_fallbacks false, only when OPENAI_BASE_URL targets openrouter.ai
-  command: DRY_RUN=1 LIMIT=1 ./mi_harbor/run-tb21-subset.sh 2>/dev/null | grep -q '"provider":{"order":\["alibaba"\],"allow_fallbacks":false}' && ! DRY_RUN=1 LIMIT=1 OPENAI_BASE_URL=http://localhost:1 OPENAI_API_KEY=dummy ./mi_harbor/run-tb21-subset.sh 2>/dev/null | grep -q provider
-  tags: [implemented]
-- label: eval determinism pins are overridable via MI_API_PARAMS/MI_JUDGE_PARAMS env and fully disabled by NO_PIN=1
-  command: DRY_RUN=1 LIMIT=1 NO_PIN=1 ./mi_harbor/run-tb21-subset.sh 2>/dev/null | grep -q 'MI_API_PARAMS=<unset>' && DRY_RUN=1 LIMIT=1 MI_API_PARAMS='{"seed":7}' ./mi_harbor/run-tb21-subset.sh 2>/dev/null | grep -q 'MI_API_PARAMS={"seed":7}'
-  tags: [implemented]
-- label: run-tb21-subset.sh supports K_TRIALS env (default 1) passing --n-attempts to harbor for both mi and terminus harnesses
-  command: DRY_RUN=1 K_TRIALS=3 LIMIT=1 OUT_ROOT=/tmp/mi-facts-dryrun ./mi_harbor/run-tb21-subset.sh 2>/dev/null | grep -q -- '--n-attempts 3' && ! (DRY_RUN=1 LIMIT=1 OUT_ROOT=/tmp/mi-facts-dryrun ./mi_harbor/run-tb21-subset.sh 2>/dev/null | grep -q -- '--n-attempts')
-  tags: [implemented]
-- label: mi_harbor/passrate.py aggregates all attempts per task across run dirs into pass rates with Wilson 95% CIs, expected score ± SE, stable-pass/stable-fail/flaky sets, exception failure-mode annotations, and a --json mode
-  command: ./mi_harbor/passrate.py --json bench/terminal-bench-2.1-subset/deepseek_deepseek-v4-flash/20260705-232414 | python3 -c 'import json,sys; d=json.load(sys.stdin); s=d["summary"]; assert s["n_tasks"]==22 and s["expected_score"]==12.0'
-  tags: [implemented]
-- label: mi_harbor/compare-runs.py compares two eval variants (--a/--b run dir sets, reusing passrate.py parsing): per-task Fisher exact table for differing tasks, smoothed-variance z-test verdict (SIGNAL/NOISE with 12-vs-18 single-run pair judged NOISE), 80%-power trial-count hint, --json mode, exit 0 on success regardless of verdict
-  command: ./mi_harbor/compare-runs.py --a bench/terminal-bench-2.1-subset/deepseek_deepseek-v4-flash/20260705-232414 --b bench/terminal-bench-2.1-subset/deepseek_deepseek-v4-flash/20260705-232414 | grep -q "verdict: NOISE"
-  tags: [implemented]
-- label: compare-runs.py Fisher exact implementation matches published two-sided values (e.g. [[3,0],[0,3]] p=0.1, [[5,0],[0,5]] p~=0.00794)
-  command: python3 -c "import sys,importlib; sys.path.insert(0,\"mi_harbor\"); cr=importlib.import_module(\"compare-runs\"); assert abs(cr.fisher_exact_two_sided(3,0,0,3)-0.1)<1e-9; assert abs(cr.fisher_exact_two_sided(5,0,0,5)-2/252)<1e-9"
-  tags: [implemented]
+  command: grep -q 'test results are GROUND TRUTH' bench/mi_agent.py && grep -q 'hidden external verifier' bench/mi_agent.py && grep -q 'EVERY goal-stated output path' bench/mi_agent.py && grep -q 'never NACK for margin' bench/mi_agent.py
+- label: harbor adapter writes an AGENTS.md workspace snapshot in the detected workdir before the goal loop
+  command: grep -q 'Workspace Snapshot' bench/mi_agent.py && grep -q 'detect_workdir' bench/mi_agent.py
+- label: eval determinism knobs are agent kwargs (temperature 0, seed 42, OpenRouter provider pin alibaba with allow_fallbacks false) merged into MI_API_PARAMS; the pin applies only to openrouter models
+  command: grep -Pzq 'temperature: 0\n\s+seed: 42\n\s+provider: alibaba' bench/configs/mi.yaml && grep -q '"allow_fallbacks": False' bench/mi_agent.py && grep -q 'provider == "openrouter"' bench/mi_agent.py
+- label: bench/compare.py reads Harbor job/trial result.json (Harbor's mean and pass@k shown as-is), pools trials per task, and gives per-task Fisher exact plus a smoothed z-test SIGNAL/NOISE verdict on common tasks
+  command: python3 -c "import sys; sys.path.insert(0,'bench'); import compare as c; assert abs(c.fisher_exact_two_sided(3,0,0,3)-0.1)<1e-9; assert abs(c.fisher_exact_two_sided(5,0,0,5)-2/252)<1e-9"
+- label: past benchmark scores and findings live in docs/benchmark-history.md; old run data is archived at ~/archive/mi-bench-2026-09-26/
+  command: grep -q '38/89' docs/benchmark-history.md && grep -q '50/89' docs/benchmark-history.md && grep -q 'mi-bench-2026-09-26' docs/benchmark-history.md
 
 # benchmark
-- label: 2026-06-18 Terminal-Bench 2.1 full mi vs terminus-2 comparison is stored under docs
-  command: test -f docs/terminal-bench-2.1-full-comparison-2026-06-18.md && grep -q 'mi.*38/89' docs/terminal-bench-2.1-full-comparison-2026-06-18.md && grep -q 'terminus-2.*46/89' docs/terminal-bench-2.1-full-comparison-2026-06-18.md && grep -q 'official-full-deepseek-v4-flash-tb21-20260617-232838' docs/terminal-bench-2.1-full-comparison-2026-06-18.md
-- label: 2026-06-18 Terminal-Bench 2.1 mi failure analysis is stored under docs
-  command: test -f docs/terminal-bench-2.1-mi-failure-analysis-2026-06-18.md && grep -q 'False completion after normal exit.*20' docs/terminal-bench-2.1-mi-failure-analysis-2026-06-18.md && grep -q 'Agent timeout at task budget.*28' docs/terminal-bench-2.1-mi-failure-analysis-2026-06-18.md && grep -q 'Replace the Harbor adapter' docs/terminal-bench-2.1-mi-failure-analysis-2026-06-18.md
-- label: Terminal-Bench 2.1 summarizer supports mi-only result directories
-  command: grep -q 'if (!existsSync(root)) return null' scripts/summarize-terminal-bench-2-1.mjs && grep -q 'results.mi && brief(results.mi)' scripts/summarize-terminal-bench-2-1.mjs
-- label: 2026-06-18 goal-hardened mi-only Terminal-Bench 2.1 run scored 50/89
-  command: test -f docs/terminal-bench-2.1-goal-hardening-mi-only-2026-06-18.md && grep -q 'Score: `50/89`' docs/terminal-bench-2.1-goal-hardening-mi-only-2026-06-18.md && grep -q 'Goal-hardened mi: `50/89`' docs/terminal-bench-2.1-goal-hardening-mi-only-2026-06-18.md
-- label: 2026-06-19 goal-hardened mi failure analysis classifies 39 failed Terminal-Bench 2.1 tasks
-  command: test -f docs/terminal-bench-2.1-goal-hardening-failure-analysis-2026-06-19.md && grep -q 'False ACK after normal exit | 14' docs/terminal-bench-2.1-goal-hardening-failure-analysis-2026-06-19.md && grep -q 'Timeout while still incomplete | 22' docs/terminal-bench-2.1-goal-hardening-failure-analysis-2026-06-19.md && grep -q 'Non-zero agent or infrastructure exit | 3' docs/terminal-bench-2.1-goal-hardening-failure-analysis-2026-06-19.md
 - label: goal loop skips LLM judge with a mechanical NACK while no declared artifact exists — mech NACKs are exempt from strategy/blockerSig accounting
   command: grep -q 'missingAll' tools/goal.mjs && grep -q "emit('judge_skipped'" tools/goal.mjs && grep -q 'implementation does not exist yet; write the artifact first' tools/goal.mjs && grep -qF '!last.ok && !last.mech' tools/goal.mjs && grep -qF 'existsSync, readFileSync } from "fs"' tools/goal.mjs
 - label: goal loop keeps a per-criterion measured/expected ledger from judge NACKs and injects a PARAMETER HISTORY table into the worker checkpoint when >=2 different measured values exist for the same criterion (capped at 5 entries)
@@ -302,7 +254,4 @@
 # observability
 - label: SSE parser prints '[provider] Name (model)' to stderr once per distinct provider value per process when chunks carry a top-level provider field (OpenRouter); no-op when absent
   command: grep -q 'seenProviders' index.mjs && grep -q '\[provider\]' index.mjs
-  tags: [implemented]
-- label: mi_harbor/provider-report.sh <run-dir> prints per-task provider counts from trial agent/mi-stderr.txt and mi-output.txt logs
-  command: test -x mi_harbor/provider-report.sh && grep -q '\[provider\]' mi_harbor/provider-report.sh
   tags: [implemented]

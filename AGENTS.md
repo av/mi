@@ -11,7 +11,7 @@ Bundled skills and user skills are loaded through the `skill` tool from `skills/
 The `goal` tool (`tools/goal.mjs`) uses a planner/worker/judge loop. It supports budget-aware iteration via `deadline` (unix timestamp): phases shift from EXPLORE → COMMIT → URGENT → SALVAGE as time runs out, with a forced artifact-write salvage pass before timeout. The planner emits an `ARTIFACTS:` line (driving a draft-first worker directive when required outputs are still missing past 25% of budget), a `CONSTRAINTS` list (every numeric bound, enumerated endpoint/RPC/file/field, and format rule quoted verbatim from the goal text) that the judge must answer with a per-constraint `MEASURED:` value or NACK, and an `INVARIANTS` section of input-derived conservation checks that the judge executes against the pristine input before ACK. The judge uses a strict adversarial verification protocol (exact thresholds with 5%-margin risk notes, measured values, edge-case probing) with observational-only probes — it never kills services or writes to service control channels. For single-answer deliverables it cross-validates by a method different in kind from the worker's, re-deriving recipe/region/window quantities on the goal's literal measurement basis, and — when an answer cannot be re-derived within budget — requires evidence of a second independent derivation in the worker's log before ACK. For network services it runs an external-client runtime probe, exercising every goal-documented endpoint/RPC as a fresh external client and asserting the stated status/shape, plus a verbatim-identifier guard that greps artifacts for each goal-named identifier byte-for-byte. ACKs are confirmed by a blind skeptical recheck (task text only, no plan context, element-by-element measurement) when idle budget remains. Workers receive structured checkpoints and strategy diversity enforcement to avoid repeating failed approaches; a pivot to a structurally different method is armed either by budget (>30% elapsed with declared artifacts still missing) or by signature — two consecutive identical judge-NACK blocker signatures. Per-iteration worker cost is phase-gated: EXPLORE may spend the full usable remaining budget, but COMMIT/URGENT iterations are capped at 50% of remaining so a runaway sweep is cut off with budget banked for a salvage artifact-write. The final salvage pass bans kill verbs (a `salvage_kill_violation` lint fires if one appears), leaving every process alive for the external verifier. Background jobs in the shared per-session registry (`MI_SESSION_ID`) are polled without LLM calls between worker and judge, capped at 50% of total budget.
 
 `scripts/count-lines.mjs` is a dev utility — not part of the published package (`files` in `package.json` is `index.mjs`, `tools/`, and `skills/`).
-`tests/`, `assets/`, docs, CI config, `scripts/`, and `mi_harbor/` are also excluded from the npm package by `.npmignore` / `package.json` publishing rules.
+`tests/`, `assets/`, docs, CI config, `scripts/`, and `bench/` are also excluded from the npm package by `.npmignore` / `package.json` publishing rules.
 
 ## Running locally
 
@@ -40,76 +40,21 @@ The test suite is real and should be kept green. It covers CLI modes, streaming 
 - No type annotations, no imports beyond Node builtins and `fetch` (available natively in Node 18+).
 - Run `npm test` after non-trivial edits.
 
-## Harbor benchmark adapter
+## Benchmarking (Harbor)
 
-`mi_harbor/` contains a Python adapter and helper scripts for running `mi` against Harbor-supported benchmarks such as Terminal-Bench 2.0.
-It is development/evaluation infrastructure, not part of the published npm CLI.
-The adapter automatically computes `MI_DEADLINE` from `MI_TASK_TIMEOUT` (with 60s verifier buffer) to enable budget-aware goal iteration.
-See `mi_harbor/README.md` for setup and commands.
-
-## Harbor eval launch commands
-
-All committed Harbor run scripts use `mi_harbor.cached_docker_environment:MiCachedDockerEnvironment`, which derives persistent `mi-eval-cache:<hash>` images from Terminal-Bench task images and installs the current checkout under `/opt/mi`.
-
-For a fast OpenRouter + DeepSeek-V4-Flash smoke run:
+`bench/` holds the Harbor installed agent (`bench.mi_agent:MiAgent`), Harbor job configs, a pinned Harbor wrapper and `compare.py`.
+It is evaluation infrastructure, not part of the published npm CLI. The adapter uploads the local checkout to `/opt/mi`, runs `mi -g <task> -c <check>`, and derives `MI_TASK_TIMEOUT`/`MI_DEADLINE`/`MI_GOAL_MAX` from the trial's real agent timeout.
 
 ```sh
-./mi_harbor/run-smoke.sh
+export OPENROUTER_API_KEY=...
+npm run bench:smoke                 # 2 tasks
+npm run bench:subset                # 10 tasks
+npm run bench:full                  # Terminal-Bench 2.1, 89 tasks
+npm run bench:subset -- -k 3        # extra args go to `harbor run`
+npm run bench:compare -- jobs/<a>   # pass rates; --a <dirs> --b <dirs> for A/B
 ```
 
-The smoke defaults to `TASK=fix-git`, `MODEL=deepseek/deepseek-v4-flash`, and `OPENAI_BASE_URL=https://openrouter.ai/api/v1`. It reads `OPENAI_API_KEY` from the environment or `OPENROUTER_API_KEY` in `~/.hermes/.env`.
-
-For a local OpenAI-compatible server:
-
-```sh
-OPENAI_BASE_URL=http://localhost:33831 \
-MODEL='unsloth/Qwen3.6-35B-A3B-GGUF:Q4_K_XL' \
-OPENAI_API_KEY=dummy \
-./mi_harbor/run-subset.sh
-```
-
-To run one explicit `mi` task through Harbor:
-
-```sh
-export PYTHONPATH="$PWD"
-export OPENAI_API_KEY="${OPENAI_API_KEY:-$(grep '^OPENROUTER_API_KEY=' ~/.hermes/.env | cut -d= -f2-)}"
-export OPENAI_BASE_URL=https://openrouter.ai/api/v1
-export MODEL=deepseek/deepseek-v4-flash
-
-uvx --from harbor harbor run \
-  --dataset terminal-bench@2.0 \
-  --agent-import-path mi_harbor.mi_agent:MiAgent \
-  --environment-import-path mi_harbor.cached_docker_environment:MiCachedDockerEnvironment \
-  --model openai/deepseek/deepseek-v4-flash \
-  --agent-timeout-multiplier 0.25 \
-  --n-concurrent 1 \
-  --n-tasks 1 \
-  --include-task-name fix-git \
-  --jobs-dir jobs/mi-single-fix-git-$(date +%Y%m%d-%H%M%S) \
-  --yes
-```
-
-To compare against Harbor's built-in `terminus-2` harness on the same task/image path:
-
-```sh
-export PYTHONPATH="$PWD"
-export OPENAI_API_KEY="${OPENAI_API_KEY:-$(grep '^OPENROUTER_API_KEY=' ~/.hermes/.env | cut -d= -f2-)}"
-
-uvx --from harbor harbor run \
-  --dataset terminal-bench@2.0 \
-  --agent terminus-2 \
-  --environment-import-path mi_harbor.cached_docker_environment:MiCachedDockerEnvironment \
-  --model openai/deepseek/deepseek-v4-flash \
-  --agent-kwarg api_base=https://openrouter.ai/api/v1 \
-  --agent-timeout-multiplier 0.25 \
-  --n-concurrent 1 \
-  --n-tasks 1 \
-  --include-task-name fix-git \
-  --jobs-dir jobs/terminus-single-fix-git-$(date +%Y%m%d-%H%M%S) \
-  --yes
-```
-
-Use `docs/harness-comparison-2026-05-24.md` as the current small apples-to-apples comparison snapshot. It uses `fix-git`, `merge-diff-arc-agi-task`, and `openssl-selfsigned-cert` with DeepSeek-V4-Flash, `--n-concurrent 1`, and `--agent-timeout-multiplier 0.25`.
+See `docs/benchmarking.md` (how to run, knobs) and `docs/benchmark-history.md` (past scores and findings).
 
 ## Publishing
 

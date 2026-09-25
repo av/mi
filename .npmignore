@@ -1,6 +1,6 @@
 # dev utilities
 scripts/
-mi_harbor/
+bench/
 
 # tests
 tests/

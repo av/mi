@@ -1,0 +1,16 @@
+# Subset: 10 Terminal-Bench 2.1 tasks from the 22-task discriminative subset
+# (docs/benchmark-history.md) — 7 stable passes, 2 flaky, 1 stable fail,
+# all under ~15 min. Expected from the 2026-07-21 k=3 run: 8.3/10.
+datasets:
+  - name: terminal-bench/terminal-bench-2-1
+    task_names:
+      - terminal-bench/vulnerable-secret
+      - terminal-bench/openssl-selfsigned-cert
+      - terminal-bench/log-summary-date-ranges
+      - terminal-bench/kv-store-grpc
+      - terminal-bench/nginx-request-logging
+      - terminal-bench/prove-plus-comm
+      - terminal-bench/fix-git
+      - terminal-bench/code-from-image
+      - terminal-bench/extract-elf
+      - terminal-bench/count-dataset-tokens
