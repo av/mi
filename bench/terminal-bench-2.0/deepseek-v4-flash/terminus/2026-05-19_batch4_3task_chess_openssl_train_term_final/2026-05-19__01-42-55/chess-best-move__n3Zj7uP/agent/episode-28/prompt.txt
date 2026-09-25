@@ -1,4 +1,0 @@
-New Terminal Output:
-
-root@1d7c18d8cd63:/app# apt-get install -y mrgingham python3-mrgingham curl 2>&1 | tail -10
-

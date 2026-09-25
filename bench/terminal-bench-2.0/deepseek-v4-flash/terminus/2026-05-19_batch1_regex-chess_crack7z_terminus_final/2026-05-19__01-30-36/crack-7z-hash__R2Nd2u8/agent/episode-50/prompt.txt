@@ -1,4 +1,0 @@
-Previous response had parsing errors:
-ERROR: Invalid JSON: Expecting ',' delimiter: line 17 column 18 (char 719) | Content preview: '{\n  "analysis": "The script ran but no output was shown. This could mean the password wasn\'t found w'...
-
-Please fix these issues and provide a proper JSON response.

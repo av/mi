@@ -1,8 +1,0 @@
-New Terminal Output:
-
-root@65d87fd22d30:/app/john/run#
--rwxr-xr-x. 1 root root 22647944 Oct 31  2025 /app/john/run/john
--rw-r--r--. 1 root root    33024 Oct 31  2025 /app/john/run/john.bash_completion
--rw-r--r--. 1 root root   126985 Oct 31  2025 /app/john/run/john.conf
--rw-r--r--. 1 root root     8928 Oct 31  2025 /app/john/run/john.zsh_completion
-root@65d87fd22d30:/app/john/run#

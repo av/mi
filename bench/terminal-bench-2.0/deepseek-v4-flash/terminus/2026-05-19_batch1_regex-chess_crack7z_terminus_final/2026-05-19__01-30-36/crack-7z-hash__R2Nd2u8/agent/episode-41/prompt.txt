@@ -1,5 +1,0 @@
-New Terminal Output:
-
-root@65d87fd22d30:/app#
-py7zr is available
-root@65d87fd22d30:/app#

@@ -1,4 +1,0 @@
-Previous response had parsing errors:
-ERROR: Invalid JSON: Expecting ',' delimiter: line 26 column 33 (char 1007) | Content preview: '{\n  "analysis": "The JSON keeps having parsing errors due to invalid syntax (extra \'duration\' key wi'...
-
-Please fix these issues and provide a proper JSON response.

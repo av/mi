@@ -1,9 +1,0 @@
-New Terminal Output:
-
-root@65d87fd22d30:/app#
-ERROR: Data Error in encrypted file. Wrong password? : secrets/secret_file.txt
-Sub items Errors: 1
-Archives with Errors: 1
-Sub items Errors: 1
-root@65d87fd22d30:/app#
-root@65d87fd22d30:/app#

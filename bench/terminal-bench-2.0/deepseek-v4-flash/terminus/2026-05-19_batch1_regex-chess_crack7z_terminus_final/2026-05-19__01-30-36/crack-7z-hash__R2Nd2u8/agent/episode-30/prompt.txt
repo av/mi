@@ -1,4 +1,0 @@
-New Terminal Output:
-
-Press 'q' or Ctrl-C to abort, 'h' for help, almost any other key for status
-

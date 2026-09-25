@@ -1,9 +1,0 @@
-New Terminal Output:
-
-root@65d87fd22d30:/app/john/run#
-Selecting previously unselected package libcompress-raw-lzma-perl:amd64.
-(Reading database ... 17162 files and directories currently installed.)
-Preparing to unpack .../libcompress-raw-lzma-perl_2.209-1build2_amd64.deb ...
-Unpacking libcompress-raw-lzma-perl:amd64 (2.209-1build2) ...
-Setting up libcompress-raw-lzma-perl:amd64 (2.209-1build2) ...
-root@65d87fd22d30:/app/john/run#

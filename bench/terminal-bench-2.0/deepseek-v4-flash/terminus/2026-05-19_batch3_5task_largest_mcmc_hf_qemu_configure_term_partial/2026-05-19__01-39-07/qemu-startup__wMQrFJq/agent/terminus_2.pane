@@ -1,334 +1,0 @@
-[?2004hroot@c13b8dc816d1:/app# asciinema rec --stdin /logs/agent/recording.cast
-[?2004l[0;32masciinema: recording asciicast to /logs/agent/recording.cast[0m
-[0;32masciinema: press <ctrl-d> or type "exit" when you're done[0m
-[?2004hroot@c13b8dc816d1:/app# clear
-[?2004l[H[J[?2004hroot@c13b8dc816d1:/app# ls -la /app/
-[?2004ltotal 980164
-drwxr-xr-x. 1 root root         34 Oct 22  2025 .
-drwxr-xr-x. 1 root root         34 May 18 23:51 ..
--rw-r--r--. 1 root root     197120 Oct 22  2025 alpine-disk.qcow2
--rw-r--r--. 1 root root 1003487232 Dec  7  2023 alpine.iso
-[?2004hroot@c13b8dc816d1:/app# which qemu-system-x86_64 || which qemu || apt-get update && apt-get install -y qemu-system-x86 2>/dev/null
-[?2004l/usr/bin/qemu-system-x86_64
-Reading package lists... 0%Reading package lists... 0%Reading package lists... 0%Reading package lists... 93%Reading package lists... 93%Reading package lists... 98%Reading package lists... 98%Reading package lists... 99%Reading package lists... 99%Reading package lists... Done
-Building dependency tree... 0%Building dependency tree... 0%Building dependency tree... 50%Building dependency tree... 50%Building dependency tree... Done
-Reading state information... 0% Reading state information... 0%Reading state information... Done
-qemu-system-x86 is already the newest version (1:5.2+dfsg-11+deb11u5).
-0 upgraded, 0 newly installed, 0 to remove and 0 not upgraded.
-[?2004hroot@c13b8dc816d1:/app# qemu-system-x86_64 -cdrom /app/alpine.iso -hda /app/alpine-disk.qcow2 -serial telnet:0.0.0.0:6665,server,nowait -nographic -m 256M -boot d &> /tmp/qemu.log &
-[?2004l[1] 121
-[?2004hroot@c13b8dc816d1:/app# echo $!
-[?2004l121
-[?2004hroot@c13b8dc816d1:/app# ss -tlnp | grep 6665
-[?2004lbash: ss: command not found
-
-[1]+  Stopped                 qemu-system-x86_64 -cdrom /app/alpine.iso -hda /app/alpine-disk.qcow2 -serial telnet:0.0.0.0:6665,server,nowait -nographic -m 256M -boot d &> /tmp/qemu.log
-[?2004hroot@c13b8dc816d1:/app# kill 121 2>/dev/null; sleep 0.2
-[?2004l[?2004hroot@c13b8dc816d1:/app# cat /tmp/qemu.log 2>/dev/null || echo "(no log)"
-[?2004l[?2004hroot@c13b8dc816d1:/app# apt-get install -y netcat-openbsd 2>/dev/null || true
-[?2004lReading package lists... 0%Reading package lists... 0%Reading package lists... 0%Reading package lists... 93%Reading package lists... 93%Reading package lists... 98%Reading package lists... 98%Reading package lists... 99%Reading package lists... 99%Reading package lists... Done
-Building dependency tree... 0%Building dependency tree... 0%Building dependency tree... 50%Building dependency tree... 50%Building dependency tree... Done
-Reading state information... 0% Reading state information... 0%Reading state information... Done
-netcat-openbsd is already the newest version (1.217-3).
-netcat-openbsd set to manually installed.
-0 upgraded, 0 newly installed, 0 to remove and 0 not upgraded.
-[?2004hroot@c13b8dc816d1:/app# which nc nc.traditional 2>/dev/null
-[?2004l/bin/nc
-[?2004hroot@c13b8dc816d1:/app# setsid qemu-system-x86_64 -cdrom /app/alpine.iso -hda /app/alpine-disk.qcow2 -serial telnet:0.0.0.0:6665,server,nowait -nographic -m 256M -boot d </dev/null &>/tmp/qemu.log &
-[?2004l[2] 210
-[?2004hroot@c13b8dc816d1:/app# echo "QEMU PID: $!"
-[?2004lQEMU PID: 210
-[?2004hroot@c13b8dc816d1:/app# for i in $(seq 1 30); do
-[?2004l[2]-  Done                    setsid qemu-system-x86_64 -cdrom /app/alpine.iso -hda /app/alpine-disk.qcow2 -serial telnet:0.0.0.0:6665,server,nowait -nographic -m 256M -boot d < /dev/null &> /tmp/qemu.log
-[?2004h>   if nc -z 127.0.0.1 6665 2>/dev/null; then
-[?2004l[?2004h>     echo "Port 6665 is ready!"
-[?2004l[?2004h>     exit 0
-[?2004l[?2004h>   fi
-[?2004l[?2004h>   echo "Waiting... $i"
-[?2004l[?2004h>   sleep 1
-[?2004l[?2004h> done
-[?2004lPort 6665 is ready!
-exit
-There are stopped jobs.
-Waiting... 1
-Port 6665 is ready!
-exit
-There are stopped jobs.
-Waiting... 2
-Port 6665 is ready!
-exit
-There are stopped jobs.
-Waiting... 3
-Port 6665 is ready!
-exit
-There are stopped jobs.
-Waiting... 4
-Port 6665 is ready!
-exit
-There are stopped jobs.
-Waiting... 5
-Port 6665 is ready!
-exit
-There are stopped jobs.
-Waiting... 6
-Port 6665 is ready!
-exit
-There are stopped jobs.
-Waiting... 7
-Port 6665 is ready!
-exit
-There are stopped jobs.
-Waiting... 8
-Port 6665 is ready!
-exit
-There are stopped jobs.
-Waiting... 9
-Port 6665 is ready!
-exit
-There are stopped jobs.
-Waiting... 10
-Port 6665 is ready!
-exit
-There are stopped jobs.
-Waiting... 11
-Port 6665 is ready!
-exit
-There are stopped jobs.
-Waiting... 12
-Port 6665 is ready!
-exit
-There are stopped jobs.
-Waiting... 13
-Port 6665 is ready!
-exit
-There are stopped jobs.
-Waiting... 14
-Port 6665 is ready!
-exit
-There are stopped jobs.
-Waiting... 15
-Port 6665 is ready!
-exit
-There are stopped jobs.
-Waiting... 16
-Port 6665 is ready!
-exit
-There are stopped jobs.
-Waiting... 17
-Port 6665 is ready!
-exit
-There are stopped jobs.
-Waiting... 18
-Port 6665 is ready!
-exit
-There are stopped jobs.
-Waiting... 19
-Port 6665 is ready!
-exit
-There are stopped jobs.
-Waiting... 20
-Port 6665 is ready!
-exit
-There are stopped jobs.
-Waiting... 21
-Port 6665 is ready!
-exit
-There are stopped jobs.
-Waiting... 22
-Port 6665 is ready!
-exit
-There are stopped jobs.
-Waiting... 23
-Port 6665 is ready!
-exit
-There are stopped jobs.
-Waiting... 24
-Port 6665 is ready!
-exit
-There are stopped jobs.
-Waiting... 25
-Port 6665 is ready!
-exit
-There are stopped jobs.
-Waiting... 26
-Port 6665 is ready!
-exit
-There are stopped jobs.
-Waiting... 27
-Port 6665 is ready!
-exit
-There are stopped jobs.
-Waiting... 28
-Port 6665 is ready!
-exit
-There are stopped jobs.
-Waiting... 29
-Port 6665 is ready!
-exit
-There are stopped jobs.
-Waiting... 30
-[?2004hroot@c13b8dc816d1:/app# echo "Timed out waiting for port 6665"
-[?2004lTimed out waiting for port 6665
-[?2004hroot@c13b8dc816d1:/app# cat /tmp/qemu.log 2>/dev/null || echo "(no log)"
-[?2004lQEMU 5.2.0 monitor - type 'help' for more information
-(qemu) [?2004hroot@c13b8dc816d1:/app# ps aux | grep qemu
-[?2004lbash: ps: command not found
-[?2004hroot@c13b8dc816d1:/app# apt-get install -y procps 2>/dev/null
-[?2004lReading package lists... 0%Reading package lists... 0%Reading package lists... 0%Reading package lists... 93%Reading package lists... 93%Reading package lists... 98%Reading package lists... 98%Reading package lists... 99%Reading package lists... 99%Reading package lists... Done
-Building dependency tree... 0%Building dependency tree... 0%Building dependency tree... 50%Building dependency tree... 50%Building dependency tree... Done
-Reading state information... 0% Reading state information... 0%Reading state information... Done
-The following additional packages will be installed:
-  libprocps8 psmisc
-The following NEW packages will be installed:
-  libprocps8 procps psmisc
-0 upgraded, 3 newly installed, 0 to remove and 0 not upgraded.
-Need to get 764 kB of archives.
-After this operation, 2635 kB of additional disk space will be used.
-0% [Working]            Get:1 http://deb.debian.org/debian bullseye/main amd64 libprocps8 amd64 2:3.3.17-5 [63.9 kB]
-0% [1 libprocps8 2058 B/63.9 kB 3%]                                   13% [Working]             Get:2 http://deb.debian.org/debian bullseye/main amd64 procps amd64 2:3.3.17-5 [502 kB]
-14% [2 procps 8192 B/502 kB 2%]                               73% [Waiting for headers]fg 2>/dev/null || true
-                         Get:3 http://deb.debian.org/debian bullseye/main amd64 psmisc amd64 23.4-2 [198 kB]
-73% [3 psmisc 1408 B/198 kB 1%]                               100% [Working]              Fetched 764 kB in 0s (1727 kB/s)
-Selecting previously unselected package libprocps8:amd64.
-(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 22331 files and directories currently installed.)
-Preparing to unpack .../libprocps8_2%3a3.3.17-5_amd64.deb ...
-Unpacking libprocps8:amd64 (2:3.3.17-5) ...
-Selecting previously unselected package procps.
-Preparing to unpack .../procps_2%3a3.3.17-5_amd64.deb ...
-Unpacking procps (2:3.3.17-5) ...
-Selecting previously unselected package psmisc.
-Preparing to unpack .../psmisc_23.4-2_amd64.deb ...
-Unpacking psmisc (23.4-2) ...
-Setting up psmisc (23.4-2) ...
-Setting up libprocps8:amd64 (2:3.3.17-5) ...
-Setting up procps (2:3.3.17-5) ...
-Processing triggers for libc-bin (2.31-13+deb11u13) ...
-[?2004hroot@c13b8dc816d1:/app# ps aux | grep qemu
-[?2004lroot         121  0.0  0.0 139668 33304 pts/1    Tl   23:51   0:00 qemu-system-x86_64 -cdrom /app/alpine.iso -hda /app/alpine-disk.qcow2 -serial telnet:0.0.0.0:6665,server,nowait -nographic -m 256M -boot d
-root         211 43.5  1.0 1804556 1325704 ?     Ssl  23:52   0:40 qemu-system-x86_64 -cdrom /app/alpine.iso -hda /app/alpine-disk.qcow2 -serial telnet:0.0.0.0:6665,server,nowait -nographic -m 256M -boot d
-root         448  0.0  0.0   3616  2144 pts/1    S+   23:53   0:00 grep qemu
-[?2004hroot@c13b8dc816d1:/app# nc -z 127.0.0.1 6665 && echo "Port 6665 is open" || echo "Port 6665 not open"
-[?2004lPort 6665 is open
-[?2004hroot@c13b8dc816d1:/app# kill -9 121 2>/dev/null; echo "killed stopped process"
-[?2004lkilled stopped process
-[?2004hroot@c13b8dc816d1:/app# timeout 3 nc 127.0.0.1 6665 2>&1 || echo "(timeout or connection closed)"
-[?2004lÿûÿûÿû ÿý [1]+  Killed                  qemu-system-x86_64 -cdrom /app/alpine.iso -hda /app/alpine-disk.qcow2 -serial telnet:0.0.0.0:6665,server,nowait -nographic -m 256M -boot d &> /tmp/qemu.log
-(timeout or connection closed)
-[?2004hroot@c13b8dc816d1:/app# ps aux | grep 211 | grep -v grep
-[?2004lroot         211 32.4  1.0 1804556 1325704 ?     Ssl  23:52   0:41 qemu-system-x86_64 -cdrom /app/alpine.iso -hda /app/alpine-disk.qcow2 -serial telnet:0.0.0.0:6665,server,nowait -nographic -m 256M -boot d
-[?2004hroot@c13b8dc816d1:/app# cat /tmp/qemu.log 2>/dev/null | tail -20
-[?2004lQEMU 5.2.0 monitor - type 'help' for more information
-(qemu) [?2004hroot@c13b8dc816d1:/app# which python3 || which python
-[?2004l/usr/bin/python3
-[?2004hroot@c13b8dc816d1:/app# cat > /tmp/wait_for_login.py << 'EOF'
-[?2004l True
-            except socket.timeout:
-                continue
-        print("\n[Timed out waiting for login prompt]")
-        return False
-    finally:
-        sock.close()
-
-if __name__ == '__main__':
-    if wait_for_login('127.0.0.1', 6665):
-        sys.exit(0)
-    else:
-        sys.exit(1)
-EOF
-echo "Script created"
-[?2004h> import socket
-[?2004l[?2004h> import sys
-[?2004l[?2004h> import re
-[?2004l[?2004h> import time
-[?2004l[?2004h> 
-[?2004l[?2004h> def wait_for_login(host, port, timeout=120):
-[?2004l[?2004h>     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-[?2004l[?2004h>     sock.settimeout(timeout)
-[?2004l[?2004h>     try:
-[?2004l[?2004h>         sock.connect((host, port))
-[?2004l[?2004h>         # Give it a moment to start
-[?2004l[?2004h>         time.sleep(1)
-[?2004l[?2004h>         # Send a newline in case it's waiting at boot prompt
-[?2004l[?2004h>         sock.send(b'\n')
-[?2004l[?2004h>         # Wait for login prompt
-[?2004l[?2004h>         data = b''
-[?2004l[?2004h>         end_time = time.time() + timeout
-[?2004l[?2004h>         while time.time() < end_time:
-[?2004l[?2004h>             try:
-[?2004l[?2004h>                 chunk = sock.recv(4096)
-[?2004l[?2004h>                 if not chunk:
-[?2004l[?2004h>                     break
-[?2004l[?2004h>                 data += chunk
-[?2004l[?2004h>                 # Print received data for debugging
-[?2004l[?2004h>                 sys.stdout.write(chunk.decode('utf-8', errors='replace'))
-[?2004l[?2004h>                 sys.stdout.flush()
-[?2004l[?2004h>                 # Check for login prompt
-[?2004l[?2004h>                 if b'login:' in data or b'login' in data:
-[?2004l[?2004h>                     print("\n[Login prompt detected!]")
-[?2004l[?2004h>                     return True
-[?2004l[?2004h>             except socket.timeout:
-[?2004l[?2004h>                 continue
-[?2004l[?2004h>         print("\n[Timed out waiting for login prompt]")
-[?2004l[?2004h>         return False
-[?2004l[?2004h>     finally:
-[?2004l[?2004h>         sock.close()
-[?2004l[?2004h> 
-[?2004l[?2004h> if __name__ == '__main__':
-[?2004l[?2004h>     if wait_for_login('127.0.0.1', 6665):
-[?2004l[?2004h>         sys.exit(0)
-[?2004l[?2004h>     else:
-[?2004l[?2004h>         sys.exit(1)
-[?2004l[?2004h> EOF
-[?2004l[?2004hroot@c13b8dc816d1:/app# echo "Script created"
-[?2004lScript created
-[?2004hroot@c13b8dc816d1:/app# cat /tmp/wait_for_login.py
-[?2004limport socket
-import sys
-import re
-import time
-
-def wait_for_login(host, port, timeout=120):
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.settimeout(timeout)
-    try:
-        sock.connect((host, port))
-        # Give it a moment to start
-        time.sleep(1)
-        # Send a newline in case it's waiting at boot prompt
-        sock.send(b'\n')
-        # Wait for login prompt
-        data = b''
-        end_time = time.time() + timeout
-        while time.time() < end_time:
-            try:
-                chunk = sock.recv(4096)
-                if not chunk:
-                    break
-                data += chunk
-                # Print received data for debugging
-                sys.stdout.write(chunk.decode('utf-8', errors='replace'))
-                sys.stdout.flush()
-                # Check for login prompt
-                if b'login:' in data or b'login' in data:
-                    print("\n[Login prompt detected!]")
-                    return True
-            except socket.timeout:
-                continue
-        print("\n[Timed out waiting for login prompt]")
-        return False
-    finally:
-        sock.close()
-
-if __name__ == '__main__':
-    if wait_for_login('127.0.0.1', 6665):
-        sys.exit(0)
-    else:
-        sys.exit(1)
-[?2004hroot@c13b8dc816d1:/app# timeout 120 python3 /tmp/wait_for_login.py
-[?2004lï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ 
-Welcome to Alpine Linux 3.19
-Kernel 6.6.4-1-lts on an x86_64 (/dev/ttyS0)
-
-localhost login:
-[Login prompt detected!]
-[?2004hroot@c13b8dc816d1:/app# 

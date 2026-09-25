@@ -1,6 +1,0 @@
-New Terminal Output:
-
-root@65d87fd22d30:/app#
-tail: cannot open 'timet' for reading: No such file or directory
-tail: cannot open '5' for reading: No such file or directory
-root@65d87fd22d30:/app#

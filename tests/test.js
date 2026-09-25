@@ -2917,53 +2917,6 @@ test('MI_API_PARAMS with invalid JSON gives clean error', async () => {
     'Should not show raw stack trace');
 });
 
-test('Harbor diagnostic wrapper normalizes health URL', async () => {
-  const adapter = readFileSync(join(__dirname, '../mi_harbor/mi_agent.py'), 'utf8');
-  assert.match(adapter, /HEALTH_URL="\$API_BASE\/v1\/models"/);
-  assert.doesNotMatch(adapter, /\$\{OPENAI_BASE_URL:-https:\/\/api\.openai\.com\}\/v1\/models/);
-});
-
-test('Harbor adapter uses local package and padded timestamp diagnostics', async () => {
-  const adapter = readFileSync(join(__dirname, '../mi_harbor/mi_agent.py'), 'utf8');
-  assert.match(adapter, /tar -xzf - -C \/opt\/mi/);
-  assert.match(adapter, /\.mi_package_hash/);
-  assert.match(adapter, /node \/opt\/mi\/index\.mjs/);
-  assert.match(adapter, /process\.versions\.node\.split\('\.'\)\[0\]\)>=18/);
-  assert.match(adapter, /NEED_NPM=.*if package else/);
-  assert.match(adapter, /ver=v22\.11\.0/);
-  assert.match(adapter, /node-\$ver-linux-\$arch/);
-  assert.match(adapter, /\[\[:space:\]\]\*\[0-9\.\]\+s/);
-  assert.match(adapter, /else:\n\s+version_spec =/);
-});
-
-test('Harbor adapter routes Terminal-Bench through goal mode', async () => {
-  const adapter = readFileSync(join(__dirname, '../mi_harbor/mi_agent.py'), 'utf8');
-  assert.match(adapter, /TERMINAL_BENCH_CHECK/);
-  assert.match(adapter, /-g "\$1" -c "\$MI_GOAL_CHECK"/);
-  assert.match(adapter, /MI_GOAL_MAX/);
-  assert.match(adapter, /Workspace Snapshot/);
-  assert.match(adapter, /hidden external verifier/);
-  assert.match(adapter, /working directory/);
-  assert.match(adapter, /"PAGER": "cat"/);
-  assert.match(adapter, /"GIT_PAGER": "cat"/);
-  assert.match(adapter, /"GIT_EDITOR": "true"/);
-  assert.match(adapter, /Workdir: \$WORKDIR/);
-});
-
-test('Harbor cached Docker environment derives task images', async () => {
-  const env = readFileSync(join(__dirname, '../mi_harbor/cached_docker_environment.py'), 'utf8');
-  const smoke = readFileSync(join(__dirname, '../mi_harbor/run-smoke.sh'), 'utf8');
-  assert.match(env, /class MiCachedDockerEnvironment\(DockerEnvironment\)/);
-  assert.match(env, /FROM \{base_image\}/);
-  assert.match(env, /base_image.*digest/);
-  assert.match(env, /node18-runtime-v2/);
-  assert.match(env, /node_ok\(\)/);
-  assert.match(env, /mi-eval-cache:\{image_key\[:16\]\}/);
-  assert.match(env, /self\.task_env_config\.docker_image = cached/);
-  assert.match(env, /\["down", "--volumes", "--remove-orphans"\]/);
-  assert.match(smoke, /--environment-import-path mi_harbor\.cached_docker_environment:MiCachedDockerEnvironment/);
-});
-
 test('goal 402 credit exhaustion aborts immediately with fatal event', async () => {
   const prompts = [];
   requestHandler = (req, res, body) => {

@@ -1,5 +1,0 @@
-New Terminal Output:
-
-root@65d87fd22d30:/app#
-/app/john/run/7z2john.pl
-root@65d87fd22d30:/app#

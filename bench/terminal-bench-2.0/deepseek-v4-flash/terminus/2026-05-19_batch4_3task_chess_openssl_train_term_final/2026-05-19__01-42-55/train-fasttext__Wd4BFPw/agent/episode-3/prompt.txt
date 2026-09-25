@@ -1,4 +1,0 @@
-Previous response had parsing errors:
-ERROR: Invalid JSON: Expecting ',' delimiter: line 15 column 22 (char 1184) | Content preview: '{\n  "analysis": "fasttext pip install failed because the C++ compiler doesn\'t support C++17. I need '...
-
-Please fix these issues and provide a proper JSON response.

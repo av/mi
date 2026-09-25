@@ -1,5 +1,0 @@
-New Terminal Output:
-
-root@1d7c18d8cd63:/app# which convert identify 2>/dev/null; dpkg -f /usr/bin/convert 2>/dev/null && echo "ImageMagick found" || echo "not found"
-not found
-root@1d7c18d8cd63:/app#

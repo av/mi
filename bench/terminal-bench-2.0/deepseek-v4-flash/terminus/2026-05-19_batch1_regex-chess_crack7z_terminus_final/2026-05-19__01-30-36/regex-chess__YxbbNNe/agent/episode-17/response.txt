@@ -1,6 +1,0 @@
-The terminal output hasn't come back yet. Let me wait{
-  "analysis": "The command was executed but I don't see the output yet. I need to wait for the terminal output.",
-  "plan": "Wait for the command to finish and see the output.",
-  "commands": [],
-  "task_complete": false
-}

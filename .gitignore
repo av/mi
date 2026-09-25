@@ -3,5 +3,5 @@ node_modules/
 .ruff_cache/
 __pycache__/
 *.pyc
+# Harbor job output (bench/run.sh writes here); old runs: ~/archive/mi-bench-2026-09-26/
 jobs/
-bench/

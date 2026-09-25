@@ -1,6 +1,0 @@
-[2026-05-18T23:44:45+00:00] === MI AGENT START ===
-[2026-05-18T23:44:45+00:00] LLM endpoint: https://openrouter.ai/api/v1 (normalized: https://openrouter.ai/api/v1/models)
-[2026-05-18T23:44:45+00:00] Model: deepseek/deepseek-v4-flash
-[2026-05-18T23:44:45+00:00] Pre-flight LLM connectivity check...
-[2026-05-18T23:44:45+00:00] Pre-flight completed: HTTP 200 in 0.156625s
-[2026-05-18T23:44:45+00:00] Starting mi agent...

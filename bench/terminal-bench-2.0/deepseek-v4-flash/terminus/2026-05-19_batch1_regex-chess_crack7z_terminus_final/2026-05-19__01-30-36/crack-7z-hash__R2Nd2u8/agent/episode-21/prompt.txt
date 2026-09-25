@@ -1,7 +1,0 @@
-New Terminal Output:
-
-root@65d87fd22d30:/app#
-Traceback (most recent call last):
-  File "<string>", line 1, in <module>
-ModuleNotFoundError: No module named 'py7zr'
-root@65d87fd22d30:/app#

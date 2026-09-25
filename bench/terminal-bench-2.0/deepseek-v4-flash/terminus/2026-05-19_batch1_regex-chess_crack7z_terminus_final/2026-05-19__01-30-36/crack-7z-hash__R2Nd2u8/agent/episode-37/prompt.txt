@@ -1,9 +1,0 @@
-New Terminal Output:
-
-root@65d87fd22d30:/app#
-Reading package lists... Done
-Building dependency tree... Done
-Reading state information... Done
-python3-py7zr is already the newest version (0.11.3+dfsg-8build1).
-0 upgraded, 0 newly installed, 0 to remove and 80 not upgraded.
-root@65d87fd22d30:/app#

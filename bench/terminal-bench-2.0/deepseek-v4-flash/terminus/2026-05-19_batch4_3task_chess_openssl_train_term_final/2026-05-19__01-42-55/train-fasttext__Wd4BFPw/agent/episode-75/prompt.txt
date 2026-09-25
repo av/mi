@@ -1,6 +1,0 @@
-New Terminal Output:
-
-root@fc9984fcd95c:/app# shuf train.txt > train_shuffled.txt
-root@fc9984fcd95c:/app# ls -la train_shuffled.txt
--rw-r--r--. 1 root root 483811554 May 19 00:37 train_shuffled.txt
-root@fc9984fcd95c:/app#
