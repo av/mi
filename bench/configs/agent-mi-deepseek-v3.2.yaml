@@ -1,0 +1,9 @@
+# mi under the same model, provider and sampling as agent-terminus2-deepseek-v3.2.yaml
+# (temperature 0.7, no seed) instead of mi's usual temperature 0 / seed 42.
+agents:
+  - import_path: bench.mi_agent:MiAgent
+    model_name: openrouter/deepseek/deepseek-v3.2
+    kwargs:
+      temperature: 0.7
+      seed: null
+      provider: gmicloud

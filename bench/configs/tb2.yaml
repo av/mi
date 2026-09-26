@@ -1,0 +1,10 @@
+# Terminal-Bench 2.0 (89 tasks) from the Harbor registry, run shape of the
+# published leaderboard submissions: default timeouts, concurrency 4.
+# Stack one or more agent configs on top (agents lists append):
+#   bench/harbor.sh run -c bench/configs/tb2.yaml -c bench/configs/agent-terminus2-deepseek-v3.2.yaml -c bench/configs/agent-mi-deepseek-v3.2.yaml
+jobs_dir: jobs
+n_attempts: 1
+n_concurrent_trials: 4        # shared host: keep <= 4
+datasets:
+  - name: terminal-bench
+    version: "2.0"

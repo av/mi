@@ -38,7 +38,7 @@ summary (mean, pass@k, exceptions). Extra arguments go straight to
 npm run bench:subset -- -k 3                     # 3 trials per task (pass@1..3)
 npm run bench:full -- -n 2                       # lower concurrency
 npm run bench:full -- -d terminal-bench@2.0      # TB 2.0 instead of 2.1
-npm run bench:smoke -- -i 'terminal-bench/fix-git'   # narrow to one task
+npm run bench:smoke -- -d terminal-bench/terminal-bench-2-1 -i terminal-bench/fix-git   # one task (-i needs -d)
 bench/harbor.sh run -c bench/configs/mi.yaml -c my-tasks.yaml   # any other selection
 ```
 

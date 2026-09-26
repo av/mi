@@ -4,6 +4,9 @@
   bench/compare.py JOB_DIR [JOB_DIR ...]          per-task pass rates (all trials pooled)
   bench/compare.py --a JOB_DIR... --b JOB_DIR...  A/B: per-task Fisher exact + signal/noise verdict
 
+JOB_DIR@AGENT keeps only one agent's trials (e.g. jobs/tb2@terminus-2, jobs/tb2@mi)
+when a job ran several agents.
+
 Reads Harbor's own files only: each job's result.json (Harbor's mean and
 pass@k are shown as computed by Harbor) and each trial's result.json
 (task_name, verifier reward, exception). Any directory containing Harbor jobs
@@ -27,15 +30,20 @@ def load(dirs):
     """task -> {"n", "pass", "exc": [..], "providers": set} and the Harbor job summaries."""
     tasks = defaultdict(lambda: {"n": 0, "pass": 0, "exc": [], "providers": set()})
     jobs = []
-    for d in map(Path, dirs):
+    for arg in dirs:
+        d, agent = Path(arg), None
+        if not d.is_dir() and "@" in arg:
+            d, agent = Path(arg.rsplit("@", 1)[0]), arg.rsplit("@", 1)[1]
         if not d.is_dir():
             sys.exit(f"not a directory: {d}")
         for f in sorted(d.rglob("result.json")):
             r = json.loads(f.read_text())
-            if "stats" in r and "n_total_trials" in r:
-                jobs.append((f.parent, r))
+            if "stats" in r and ("n_total_trials" in r or "n_trials" in r["stats"]):
+                jobs.append((f.parent, r, agent))
                 continue
             if "task_name" not in r or not r.get("finished_at"):
+                continue
+            if agent and (r.get("agent_info") or {}).get("name") != agent:
                 continue
             rewards = (r.get("verifier_result") or {}).get("rewards") or {}
             t = tasks[r["task_name"].split("/")[-1]]
@@ -52,8 +60,10 @@ def load(dirs):
 
 
 def harbor_summary(jobs):
-    for path, r in jobs:
+    for path, r, agent in jobs:
         for key, s in (r["stats"].get("evals") or {}).items():
+            if agent and not key.startswith(f"{agent}__"):
+                continue
             metrics = ", ".join(f"{k}={v:.3f}" for m in s.get("metrics", []) for k, v in m.items())
             pak = ", ".join(f"pass@{k}={v:.3f}" for k, v in sorted(s.get("pass_at_k", {}).items(), key=lambda x: int(x[0])))
             print(f"{path}: {key}  trials={s['n_trials']} errors={s['n_errors']}  {metrics}  {pak}".rstrip())
