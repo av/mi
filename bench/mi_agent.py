@@ -139,6 +139,11 @@ SECONDS=0
   > >(exec > "$LOG/mi-output.txt" 2>/dev/null; stamp) 2> >(exec > "$LOG/mi-stderr.txt" 2>/dev/null; stamp)
 CODE=$?
 sleep 1  # let the stampers flush
+# mi can end a run with exit 0 after its model API refused every request
+# (no credits, bad key); surface that as a failed agent run, not a task miss.
+if [ "$CODE" = 0 ] && FATAL=$(grep -m1 -hE "code: 40[123]|requires more credits|insufficient_quota|Invalid API key" "$LOG/mi-output.txt" "$LOG/mi-stderr.txt"); then
+  echo "mi: model API error: $FATAL" >&2; CODE=3
+fi
 echo "end=$(date +%s)" >> "$LOG/run.txt"; echo "exit_code=$CODE" >> "$LOG/run.txt"
 exit $CODE
 """

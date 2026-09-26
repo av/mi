@@ -2934,6 +2934,9 @@ test('Harbor adapter routes tasks through goal mode with the eval prompts', asyn
   // services left running for the verifier must not keep the wrapper waiting on a log pipe
   assert.match(adapter, /< \/dev\/null \\\n\s+> >\(exec > "\$LOG\/mi-output\.txt" 2>\/dev\/null; stamp\)/);
   assert.doesNotMatch(adapter, /\| stamp/);
+  // an API that refuses every call must fail the agent run, not read as a task miss
+  assert.match(adapter, /requires more credits\|insufficient_quota/);
+  assert.match(adapter, /CODE=3/);
 });
 
 test('Harbor adapter derives the goal budget from the trial agent timeout', async () => {
