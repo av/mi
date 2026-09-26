@@ -127,3 +127,54 @@ concurrency differed.
 - **Adapter behaviour that matters for scores:** the eval system prompt, the
   `TERMINAL_BENCH_CHECK` judge criterion, workdir detection and the AGENTS.md
   workspace snapshot. `bench/mi_agent.py` carries them over verbatim.
+
+## 2026-09-26: Harbor rebuild validation
+
+The new adapter (`bench/`, Harbor 0.23.0) was run on fedora with the same
+model, pins and n=4 as the July runs.
+
+| Job (`jobs/`, gitignored) | Adapter | Result |
+|---|---|---|
+| `smoke-20260926-013836` | `3fab338` | 2/2 (openssl-selfsigned-cert, vulnerable-secret), 2 min |
+| `subset-20260926-014103` | `3fab338` | **10/10**, 18 min; 2 `AgentTimeoutError` (see below) |
+| `services-recheck-20260926` | `66a1d9e` | 2/2 kv-store-grpc, nginx-request-logging; 247 s / 289 s, no exceptions |
+
+All trials were served by Alibaba only. Model spend for all runs was about $0.30.
+
+History for the 10 subset tasks, from the same archived runs:
+
+| task | 06-17 full | 06-18 full | 06-25 full | 07-02 | 07-06 k2 | 07-12 | 07-16 k3 | 07-21 k3 | **09-26** |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| vulnerable-secret | 1/1 | 1/1 | 1/1 | 1/1 | 2/2 | 1/1 | 3/3 | 3/3 | 1/1 |
+| openssl-selfsigned-cert | 0/1 | 1/1 | 0/1 | 1/1 | 2/2 | 1/1 | 3/3 | 3/3 | 1/1 |
+| log-summary-date-ranges | 0/1 | 1/1 | 1/1 | 1/1 | 2/2 | 1/1 | 3/3 | 3/3 | 1/1 |
+| kv-store-grpc | 1/1 | 0/1 | 1/1 | 1/1 | 0/2 | 0/1 | 2/3 | 3/3 | 1/1 |
+| nginx-request-logging | 1/1 | 1/1 | 1/1 | 1/1 | 2/2 | 1/1 | 3/3 | 3/3 | 1/1 |
+| prove-plus-comm | 0/1 | 0/1 | 0/1 | 1/1 | 2/2 | 1/1 | 2/3 | 3/3 | 1/1 |
+| fix-git | 1/1 | 1/1 | 0/1 | 1/1 | 2/2 | 1/1 | 3/3 | 3/3 | 1/1 |
+| code-from-image | 1/1 | 1/1 | 1/1 | 1/1 | 2/2 | 1/1 | 2/3 | 2/3 | 1/1 |
+| extract-elf | 0/1 | 0/1 | 0/1 | 0/1 | 2/2 | 1/1 | 2/3 | 2/3 | 1/1 |
+| count-dataset-tokens | 0/1 | 1/1 | 1/1 | 0/1 | 0/2 | 1/1 | 1/3 | 0/3 | 1/1 |
+| **sum of pass rates** | 5.0 | 7.0 | 6.0 | 8.0 | 8.0 | 9.0 | 8.0 | 8.3 | **10.0** |
+
+The gap: 10/10 against 8.33 expected from the last k=3 run at the same mi
+code (master `4772ae6`, 07-21), or 8.2 pooled over the five July subset runs.
+`bench/compare.py` calls both NOISE (p = 0.32 and p = 0.24). The whole +1.7
+comes from three historically flaky tasks landing on the pass side in a
+single trial:
+
+- `count-dataset-tokens`: 4/13 historically; an off-by-one token count flips it.
+- `code-from-image` and `extract-elf`: each 2/3 at 07-21.
+
+Nothing points to the adapter changing mi's behaviour. The prompts, goal
+check, workdir detection, snapshot and budget derivation are carried over,
+and task timeouts were derived correctly (900/1200 s → 6/8 iterations). No
+task regressed, and the always-pass tasks passed again. Treat 10/10 as one
+lucky draw, not an improvement; a claim needs `-k 3`.
+
+The first subset run exposed a bug in the new wrapper. mi logged through a
+`| stamp` pipeline, and services mi leaves running for the verifier (the gRPC
+server, nginx) held the pipe open. kv-store-grpc and nginx-request-logging
+ACKed at ~230 s but ran until Harbor's 900 s kill. The verifier still passed
+them, but the trials logged `AgentTimeoutError`. `66a1d9e` fixes it, and the
+recheck ended at 247 s and 289 s, matching July's 250–450 s.
