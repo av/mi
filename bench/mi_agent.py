@@ -133,10 +133,12 @@ cd "$WORKDIR" || cd /
 
 stamp() { while IFS= read -r line; do printf '[%6ds] %s\n' "$SECONDS" "$line"; done; }
 SECONDS=0
-"$NODE" /opt/mi/index.mjs -g "$1" -c "$MI_GOAL_CHECK" \
-  2> >(stamp > "$LOG/mi-stderr.txt") | stamp > "$LOG/mi-output.txt"
+# Process substitutions, not a pipeline: services mi leaves running for the
+# verifier may keep the log pipes open, and the wrapper must not wait for them.
+"$NODE" /opt/mi/index.mjs -g "$1" -c "$MI_GOAL_CHECK" < /dev/null \
+  > >(exec > "$LOG/mi-output.txt" 2>/dev/null; stamp) 2> >(exec > "$LOG/mi-stderr.txt" 2>/dev/null; stamp)
 CODE=$?
-sleep 1  # let the stderr stamper flush
+sleep 1  # let the stampers flush
 echo "end=$(date +%s)" >> "$LOG/run.txt"; echo "exit_code=$CODE" >> "$LOG/run.txt"
 exit $CODE
 """

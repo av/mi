@@ -2931,6 +2931,9 @@ test('Harbor adapter routes tasks through goal mode with the eval prompts', asyn
   assert.match(adapter, /"SYSTEM_PROMPT": self\.options\.system_prompt or EVAL_SYSTEM_PROMPT/);
   assert.match(adapter, /## Workspace Snapshot/);
   assert.match(adapter, /for c in \/app \/workdir \/home \/workspace \/work \/root \/src/);
+  // services left running for the verifier must not keep the wrapper waiting on a log pipe
+  assert.match(adapter, /< \/dev\/null \\\n\s+> >\(exec > "\$LOG\/mi-output\.txt" 2>\/dev\/null; stamp\)/);
+  assert.doesNotMatch(adapter, /\| stamp/);
 });
 
 test('Harbor adapter derives the goal budget from the trial agent timeout', async () => {
