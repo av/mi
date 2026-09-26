@@ -1,0 +1,15 @@
+# Base Harbor JobConfig for mi. Stack a task selection on top:
+#   bench/harbor.sh run -c bench/configs/mi.yaml -c bench/configs/<smoke|subset|full>.yaml
+# CLI flags override anything here (-m MODEL, -k TRIALS, --ak seed=7, -n 2, ...).
+jobs_dir: jobs
+n_attempts: 1
+n_concurrent_trials: 4        # shared host: keep <= 4
+agents:
+  - import_path: bench.mi_agent:MiAgent
+    # Model of the 2026-06/07 history (docs/benchmark-history.md).
+    # Needs OPENROUTER_API_KEY. Local server: -m openai/<model> with OPENAI_BASE_URL.
+    model_name: openrouter/deepseek/deepseek-v4-flash
+    kwargs:
+      temperature: 0
+      seed: 42
+      provider: alibaba       # OpenRouter pin, no fallbacks; supports temperature+seed for this model

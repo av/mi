@@ -1,0 +1,4 @@
+# Full Terminal-Bench 2.1 (89 tasks) from the Harbor registry.
+# TB 2.0 instead: -d terminal-bench@2.0 on the command line.
+datasets:
+  - name: terminal-bench/terminal-bench-2-1

@@ -1,100 +1,0 @@
-[?2004hroot@e28a8ce01342:/app# asciinema rec --stdin /logs/agent/recording.cast
-[?2004l[0;32masciinema: recording asciicast to /logs/agent/recording.cast[0m
-[0;32masciinema: press <ctrl-d> or type "exit" when you're done[0m
-[?2004hroot@e28a8ce01342:/app# clear
-[?2004l[H[J[3J[?2004hroot@e28a8ce01342:/app# mkdir -p /app/ssl
-[?2004l[?2004hroot@e28a8ce01342:/app# openssl genrsa -out /app/ssl/server.key 2048
-[?2004l[?2004hroot@e28a8ce01342:/app# chmod 600 /app/ssl/server.key
-[?2004l[?2004hroot@e28a8ce01342:/app# openssl req -new -x509 -key /app/ssl/server.key -out /app/ssl/server.crt -days 365 -subj "/O=DevOps Team/CN=dev-internal.company.local"
-[?2004l[?2004hroot@e28a8ce01342:/app# cat /app/ssl/server.key /app/ssl/server.crt > /app/ssl/server.pem
-[?2004l[?2004hroot@e28a8ce01342:/app# chmod 600 /app/ssl/server.pem
-[?2004l[?2004hroot@e28a8ce01342:/app# echo "Subject: $(openssl x509 -in /app/ssl/server.crt -noout -subject)" > /app/ssl/verification.txt
-[?2004l[?2004hroot@e28a8ce01342:/app# echo "Validity:" >> /app/ssl/verification.txt
-[?2004l[?2004hroot@e28a8ce01342:/app# openssl x509 -in /app/ssl/server.crt -noout -dates >> /app/ssl/verification.txt
-[?2004l[?2004hroot@e28a8ce01342:/app# echo "SHA-256 Fingerprint: $(openssl x509 -in /app/ssl/server.crt -noout -fingerprint -sha256 | cut -d'=' -f2)" >> /app/ssl/verification.txt
-[?2004l[?2004hroot@e28a8ce01342:/app# cat > /app/check_cert.py << 'EOF'
-[?2004lROR: {e}")
-    exit(1)
-EOF
-[?2004h> #!/usr/bin/env python3
-[?2004l[?2004h> from cryptography import x509
-[?2004l[?2004h> from cryptography.hazmat.backends import default_backend
-[?2004l[?2004h> import datetime
-[?2004l[?2004h> 
-[?2004l[?2004h> cert_path = '/app/ssl/server.crt'
-[?2004l[?2004h> key_path = '/app/ssl/server.key'
-[?2004l[?2004h> pem_path = '/app/ssl/server.pem'
-[?2004l[?2004h> 
-[?2004l[?2004h> try:
-[?2004l[?2004h>     # Load certificate
-[?2004l[?2004h>     with open(cert_path, 'rb') as f:
-[?2004l[?2004h>         cert = x509.load_pem_x509_certificate(f.read(), default_backend())
-[?2004l[?2004h>     
-[?2004l[?2004h>     # Load private key
-[?2004l[?2004h>     with open(key_path, 'rb') as f:
-[?2004l[?2004h>         key = f.read()
-[?2004l[?2004h>     
-[?2004l[?2004h>     # Get Common Name
-[?2004l[?2004h>     common_name = cert.subject.get_attributes_for_oid(x509.OID_COMMON_NAME)[0].value
-[?2004l[?2004h>     print(f"Common Name: {common_name}")
-[?2004l[?2004h>     
-[?2004l[?2004h>     # Get expiration date
-[?2004l[?2004h>     expiry = cert.not_valid_after
-[?2004l[?2004h>     print(f"Expiration Date: {expiry.strftime('%Y-%m-%d')}")
-[?2004l[?2004h>     
-[?2004l[?2004h>     # Check that cert is not expired
-[?2004l[?2004h>     now = datetime.datetime.utcnow()
-[?2004l[?2004h>     if expiry < now:
-[?2004l[?2004h>         print("ERROR: Certificate has expired!")
-[?2004l[?2004h>         exit(1)
-[?2004l[?2004h>     
-[?2004l[?2004h>     print("Certificate verification successful")
-[?2004l[?2004h> except Exception as e:
-[?2004l[?2004h>     print(f"ERROR: {e}")
-[?2004l[?2004h>     exit(1)
-[?2004l[?2004h> EOF
-[?2004l[?2004hroot@e28a8ce01342:/app# python3 /app/check_cert.py
-[?2004lTraceback (most recent call last):
-  File [35m"/app/check_cert.py"[0m, line [35m2[0m, in [35m<module>[0m
-    from cryptography import x509
-[1;35mModuleNotFoundError[0m: [35mNo module named 'cryptography'[0m
-[?2004hroot@e28a8ce01342:/app# pip install cryptography
-[?2004lCollecting cryptography
-  Downloading cryptography-48.0.0-cp311-abi3-manylinux_2_34_x86_64.whl.metadata (4.3 kB)
-Collecting cffi>=2.0.0 (from cryptography)
-  Downloading cffi-2.0.0-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (2.6 kB)
-Collecting pycparser (from cffi>=2.0.0->cryptography)
-  Downloading pycparser-3.0-py3-none-any.whl.metadata (8.2 kB)
-Downloading cryptography-48.0.0-cp311-abi3-manylinux_2_34_x86_64.whl (4.7 MB)
-[?25l   [38;5;237m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m [32m0.0/4.7 MB[0m [31m?[0m eta [36m-:--:--[0m[2K   [38;5;197m━━━━━━━━━━━━━━━━━━━━━━━━━━[0m[38;5;197m╸[0m[38;5;237m━━━━━━━━━━━━━[0m [32m3.1/4.7 MB[0m [31m24.9 MB/s[0m eta [36m0:00:01[0m[2K   [38;5;70m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m [32m4.7/4.7 MB[0m [31m28.0 MB/s[0m  [33m0:00:00[0m
-[?25hDownloading cffi-2.0.0-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (219 kB)
-Downloading pycparser-3.0-py3-none-any.whl (48 kB)
-Installing collected packages: pycparser, cffi, cryptography
-[?25l[2K   [38;5;197m━━━━━━━━━━━━━━━━━━━━━━━━━━[0m[38;5;197m╸[0m[38;5;237m━━━━━━━━━━━━━[0m [32m2/3[0m [cryptography][2K   [38;5;70m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m [32m3/3[0m [cryptography]
-[?25h[1A[2KSuccessfully installed cffi-2.0.0 cryptography-48.0.0 pycparser-3.0
-[33mWARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.[0m[33m
-[0m
-[1m[[0m[34;49mnotice[0m[1;39;49m][0m[39;49m A new release of pip is available: [0m[31;49m25.2[0m[39;49m -> [0m[32;49m26.1.1[0m
-[1m[[0m[34;49mnotice[0m[1;39;49m][0m[39;49m To update, run: [0m[32;49mpip install --upgrade pip[0m
-[?2004hroot@e28a8ce01342:/app# python3 /app/check_cert.py
-[?2004lCommon Name: dev-internal.company.local
-/app/check_cert.py:24: CryptographyDeprecationWarning: Properties that return a naïve datetime object have been deprecated. Please switch to not_valid_after_utc.
-  expiry = cert.not_valid_after
-Expiration Date: 2027-05-18
-/app/check_cert.py:28: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
-  now = datetime.datetime.utcnow()
-Certificate verification successful
-[?2004hroot@e28a8ce01342:/app# ls -la /app/ssl/ && cat /app/ssl/verification.txt
-[?2004ltotal 16
-drwxr-xr-x. 1 root root   92 May 18 23:59 .
-drwxr-xr-x. 1 root root   32 May 18 23:59 ..
--rw-r--r--. 1 root root 1220 May 18 23:59 server.crt
--rw-------. 1 root root 1704 May 18 23:59 server.key
--rw-------. 1 root root 2924 May 18 23:59 server.pem
--rw-r--r--. 1 root root  262 May 18 23:59 verification.txt
-Subject: subject=O = DevOps Team, CN = dev-internal.company.local
-Validity:
-notBefore=May 18 23:59:04 2026 GMT
-notAfter=May 18 23:59:04 2027 GMT
-SHA-256 Fingerprint: 90:AD:E4:7B:CA:1D:F3:5D:2D:67:07:99:A8:2D:DC:5A:AE:36:77:76:76:15:42:74:6D:9D:93:15:4C:92:31:FA
-[?2004hroot@e28a8ce01342:/app# 

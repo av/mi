@@ -1,5 +1,0 @@
-Previous response had parsing errors:
-ERROR: Invalid JSON: Invalid control character at: line 6 column 37 (char 804) | Content preview: '{\n  "analysis": "Test data has 10k rows. Now I need to write a Python script to:\\n1. Read the parque'...
-WARNINGS: - Extra text detected before JSON object
-
-Please fix these issues and provide a proper JSON response.

@@ -1,5 +1,0 @@
-New Terminal Output:
-
-root@fcc59c6b1184:/app# python3 -c "import chess.pgn; print('chess.pgn available')" 2>&1
-chess.pgn available
-root@fcc59c6b1184:/app#

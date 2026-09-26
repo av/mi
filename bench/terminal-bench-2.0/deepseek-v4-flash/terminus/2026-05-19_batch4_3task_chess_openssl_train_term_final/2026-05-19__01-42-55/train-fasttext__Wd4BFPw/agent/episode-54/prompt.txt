@@ -1,7 +1,0 @@
-New Terminal Output:
-
-root@fc9984fcd95c:/app# fasttext supervised -input train.txt -output model -dim 50 -lr 0.1 -epoch 30 -wordNgrams 2 -bucket 300000 -minCount 5 -thread 4 2>&1
-Read 88M words
-Number of words:  198505
-Number of labels: 5
-Progress:   6.3% words/sec/thread:  757892 lr:  0.093682 avg.loss:  1.010950 ETA:   0h13m40s

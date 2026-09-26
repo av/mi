@@ -1,8 +1,0 @@
-New Terminal Output:
-
-root@fc9984fcd95c:/app# fasttext supervised -input train_shuffled.txt -output model -dim 50 -lr 0.1 -epoch 15 -wordNgrams 3 -bucket 200000 -minCount 5 -thread 4
- 2>&1
-Read 88M words
-Number of words:  198505
-Number of labels: 5
-Progress:   8.6% words/sec/thread:  519151 lr:  0.091360 avg.loss:  1.065634 ETA:   0h 9m43s

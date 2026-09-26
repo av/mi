@@ -2917,51 +2917,76 @@ test('MI_API_PARAMS with invalid JSON gives clean error', async () => {
     'Should not show raw stack trace');
 });
 
-test('Harbor diagnostic wrapper normalizes health URL', async () => {
-  const adapter = readFileSync(join(__dirname, '../mi_harbor/mi_agent.py'), 'utf8');
-  assert.match(adapter, /HEALTH_URL="\$API_BASE\/v1\/models"/);
-  assert.doesNotMatch(adapter, /\$\{OPENAI_BASE_URL:-https:\/\/api\.openai\.com\}\/v1\/models/);
-});
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 
-test('Harbor adapter uses local package and padded timestamp diagnostics', async () => {
-  const adapter = readFileSync(join(__dirname, '../mi_harbor/mi_agent.py'), 'utf8');
-  assert.match(adapter, /tar -xzf - -C \/opt\/mi/);
-  assert.match(adapter, /\.mi_package_hash/);
-  assert.match(adapter, /node \/opt\/mi\/index\.mjs/);
-  assert.match(adapter, /process\.versions\.node\.split\('\.'\)\[0\]\)>=18/);
-  assert.match(adapter, /NEED_NPM=.*if package else/);
-  assert.match(adapter, /ver=v22\.11\.0/);
-  assert.match(adapter, /node-\$ver-linux-\$arch/);
-  assert.match(adapter, /\[\[:space:\]\]\*\[0-9\.\]\+s/);
-  assert.match(adapter, /else:\n\s+version_spec =/);
-});
-
-test('Harbor adapter routes Terminal-Bench through goal mode', async () => {
-  const adapter = readFileSync(join(__dirname, '../mi_harbor/mi_agent.py'), 'utf8');
-  assert.match(adapter, /TERMINAL_BENCH_CHECK/);
-  assert.match(adapter, /-g "\$1" -c "\$MI_GOAL_CHECK"/);
-  assert.match(adapter, /MI_GOAL_MAX/);
-  assert.match(adapter, /Workspace Snapshot/);
+test('Harbor adapter routes tasks through goal mode with the eval prompts', async () => {
+  const adapter = readFileSync(join(__dirname, '../bench/mi_agent.py'), 'utf8');
+  assert.match(adapter, /class MiAgent\(BaseInstalledAgent\)/);
+  assert.match(adapter, /index\.mjs -g "\$1" -c "\$MI_GOAL_CHECK"/);
+  assert.match(adapter, /"MI_GOAL_CHECK": TERMINAL_BENCH_CHECK/);
   assert.match(adapter, /hidden external verifier/);
-  assert.match(adapter, /working directory/);
-  assert.match(adapter, /"PAGER": "cat"/);
-  assert.match(adapter, /"GIT_PAGER": "cat"/);
-  assert.match(adapter, /"GIT_EDITOR": "true"/);
-  assert.match(adapter, /Workdir: \$WORKDIR/);
+  assert.match(adapter, /never NACK for margin/);
+  assert.match(adapter, /"SYSTEM_PROMPT": self\.options\.system_prompt or EVAL_SYSTEM_PROMPT/);
+  assert.match(adapter, /## Workspace Snapshot/);
+  assert.match(adapter, /for c in \/app \/workdir \/home \/workspace \/work \/root \/src/);
+  // services left running for the verifier must not keep the wrapper waiting on a log pipe
+  assert.match(adapter, /< \/dev\/null \\\n\s+> >\(exec > "\$LOG\/mi-output\.txt" 2>\/dev\/null; stamp\)/);
+  assert.doesNotMatch(adapter, /\| stamp/);
 });
 
-test('Harbor cached Docker environment derives task images', async () => {
-  const env = readFileSync(join(__dirname, '../mi_harbor/cached_docker_environment.py'), 'utf8');
-  const smoke = readFileSync(join(__dirname, '../mi_harbor/run-smoke.sh'), 'utf8');
-  assert.match(env, /class MiCachedDockerEnvironment\(DockerEnvironment\)/);
-  assert.match(env, /FROM \{base_image\}/);
-  assert.match(env, /base_image.*digest/);
-  assert.match(env, /node18-runtime-v2/);
-  assert.match(env, /node_ok\(\)/);
-  assert.match(env, /mi-eval-cache:\{image_key\[:16\]\}/);
-  assert.match(env, /self\.task_env_config\.docker_image = cached/);
-  assert.match(env, /\["down", "--volumes", "--remove-orphans"\]/);
-  assert.match(smoke, /--environment-import-path mi_harbor\.cached_docker_environment:MiCachedDockerEnvironment/);
+test('Harbor adapter derives the goal budget from the trial agent timeout', async () => {
+  const adapter = readFileSync(join(__dirname, '../bench/mi_agent.py'), 'utf8');
+  assert.match(adapter, /TrialConfig\.model_validate_json/);
+  assert.match(adapter, /task\.config\.agent\.timeout_sec/);
+  assert.match(adapter, /MI_DEADLINE=\$\(\( START \+ MI_TASK_TIMEOUT - 60 \)\)/);
+  assert.match(adapter, /GOAL_MAX < 4 \)\) && GOAL_MAX=4; \(\( GOAL_MAX > 12 \)\) && GOAL_MAX=12/);
+});
+
+test('Harbor adapter ships the checkout and puts node on PATH only when it brings its own', async () => {
+  const adapter = readFileSync(join(__dirname, '../bench/mi_agent.py'), 'utf8');
+  assert.match(adapter, /PACKAGE_PATHS = \("index\.mjs", "package\.json", "README\.md", "tools", "skills"\)/);
+  assert.match(adapter, /upload_dir\(self\._staged_checkout\(\), "\/opt\/mi"\)/);
+  assert.match(adapter, /\[ "\$NODE" = \/opt\/mi-node\/bin\/node \] && export PATH="\/opt\/mi-node\/bin:\$PATH"/);
+});
+
+test('bench configs pin model and determinism knobs, and npm scripts run them', async () => {
+  const base = readFileSync(join(__dirname, '../bench/configs/mi.yaml'), 'utf8');
+  assert.match(base, /import_path: bench\.mi_agent:MiAgent/);
+  assert.match(base, /model_name: openrouter\/deepseek\/deepseek-v4-flash/);
+  assert.match(base, /temperature: 0\n\s+seed: 42\n\s+provider: alibaba/);
+  const adapter = readFileSync(join(__dirname, '../bench/mi_agent.py'), 'utf8');
+  assert.match(adapter, /params\["provider"\] = \{"order": \[o\.provider\], "allow_fallbacks": False\}/);
+  assert.match(adapter, /self\.model_connection\.provider == "openrouter"/);
+  const scripts = JSON.parse(readFileSync(join(__dirname, '../package.json'), 'utf8')).scripts;
+  for (const run of ['smoke', 'subset', 'full'])
+    assert.match(scripts[`bench:${run}`], new RegExp(`-c bench/configs/mi\\.yaml -c bench/configs/${run}\\.yaml`));
+  assert.match(readFileSync(join(__dirname, '../bench/harbor.sh'), 'utf8'), /harbor==\$\{HARBOR_VERSION:-0\.23\.0\}/);
+});
+
+test('bench/compare.py pools Harbor trials per task and calls a single-run flip noise', async (t) => {
+  try { execFileSync('python3', ['--version']); } catch { return t.skip('python3 not available'); }
+  const root = mkdtempSync(join(tmpdir(), 'mi-compare-'));
+  const trial = (job, name, task, reward, exc) => {
+    mkdirSync(join(root, job, name), { recursive: true });
+    writeFileSync(join(root, job, name, 'result.json'), JSON.stringify({
+      task_name: `terminal-bench/${task}`, trial_name: name, finished_at: '2026-09-26T00:00:00',
+      verifier_result: { rewards: { reward } }, exception_info: exc ? { exception_type: exc } : null }));
+  };
+  trial('a', 't1', 'fix-git', 1); trial('a', 't2', 'qemu-startup', 0, 'AgentTimeoutError'); trial('a', 't3', 'only-a', 1);
+  trial('b', 't1', 'fix-git', 1); trial('b', 't2', 'qemu-startup', 1);
+  const script = join(__dirname, '../bench/compare.py');
+  const single = JSON.parse(execFileSync('python3', [script, '--json', join(root, 'a')], { encoding: 'utf8' }));
+  assert.strictEqual(single.expected_score, 2);
+  assert.deepStrictEqual(single.tasks.find(r => r.task === 'qemu-startup').exceptions, ['AgentTimeoutError']);
+  const ab = JSON.parse(execFileSync('python3', [script, '--json', '--a', join(root, 'a'), '--b', join(root, 'b')], { encoding: 'utf8' }));
+  assert.deepStrictEqual(ab.not_compared, ['only-a']);
+  assert.strictEqual(ab.delta, 1);
+  assert.match(ab.verdict, /^NOISE/);
+  const fisher = execFileSync('python3', ['-c', `import sys; sys.path.insert(0, ${JSON.stringify(dirname(script))}); import compare as c; print(round(c.fisher_exact_two_sided(3,0,0,3), 6), round(c.fisher_exact_two_sided(5,0,0,5), 6))`], { encoding: 'utf8' });
+  assert.strictEqual(fisher.trim(), '0.1 0.007937');
+  rmSync(root, { recursive: true, force: true });
 });
 
 test('goal 402 credit exhaustion aborts immediately with fatal event', async () => {

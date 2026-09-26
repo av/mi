@@ -1,5 +1,0 @@
-New Terminal Output:
-
-root@65d87fd22d30:/app/john/run#
-ATTENTION: the hashes might contain sensitive encrypted data. Be careful when sharing or posting these hashes
-root@65d87fd22d30:/app#

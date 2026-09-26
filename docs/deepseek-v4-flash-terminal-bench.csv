@@ -1,5 +1,0 @@
-checked_at,source_url,source_type,model_or_mode,terminal_bench_2_accuracy_percent,notes
-2026-05-23,https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash,huggingface_model_card_evaluation_summary,DeepSeek-V4-Flash,56.9,HF evaluation summary for harborframework/terminal-bench-2.0
-2026-05-23,https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash,huggingface_model_card_mode_comparison,V4-Flash Non-Think,49.1,DeepSeek mode comparison table
-2026-05-23,https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash,huggingface_model_card_mode_comparison,V4-Flash High,56.6,DeepSeek mode comparison table
-2026-05-23,https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash,huggingface_model_card_mode_comparison,V4-Flash Max,56.9,DeepSeek mode comparison table

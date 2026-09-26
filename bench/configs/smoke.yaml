@@ -1,0 +1,6 @@
+# Smoke: 2 short Terminal-Bench 2.1 tasks that mi passed 3/3 in the last k=3 run (~5 min).
+datasets:
+  - name: terminal-bench/terminal-bench-2-1
+    task_names:
+      - terminal-bench/vulnerable-secret
+      - terminal-bench/openssl-selfsigned-cert

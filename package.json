@@ -22,7 +22,11 @@
   ],
   "scripts": {
     "test": "node --test tests/test.js",
-    "lines": "node scripts/count-lines.mjs index.mjs"
+    "lines": "node scripts/count-lines.mjs index.mjs",
+    "bench:smoke": "bench/harbor.sh run -y -c bench/configs/mi.yaml -c bench/configs/smoke.yaml --job-name smoke-$(date +%Y%m%d-%H%M%S)",
+    "bench:subset": "bench/harbor.sh run -y -c bench/configs/mi.yaml -c bench/configs/subset.yaml --job-name subset-$(date +%Y%m%d-%H%M%S)",
+    "bench:full": "bench/harbor.sh run -y -c bench/configs/mi.yaml -c bench/configs/full.yaml --job-name full-$(date +%Y%m%d-%H%M%S)",
+    "bench:compare": "python3 bench/compare.py"
   },
   "license": "MIT",
   "repository": {

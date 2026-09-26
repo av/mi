@@ -1,1134 +1,0 @@
-[?2004hroot@65d87fd22d30:/app# asciinema rec --stdin /logs/agent/recording.cast
-[?2004l[0;32masciinema: recording asciicast to /logs/agent/recording.cast[0m
-[0;32masciinema: press <ctrl-d> or type "exit" when you're done[0m
-[?2004hroot@65d87fd22d30:/app# clear
-[?2004l[H[J[3J[?2004hroot@65d87fd22d30:/app# ls -la
-[?2004ltotal 4
-drwxr-xr-x. 1 root root  20 Oct 24  2025 [0m[01;34m.[0m
-drwxr-xr-x. 1 root root  40 May 18 23:31 [01;34m..[0m
-drwxr-xr-x. 1 root root  12 Oct 31  2025 [01;34mjohn[0m
--rw-r--r--. 1 root root 215 Oct 24  2025 [01;31msecrets.7z[0m
-[?2004hroot@65d87fd22d30:/app# which 7z || which p7zip || which 7za || which 7zr
-[?2004l[?2004hroot@65d87fd22d30:/app# which python3 || which python
-[?2004l/usr/bin/python3
-[?2004hroot@65d87fd22d30:/app# ls -la john/
-[?2004ltotal 48
-drwxr-xr-x. 1 root root    12 Oct 31  2025 [0m[01;34m.[0m
-drwxr-xr-x. 1 root root    20 Oct 24  2025 [01;34m..[0m
-drwxr-xr-x. 1 root root   170 Oct 31  2025 [01;34m.ci[0m
-drwxr-xr-x. 1 root root    44 Oct 31  2025 [01;34m.circleci[0m
--rw-r--r--. 1 root root  2980 Oct 31  2025 .editorconfig
-drwxr-xr-x. 1 root root   156 Oct 31  2025 [01;34m.git[0m
--rw-r--r--. 1 root root   982 Oct 31  2025 .gitattributes
-drwxr-xr-x. 1 root root    80 Oct 31  2025 [01;34m.github[0m
--rw-r--r--. 1 root root  1595 Oct 31  2025 .gitignore
--rw-r--r--. 1 root root  2975 Oct 31  2025 .mailmap
--rwxr-xr-x. 1 root root  3836 Oct 31  2025 [01;32m.pre-commit.sh[0m
-drwxr-xr-x. 1 root root    24 Oct 31  2025 [01;34m.travis[0m
--rw-r--r--. 1 root root  1251 Oct 31  2025 .travis.yml
--rw-r--r--. 1 root root  1654 Oct 31  2025 CONTRIBUTING.md
--rw-r--r--. 1 root root  2332 Oct 31  2025 LICENSE
--rw-r--r--. 1 root root  8124 Oct 31  2025 README.md
-drwxr-xr-x. 1 root root  2412 Oct 31  2025 [01;34mdoc[0m
--rw-r--r--. 1 root root    79 Oct 31  2025 requirements.txt
-drwxr-xr-x. 1 root root   400 Oct 31  2025 [01;34mrun[0m
--rw-r--r--. 1 root root  1954 Oct 31  2025 shell.nix
-drwxr-xr-x. 1 root root 16150 Oct 31  2025 [01;34msrc[0m
-[?2004hroot@65d87fd22d30:/app# apt-get update && apt-get install -y p7zip-full 2>&1 | tail -10
-[?2004l0% [Working]            Hit:1 http://security.ubuntu.com/ubuntu noble-security InRelease
-0% [Waiting for headers]                        Hit:2 http://archive.ubuntu.com/ubuntu noble InRelease
-                        0% [Working]0% [Waiting for headers]0% [Waiting for headers]                        Hit:3 http://archive.ubuntu.com/ubuntu noble-updates InRelease
-                        0% [Working]0% [Waiting for headers]                        Hit:4 http://archive.ubuntu.com/ubuntu noble-backports InRelease
-                        0% [Working]20% [Working]             Reading package lists... 0%Reading package lists... 0%Reading package lists... 0%Reading package lists... 4%Reading package lists... 4%Reading package lists... 50%Reading package lists... 50%Reading package lists... 51%Reading package lists... 51%Reading package lists... 52%Reading package lists... 52%Reading package lists... 59%Reading package lists... 59%Reading package lists... 65%Reading package lists... 65%Reading package lists... 77%Reading package lists... 77%Reading package lists... 77%Reading package lists... 77%Reading package lists... 77%Reading package lists... 77%Reading package lists... 78%Reading package lists... 78%Reading package lists... 78%Reading package lists... 78%Reading package lists... 83%Reading package lists... 83%Reading package lists... 88%Reading package lists... 88%Reading package lists... 99%Reading package lists... 99%Reading package lists... 99%Reading package lists... 99%Reading package lists... Done
-Fetched 1849 kB in 0s (9335 kB/s)
-Selecting previously unselected package 7zip.
-(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 17136 files and directories currently installed.)
-Preparing to unpack .../7zip_23.01+dfsg-11_amd64.deb ...
-Unpacking 7zip (23.01+dfsg-11) ...
-Selecting previously unselected package p7zip-full.
-Preparing to unpack .../p7zip-full_16.02+transitional.1_all.deb ...
-Unpacking p7zip-full (16.02+transitional.1) ...
-Setting up 7zip (23.01+dfsg-11) ...
-Setting up p7zip-full (16.02+transitional.1) ...
-[?2004hroot@65d87fd22d30:/app# 7z x secrets.7z -o/app/extracted
-[?2004l
-7-Zip 23.01 (x64) : Copyright (c) 1999-2023 Igor Pavlov : 2023-06-20
- 64-bit locale=C.UTF-8 Threads:32 OPEN_MAX:1024
-
-Scanning the drive for archives:
-  0M Scan         1 file, 215 bytes (1 KiB)
-
-Extracting archive: secrets.7z
---
-Path = secrets.7z
-Type = 7z
-Physical Size = 215
-Headers Size = 199
-Method = LZMA2:12 7zAES
-Solid = -
-Blocks = 1
-
-  0%    
-Enter password (will not be echoed):[?2004hroot@65d87fd22d30:/app# [?2004l
-
-7-Zip 23.01 (x64) : Copyright (c) 1999-2023 Igor Pavlov : 2023-06-20
- 64-bit locale=C.UTF-8 Threads:32 OPEN_MAX:1024
-
-Scanning the drive for archives:
-  0M Scan         1 file, 215 bytes (1 KiB)
-
-Listing archive: secrets.7z
-
---
-Path = secrets.7z
-Type = 7z
-Physical Size = 215
-Headers Size = 199
-Method = LZMA2:12 7zAES
-Solid = -
-Blocks = 1
-
-   Date      Time    Attr         Size   Compressed  Name
-------------------- ----- ------------ ------------  ------------------------
-2025-05-04 21:22:34 D....            0            0  secrets
-2025-05-04 21:22:39 ....A            9           16  secrets/secret_file.txt
-------------------- ----- ------------ ------------  ------------------------
-2025-05-04 21:22:39                  9           16  1 files, 1 folders
-[?2004hroot@65d87fd22d30:/app# [?2004l
-/app/john/run/7z2john.pl
-[?2004hroot@65d87fd22d30:/app# [?2004l
-Can't locate Compress/Raw/Lzma.pm in @INC (you may need to install the Compress::Raw::Lzma module) (@INC entries checked: /etc/perl /usr/local/lib/x86_64-linux-gnu/perl/5.38.2 /usr/local/share/perl/5.38.2 /usr/lib/x86_64-linux-gnu/perl5/5.38 /usr/share/perl5 /usr/lib/x86_64-linux-gnu/perl-base /usr/lib/x86_64-linux-gnu/perl/5.38 /usr/share/perl/5.38 /usr/local/lib/site_perl) at 7z2john.pl line 6.
-BEGIN failed--compilation aborted at 7z2john.pl line 6.
-[?2004hroot@65d87fd22d30:/app/john/run# [?2004l
--rwxr-xr-x. 1 root root 22647944 Oct 31  2025 [0m[01;32m/app/john/run/john[0m
--rw-r--r--. 1 root root    33024 Oct 31  2025 /app/john/run/john.bash_completion
--rw-r--r--. 1 root root   126985 Oct 31  2025 /app/john/run/john.conf
--rw-r--r--. 1 root root     8928 Oct 31  2025 /app/john/run/john.zsh_completion
-[?2004hroot@65d87fd22d30:/app/john/run# [?2004l
-Selecting previously unselected package libcompress-raw-lzma-perl:amd64.
-(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 17162 files and directories currently installed.)
-Preparing to unpack .../libcompress-raw-lzma-perl_2.209-1build2_amd64.deb ...
-Unpacking libcompress-raw-lzma-perl:amd64 (2.209-1build2) ...
-Setting up libcompress-raw-lzma-perl:amd64 (2.209-1build2) ...
-[?2004hroot@65d87fd22d30:/app/john/run# [?2004l
-ATTENTION: the hashes might contain sensitive encrypted data. Be careful when sharing or posting these hashes
-[?2004hroot@65d87fd22d30:/app# [?2004l
-secrets.7z:$7z$2$19$0$$16$7f2aeca3d70f5f1298c191ab0faf61fc$1658180191$16$13$703e06dc09b6c714749d8efc9fa55434$9$00
-[?2004hroot@65d87fd22d30:/app# [?2004l
-Using default input encoding: UTF-8
-Loaded 1 password hash (7z, 7-Zip archive encryption [SHA256 256/256 AVX2 8x AES])
-Cost 1 (iteration count) is 524288 for all loaded hashes
-Cost 2 (padding size) is 3 for all loaded hashes
-Cost 3 (compression type) is 2 for all loaded hashes
-Cost 4 (data length) is 13 for all loaded hashes
-Will run 32 OpenMP threads
-Press 'q' or Ctrl-C to abort, 'h' for help, almost any other key for status
-Wait...0g 0:00:00:09  0g/s 56.14p/s 56.14c/s 56.14C/s sharte..shance
-Session aborted
-[?2004hroot@65d87fd22d30:/app# ^C[?2004l
-[?2004h[?2004l
-
-[?2004hroot@65d87fd22d30:/app# [?2004l
-Traceback (most recent call last):
-  File "<string>", line 1, in <module>
-ModuleNotFoundError: No module named 'py7zr'
-[?2004hroot@65d87fd22d30:/app# [?2004l
-
-7-Zip 23.01 (x64) : Copyright (c) 1999-2023 Igor Pavlov : 2023-06-20
- 64-bit locale=C.UTF-8 Threads:32 OPEN_MAX:1024
-
-Scanning the drive for archives:
-  0M Scan         1 file, 215 bytes (1 KiB)
-
-Extracting archive: secrets.7z
---
-Path = secrets.7z
-Type = 7z
-Physical Size = 215
-Headers Size = 199
-Method = LZMA2:12 7zAES
-Solid = -
-Blocks = 1
-
-  0%    ERROR: Data Error in encrypted file. Wrong password? : secrets/secret_file.txt
-100% 1 T secrets/secret_file.txt                                
-Sub items Errors: 1
-
-Archives with Errors: 1
-
-Sub items Errors: 1
-[?2004hroot@65d87fd22d30:/app# [?2004l
-
-7-Zip 23.01 (x64) : Copyright (c) 1999-2023 Igor Pavlov : 2023-06-20
- 64-bit locale=C.UTF-8 Threads:32 OPEN_MAX:1024
-
-Scanning the drive for archives:
-  0M Scan         1 file, 215 bytes (1 KiB)
-
-Extracting archive: secrets.7z
---
-Path = secrets.7z
-Type = 7z
-Physical Size = 215
-Headers Size = 199
-Method = LZMA2:12 7zAES
-Solid = -
-Blocks = 1
-
-  0%    ERROR: Data Error in encrypted file. Wrong password? : secrets/secret_file.txt
-100% 1 T secrets/secret_file.txt                                
-Sub items Errors: 1
-
-Archives with Errors: 1
-
-Sub items Errors: 1
-[?2004hroot@65d87fd22d30:/app# [?2004l
- /app/john/run/password.lst
-[?2004hroot@65d87fd22d30:/app# [?2004l
-
-7-Zip 23.01 (x64) : Copyright (c) 1999-2023 Igor Pavlov : 2023-06-20
- 64-bit locale=C.UTF-8 Threads:32 OPEN_MAX:1024
-
-Scanning the drive for archives:
-  0M Scan         1 file, 215 bytes (1 KiB)
-
-Extracting archive: secrets.7z
---
-Path = secrets.7z
-Type = 7z
-Physical Size = 215
-Headers Size = 199
-Method = LZMA2:12 7zAES
-Solid = -
-Blocks = 1
-
-  0%    ERROR: Data Error in encrypted file. Wrong password? : secrets/secret_file.txt
-100% 1 T secrets/secret_file.txt                                
-Sub items Errors: 1
-
-Archives with Errors: 1
-
-Sub items Errors: 1
-[?2004hroot@65d87fd22d30:/app# [?2004l
-
-7-Zip 23.01 (x64) : Copyright (c) 1999-2023 Igor Pavlov : 2023-06-20
- 64-bit locale=C.UTF-8 Threads:32 OPEN_MAX:1024
-
-Scanning the drive for archives:
-  0M Scan         1 file, 215 bytes (1 KiB)
-
-Extracting archive: secrets.7z
---
-Path = secrets.7z
-Type = 7z
-Physical Size = 215
-Headers Size = 199
-Method = LZMA2:12 7zAES
-Solid = -
-Blocks = 1
-
-  0%    ERROR: Data Error in encrypted file. Wrong password? : secrets/secret_file.txt
-100% 1 T secrets/secret_file.txt                                
-Sub items Errors: 1
-
-Archives with Errors: 1
-
-Sub items Errors: 1
-[?2004hroot@65d87fd22d30:/app# [?2004l
-
-7-Zip 23.01 (x64) : Copyright (c) 1999-2023 Igor Pavlov : 2023-06-20
- 64-bit locale=C.UTF-8 Threads:32 OPEN_MAX:1024
-
-Scanning the drive for archives:
-  0M Scan         1 file, 215 bytes (1 KiB)
-
-Extracting archive: secrets.7z
---
-Path = secrets.7z
-Type = 7z
-Physical Size = 215
-Headers Size = 199
-Method = LZMA2:12 7zAES
-Solid = -
-Blocks = 1
-
-  0%    ERROR: Data Error in encrypted file. Wrong password? : secrets/secret_file.txt
-100% 1 T secrets/secret_file.txt                                
-Sub items Errors: 1
-
-Archives with Errors: 1
-
-Sub items Errors: 1
-[?2004hroot@65d87fd22d30:/app# [?2004l
-1795708 /app/john/run/password.lst
-#!comment: This list has been compiled by Solar Designer of Openwall Project
-#!comment: in 1996 through 2022.  It is assumed to be in the public domain.
-#!comment:
-#!comment: This list is based on passwords most commonly seen on a set of Unix
-#!comment: systems in mid-1990's, sorted for decreasing number of occurrences
-#!comment: (that is, more common passwords are listed first).  It has been
-#!comment: revised to also include common website passwords from public lists
-#!comment: of "top N passwords" from major community website compromises that
-#!comment: occurred in 2006 through 2010.  That's the first 3546 entries found
-#!comment: in here.  Many further entries were added in 2022 based on Pwned
-#!comment: Passwords v8 (HIBP) 100+ hits overlap with RockYou, further filtered
-#!comment: to require 97+ hits on top of RockYou's.  These criteria are such
-#!comment: that a password used by just one person many times is very unlikely
-#!comment: to be included.
-#!comment:
-#!comment: Last update: 2022/01/20 (1795690 entries)
-#!comment:
-#!comment: For more wordlists, see https://www.openwall.com/wordlists/
-123456
-12345
-[?2004hroot@65d87fd22d30:/app# [?2004l
-Using default input encoding: UTF-8
-Loaded 1 password hash (7z, 7-Zip archive encryption [SHA256 256/256 AVX2 8x AES])
-Cost 1 (iteration count) is 524288 for all loaded hashes
-Cost 2 (padding size) is 3 for all loaded hashes
-Cost 3 (compression type) is 2 for all loaded hashes
-Cost 4 (data length) is 13 for all loaded hashes
-Will run 32 OpenMP threads
-Note: Passwords longer than 28 rejected
-Press 'q' or Ctrl-C to abort, 'h' for help, almost any other key for status
-Wait...0g 0:00:00:19 0.07% (ETA: 07:19:15) 0g/s 52.01p/s 52.01c/s 52.01C/s rangers..burton
-Session aborted
-[?2004hroot@65d87fd22d30:/app# [?2004l
-bash: pip3: command not found
-[?2004hroot@65d87fd22d30:/app# [?2004l
-Setting up python3-pip (24.0+dfsg-1ubuntu1.3) ...
-Setting up zlib1g-dev:amd64 (1:1.3.dfsg-3.1ubuntu2.1) ...
-Setting up libjs-jquery (3.6.1+dfsg+~3.5.14-1) ...
-Setting up libjs-underscore (1.13.4~dfsg+~1.11.4-3) ...
-Setting up libpython3.12-dev:amd64 (3.12.3-1ubuntu0.13) ...
-Setting up python3.12-dev (3.12.3-1ubuntu0.13) ...
-Setting up libjs-sphinxdoc (7.2.6-6) ...
-Setting up libpython3-dev:amd64 (3.12.3-0ubuntu2.1) ...
-Setting up python3-dev (3.12.3-0ubuntu2.1) ...
-Processing triggers for libc-bin (2.39-0ubuntu8.6) ...
-[?2004hroot@65d87fd22d30:/app# [?2004l
-    sure you have python3-full installed.
-    
-    If you wish to install a non-Debian packaged Python application,
-    it may be easiest to use pipx install xyz, which will manage a
-    virtual environment for you. Make sure you have pipx installed.
-    
-    See /usr/share/doc/python3.12/README.venv for more information.
-
-note: If you believe this is a mistake, please contact your Python installation or OS distribution provider. You can override this, at the risk of breaking your Python installation or OS, by passing --break-system-packages.
-hint: See PEP 668 for the detailed specification.
-[?2004hroot@65d87fd22d30:/app# [?2004l
-tail: cannot open 'timet' for reading: No such file or directory
-tail: cannot open '5' for reading: No such file or directory
-[?2004hroot@65d87fd22d30:/app# [?2004l
-Reading package lists... 0%Reading package lists... 0%Reading package lists... 0%Reading package lists... 4%Reading package lists... 4%Reading package lists... 50%Reading package lists... 50%Reading package lists... 51%Reading package lists... 51%Reading package lists... 52%Reading package lists... 52%Reading package lists... 59%Reading package lists... 59%Reading package lists... 65%Reading package lists... 65%Reading package lists... 77%Reading package lists... 77%Reading package lists... 77%Reading package lists... 77%Reading package lists... 77%Reading package lists... 77%Reading package lists... 78%Reading package lists... 78%Reading package lists... 78%Reading package lists... 78%Reading package lists... 83%Reading package lists... 83%Reading package lists... 88%Reading package lists... 88%Reading package lists... 99%Reading package lists... 99%Reading package lists... 99%Reading package lists... 99%Reading package lists... Done
-Building dependency tree... 0%Building dependency tree... 0%Building dependency tree... 50%Building dependency tree... 50%Building dependency tree... 67%Building dependency tree... Done
-Reading state information... 0% Reading state information... 0%Reading state information... Done
-python3-py7zr is already the newest version (0.11.3+dfsg-8build1).
-0 upgraded, 0 newly installed, 0 to remove and 80 not upgraded.
-[?2004hroot@65d87fd22d30:/app# [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-  File "<stdin>", line 7
-    if not pwd or pwd.startswith('#!') or pwd.startswith('!')::
-                                                              ^
-SyntaxError: invalid syntax
-[?2004hroot@65d87fd22d30:/app# [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004hroot@65d87fd22d30:/app# [?2004l
-py7zr is available
-[?2004hroot@65d87fd22d30:/app# [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004hroot@65d87fd22d30:/app# [?2004l
-total 12
-drwxr-xr-x. 1 root root  58 May 18 23:34 [0m[01;34m.[0m
-drwxr-xr-x. 1 root root  46 May 18 23:31 [01;34m..[0m
--rw-r--r--. 1 root root 739 May 18 23:34 crack.py
-drwxr-xr-x. 1 root root  14 May 18 23:31 [01;34mextracted[0m
--rw-r--r--. 1 root root 114 May 18 23:31 hash.txt
-drwxr-xr-x. 1 root root   6 Oct 31  2025 [01;34mjohn[0m
--rw-r--r--. 1 root root 215 Oct 24  2025 [01;31msecrets.7z[0m
-[?2004hroot@65d87fd22d30:/app# [?2004l
-import py7zr
-import sys
-import os
-
-with open('/app/john/run/password.lst', 'r', errors='ignore') as f:
-    for i, line in enumerate(f):
-        pwd = line.strip()
-        if not pwd or pwd.startswith('#') or pwd.startswith('!'):
-            continue
-        if i % 100 == 0:
-            print(f'Tried {i} passwords...', file=sys.stderr=True)
-        try:
-            with py7zr.SevenZipFile('/app/secrets.7z', mode='r', password=pwd) as z:
-                z.extractall(path='/app(path='/app/extracted')
-                print(f'Password found: {pwd}')
-}')
-                with open('/password.txt', 'q') as f_out:
-                    f_out.write(pwd)
-                sys.exit(0)
-        except:
-            pass
-print('Password not found')
-[?2004hroot@65d87fd22d30:/app# [?2004l
-total 0
-drwxr-xr-x. 1 root root 14 May 18 23:31 [0m[01;34m.[0m
-drwxr-xr-x. 1 root root 58 May 18 23:34 [01;34m..[0m
-drwxr-xr-x. 1 root root  0 May  4  2025 [01;34msecrets[0m
-[?2004hroot@65d87fd22d30:/app# [?2004l
-total 0
-drwxr-xr-x. 1 root root  0 May  4  2025 [0m[01;34m.[0m
-drwxr-xr-x. 1 root root 14 May 18 23:31 [01;34m..[0m
-[?2004hroot@65d87fd22d30:/app# [?2004l
-
-7-Zip 23.01 (x64) : Copyright (c) 1999-2023 Igor Pavlov : 2023-06-20
- 64-bit locale=C.UTF-8 Threads:32 OPEN_MAX:1024
-
-Scanning the drive for archives:
-  0M Scan         1 file, 215 bytes (1 KiB)
-
-Extracting archive: secrets.7z
---
-Path = secrets.7z
-Type = 7z
-Physical Size = 215
-Headers Size = 199
-Method = LZMA2:12 7zAES
-Solid = -
-Blocks = 1
-
-  0%    ERROR: Data Error in encrypted file. Wrong password? : secrets/secret_file.txt
-100% 1 T secrets/secret_file.txt                                
-Sub items Errors: 1
-
-Archives with Errors: 1
-
-Sub items Errors: 1
-Exit: 2
-total 0
-drwxr-xr-x. 1 root root  0 May  4  2025 [0m[01;34m.[0m
-drwxr-xr-x. 1 root root 14 May 18 23:31 [01;34m..[0m
-[?2004hroot@65d87fd22d30:/app# [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004hroot@65d87fd22d30:/app# [?2004l
-import py7zr
-import sys
-
-with open('/app/john/run/password.lst', 'r', errors='ignore') as f:
-    for i, line in enumerate(f):
-        pwd = line.strip()
-        if not pwd or pwd.startswith('#') or pwd.startswith('!'):
-            continue
-        try:
-            with py7zr.SevenZipFile('/app/secrets.7z', mode='r', password=pwd) as z:
-                z.extractall(path='/app/extracted')
-                print(f'Password found: {pwd}')
-                sys.exit(0)
-        except:
-            pass
-print('Password not found')
-[?2004hroot@65d87fd22d30:/app# [?2004l
-Script timed out or finished
-[?2004hroot@65d87fd22d30:/app# [?2004l
-total 0
-drwxr-xr-x. 1 root root 30 May 18 23:36 [0m[01;34m.[0m
-drwxr-xr-x. 1 root root 14 May 18 23:31 [01;34m..[0m
--rw-r--r--. 1 root root  0 May 18 23:36 secret_file.txt
--
-No pot file
-[?2004hroot@65d87fd22d30:/app# [?2004l
-[?2004hroot@65d87fd22d30:/app# [?2004l
-Script exit: 124
-[?2004hroot@65d87fd22d30:/app# [?2004l
--rw-------. 1 root root 0 May 18 23:32 /app/john/run/john.pot
-/app/john/run/john.pot
-[?2004hroot@65d87fd22d30:/app# [?2004l
-Trying: 123456
-Extracting archive: [01;31m[Ksecret[m[Ks.7z
-Path = [01;31m[Ksecret[m[Ks.7z
-[01;31m[KERROR[m[K: Data [01;31m[KError[m[K in encrypted file. [01;31m[KWrong[m[K password? : [01;31m[Ksecret[m[Ks/[01;31m[Ksecret[m[K_file.txt
-Sub items [01;31m[KError[m[Ks: 1
-Archives with [01;31m[KError[m[Ks: 1
-Sub items [01;31m[KError[m[Ks: 1
-Trying: 12345
-Extracting archive: [01;31m[Ksecret[m[Ks.7z
-Path = [01;31m[Ksecret[m[Ks.7z
-[01;31m[KERROR[m[K: Data [01;31m[KError[m[K in encrypted file. [01;31m[KWrong[m[K password? : [01;31m[Ksecret[m[Ks/[01;31m[Ksecret[m[K_file.txt
-Sub items [01;31m[KError[m[Ks: 1
-Archives with [01;31m[KError[m[Ks: 1
-Sub items [01;31m[KError[m[Ks: 1
-Trying: 123456789
-Extracting archive: [01;31m[Ksecret[m[Ks.7z
-Path = [01;31m[Ksecret[m[Ks.7z
-[01;31m[KERROR[m[K: Data [01;31m[KError[m[K in encrypted file. [01;31m[KWrong[m[K password? : [01;31m[Ksecret[m[Ks/[01;31m[Ksecret[m[K_file.txt
-Sub items [01;31m[KError[m[Ks: 1
-Archives with [01;31m[KError[m[Ks: 1
-Sub items [01;31m[KError[m[Ks: 1
-Trying: password
-Extracting archive: [01;31m[Ksecret[m[Ks.7z
-Path = [01;31m[Ksecret[m[Ks.7z
-[01;31m[KERROR[m[K: Data [01;31m[KError[m[K in encrypted file. [01;31m[KWrong[m[K password? : [01;31m[Ksecret[m[Ks/[01;31m[Ksecret[m[K_file.txt
-Sub items [01;31m[KError[m[Ks: 1
-Archives with [01;31m[KError[m[Ks: 1
-Sub items [01;31m[KError[m[Ks: 1
-Trying: qwerty
-Extracting archive: [01;31m[Ksecret[m[Ks.7z
-Path = [01;31m[Ksecret[m[Ks.7z
-[01;31m[KERROR[m[K: Data [01;31m[KError[m[K in encrypted file. [01;31m[KWrong[m[K password? : [01;31m[Ksecret[m[Ks/[01;31m[Ksecret[m[K_file.txt
-Sub items [01;31m[KError[m[Ks: 1
-Archives with [01;31m[KError[m[Ks: 1
-Sub items [01;31m[KError[m[Ks: 1
-Trying: letmein
-Extracting archive: [01;31m[Ksecret[m[Ks.7z
-Path = [01;31m[Ksecret[m[Ks.7z
-[01;31m[KERROR[m[K: Data [01;31m[KError[m[K in encrypted file. [01;31m[KWrong[m[K password? : [01;31m[Ksecret[m[Ks/[01;31m[Ksecret[m[K_file.txt
-Sub items [01;31m[KError[m[Ks: 1
-Archives with [01;31m[KError[m[Ks: 1
-Sub items [01;31m[KError[m[Ks: 1
-Trying: welcome
-Extracting archive: [01;31m[Ksecret[m[Ks.7z
-Path = [01;31m[Ksecret[m[Ks.7z
-[01;31m[KERROR[m[K: Data [01;31m[KError[m[K in encrypted file. [01;31m[KWrong[m[K password? : [01;31m[Ksecret[m[Ks/[01;31m[Ksecret[m[K_file.txt
-Sub items [01;31m[KError[m[Ks: 1
-Archives with [01;31m[KError[m[Ks: 1
-Sub items [01;31m[KError[m[Ks: 1
-Trying: admin
-Extracting archive: [01;31m[Ksecret[m[Ks.7z
-Path = [01;31m[Ksecret[m[Ks.7z
-[01;31m[KERROR[m[K: Data [01;31m[KError[m[K in encrypted file. [01;31m[KWrong[m[K password? : [01;31m[Ksecret[m[Ks/[01;31m[Ksecret[m[K_file.txt
-Sub items [01;31m[KError[m[Ks: 1
-Archives with [01;31m[KError[m[Ks: 1
-Sub items [01;31m[KError[m[Ks: 1
-Trying: master
-Extracting archive: [01;31m[Ksecret[m[Ks.7z
-Path = [01;31m[Ksecret[m[Ks.7z
-[01;31m[KERROR[m[K: Data [01;31m[KError[m[K in encrypted file. [01;31m[KWrong[m[K password? : [01;31m[Ksecret[m[Ks/[01;31m[Ksecret[m[K_file.txt
-Sub items [01;31m[KError[m[Ks: 1
-Archives with [01;31m[KError[m[Ks: 1
-Sub items [01;31m[KError[m[Ks: 1
-Trying: sunshine
-Extracting archive: [01;31m[Ksecret[m[Ks.7z
-Path = [01;31m[Ksecret[m[Ks.7z
-[01;31m[KERROR[m[K: Data [01;31m[KError[m[K in encrypted file. [01;31m[KWrong[m[K password? : [01;31m[Ksecret[m[Ks/[01;31m[Ksecret[m[K_file.txt
-Sub items [01;31m[KError[m[Ks: 1
-Archives with [01;31m[KError[m[Ks: 1
-Sub items [01;31m[KError[m[Ks: 1
-Trying: dragon
-Extracting archive: [01;31m[Ksecret[m[Ks.7z
-Path = [01;31m[Ksecret[m[Ks.7z
-[01;31m[KERROR[m[K: Data [01;31m[KError[m[K in encrypted file. [01;31m[KWrong[m[K password? : [01;31m[Ksecret[m[Ks/[01;31m[Ksecret[m[K_file.txt
-Sub items [01;31m[KError[m[Ks: 1
-Archives with [01;31m[KError[m[Ks: 1
-Sub items [01;31m[KError[m[Ks: 1
-Trying: iloveyou
-Extracting archive: [01;31m[Ksecret[m[Ks.7z
-Path = [01;31m[Ksecret[m[Ks.7z
-[01;31m[KERROR[m[K: Data [01;31m[KError[m[K in encrypted file. [01;31m[KWrong[m[K password? : [01;31m[Ksecret[m[Ks/[01;31m[Ksecret[m[K_file.txt
-Sub items [01;31m[KError[m[Ks: 1
-Archives with [01;31m[KError[m[Ks: 1
-Sub items [01;31m[KError[m[Ks: 1
-Trying: trustno1
-Extracting archive: [01;31m[Ksecret[m[Ks.7z
-Path = [01;31m[Ksecret[m[Ks.7z
-[01;31m[KERROR[m[K: Data [01;31m[KError[m[K in encrypted file. [01;31m[KWrong[m[K password? : [01;31m[Ksecret[m[Ks/[01;31m[Ksecret[m[K_file.txt
-Sub items [01;31m[KError[m[Ks: 1
-Archives with [01;31m[KError[m[Ks: 1
-Sub items [01;31m[KError[m[Ks: 1
-Trying: abc123
-Extracting archive: [01;31m[Ksecret[m[Ks.7z
-Path = [01;31m[Ksecret[m[Ks.7z
-[01;31m[KERROR[m[K: Data [01;31m[KError[m[K in encrypted file. [01;31m[KWrong[m[K password? : [01;31m[Ksecret[m[Ks/[01;31m[Ksecret[m[K_file.txt
-Sub items [01;31m[KError[m[Ks: 1
-Archives with [01;31m[KError[m[Ks: 1
-Sub items [01;31m[KError[m[Ks: 1
-Trying: football
-Extracting archive: [01;31m[Ksecret[m[Ks.7z
-Path = [01;31m[Ksecret[m[Ks.7z
-[01;31m[KERROR[m[K: Data [01;31m[KError[m[K in encrypted file. [01;31m[KWrong[m[K password? : [01;31m[Ksecret[m[Ks/[01;31m[Ksecret[m[K_file.txt
-Sub items [01;31m[KError[m[Ks: 1
-Archives with [01;31m[KError[m[Ks: 1
-Sub items [01;31m[KError[m[Ks: 1
-Trying: monkey
-Extracting archive: [01;31m[Ksecret[m[Ks.7z
-Path = [01;31m[Ksecret[m[Ks.7z
-[01;31m[KERROR[m[K: Data [01;31m[KError[m[K in encrypted file. [01;31m[KWrong[m[K password? : [01;31m[Ksecret[m[Ks/[01;31m[Ksecret[m[K_file.txt
-Sub items [01;31m[KError[m[Ks: 1
-Archives with [01;31m[KError[m[Ks: 1
-Sub items [01;31m[KError[m[Ks: 1
-[?2004hroot@65d87fd22d30:/app# [?2004l
-grep: unrecognized option '---'
-Usage: grep [OPTION]... PATTERNS [FILE]...
-Try 'grep --help' for more information.
- hash.txt
----
-"L-:
-[?2004hroot@65d87fd22d30:/app# [?2004l
-
-7-Zip 23.01 (x64) : Copyright (c) 1999-2023 Igor Pavlov : 2023-06-20
- 64-bit locale=C.UTF-8 Threads:32 OPEN_MAX:1024
-
-Scanning the drive for archives:
-  0M Scan         1 file, 215 bytes (1 KiB)
-
-Extracting archive: secrets.7z
---
-Path = secrets.7z
-Type = 7z
-Physical Size = 215
-Headers Size = 199
-Method = LZMA2:12 7zAES
-Solid = -
-Blocks = 1
-
-  0%    ERROR: Data Error in encrypted file. Wrong password? : secrets/secret_file.txt
-100% 1 T secrets/secret_file.txt                                
-Sub items Errors: 1
-
-Archives with Errors: 1
-
-Sub items Errors: 1
-Exit: 2
-[?2004hroot@65d87fd22d30:/app# [?2004l
--rw-r--r--. 1 root root    99202 Oct 31  2025 fuzz[01;31m[K.dic[m[K
--rw-r--r--. 1 root root 15327454 Oct 31  2025 password[01;31m[K.lst[m[K
-[?2004hroot@65d87fd22d30:/app# [?2004l
-Sub items Errors: 1
-
-Archives with Errors: 1
-
-Sub items Errors: 1
-Exit: 0
-total 0
-drwxr-xr-x. 1 root root 30 May  4  2025 [0m[01;34m.[0m
-drwxr-xr-x. 1 root root 14 May 18 23:36 [01;34m..[0m
--rw-r--r--. 1 root root  0 May 18 23:37 secret_file.txt
-[?2004hroot@65d87fd22d30:/app# [?2004l
-
-ERROR: Data Error in encrypted file. Wrong password? : secrets/secret_file.txt
-
-Sub items Errors: 1
-
-Archives with Errors: 1
-
-Sub items Errors: 1
-[?2004hroot@65d87fd22d30:/app# [?2004l
-
-ERROR: Data Error in encrypted file. Wrong password? : secrets/secret_file.txt
-
-Sub items Errors: 1
-
-Archives with Errors: 1
-
-Sub items Errors: 1
-[?2004hroot@65d87fd22d30:/app# [?2004l
-0
-1
-2
-3
-4
-5
-6
-7
-8
-9
-a
-b
-c
-x
-y
-z
-@
-#
-%
-^
-&
-*
-(
-)
--
-_
-=
-+
-,
-.
-[?2004hroot@65d87fd22d30:/app# [?2004l
-Using default input encoding: UTF-8
-Loaded 1 password hash (7z, 7-Zip archive encryption [SHA256 256/256 AVX2 8x AES])
-Cost 1 (iteration count) is 524288 for all loaded hashes
-Cost 2 (padding size) is 3 for all loaded hashes
-Cost 3 (compression type) is 2 for all loaded hashes
-Cost 4 (data length) is 13 for all loaded hashes
-Will run 32 OpenMP threads
-Note: Passwords longer than 28 rejected
-Press Ctrl-C to abort, or send SIGUSR1 to john process for status
-Wait...0g 0:00:00:19 0.07% (ETA: 07:25:12) 0g/s 51.51p/s 51.51c/s 51.51C/s rangers..burton
-Session aborted
----Exit: 124---
-[?2004hroot@65d87fd22d30:/app# [?2004l
-SHELL=/bin/bash
-TERM_PROGRAM_VERSION=3.4
-ASCIINEMA_REC=1
-TMUX=/tmp/tmux-0/default,472,0
-HOSTNAME=65d87fd22d30
-PWD=/app
-HOME=/root
-LS_COLORS=rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=00:tw=30;42:ow=34;42:st=37;44:ex=01;32:*.tar=01;31:*.tgz=01;31:*.arc=01;31:*.arj=01;31:*.taz=01;31:*.lha=01;31:*.lz4=01;31:*.lzh=01;31:*.lzma=01;31:*.tlz=01;31:*.txz=01;31:*.tzo=01;31:*.t7z=01;31:*.zip=01;31:*.z=01;31:*.dz=01;31:*.gz=01;31:*.lrz=01;31:*.lz=01;31:*.lzo=01;31:*.xz=01;31:*.zst=01;31:*.tzst=01;31:*.bz2=01;31:*.bz=01;31:*.tbz=01;31:*.tbz2=01;31:*.tz=01;31:*.deb=01;31:*.rpm=01;31:*.jar=01;31:*.war=01;31:*.ear=01;31:*.sar=01;31:*.rar=01;31:*.alz=01;31:*.ace=01;31:*.zoo=01;31:*.cpio=01;31:*.7z=01;31:*.rz=01;31:*.cab=01;31:*.wim=01;31:*.swm=01;31:*.dwm=01;31:*.esd=01;31:*.avif=01;35:*.jpg=01;35:*.jpeg=01;35:*.mjpg=01;35:*.mjpeg=01;35:*.gif=01;35:*.bmp=01;35:*.pbm=01;35:*.pgm=01;35:*.ppm=01;35:*.tga=01;35:*.xbm=01;35:*.xpm=01;35:*.tif=01;35:*.tiff=01;35:*.png=01;35:*.svg=01;35:*.svgz=01;35:*.mng=01;35:*.pcx=01;35:*.mov=01;35:*.mpg=01;35:*.mpeg=01;35:*.m2v=01;35:*.mkv=01;35:*.webm=01;35:*.webp=01;35:*.ogm=01;35:*.mp4=01;35:*.m4v=01;35:*.mp4v=01;35:*.vob=01;35:*.qt=01;35:*.nuv=01;35:*.wmv=01;35:*.asf=01;35:*.rm=01;35:*.rmvb=01;35:*.flc=01;35:*.avi=01;35:*.fli=01;35:*.flv=01;35:*.gl=01;35:*.dl=01;35:*.xcf=01;35:*.xwd=01;35:*.yuv=01;35:*.cgm=01;35:*.emf=01;35:*.ogv=01;35:*.ogx=01;35:*.aac=00;36:*.au=00;36:*.flac=00;36:*.m4a=00;36:*.mid=00;36:*.midi=00;36:*.mka=00;36:*.mp3=00;36:*.mpc=00;36:*.ogg=00;36:*.ra=00;36:*.wav=00;36:*.oga=00;36:*.opus=00;36:*.spx=00;36:*.xspf=00;36:*~=00;90:*#=00;90:*.bak=00;90:*.crdownload=00;90:*.dpkg-dist=00;90:*.dpkg-new=00;90:*.dpkg-old=00;90:*.dpkg-tmp=00;90:*.old=00;90:*.orig=00;90:*.part=00;90:*.rej=00;90:*.rpmnew=00;90:*.rpmorig=00;90:*.rpmsave=00;90:*.swp=00;90:*.tmp=00;90:*.ucf-dist=00;90:*.ucf-new=00;90:*.ucf-old=00;90:
-LESSCLOSE=/usr/bin/lesspipe %s %s
-TERM=tmux-256color
-LESSOPEN=| /usr/bin/lesspipe %s
-TMUX_PANE=%0
-SHLVL=2
-LC_CTYPE=C.UTF-8
-PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-TERM_PROGRAM=tmux
-_=/usr/bin/env
-OLDPWD=/app
-[?2004hroot@65d87fd22d30:/app# [?2004l
-Sub items Errors: 1
-
-Archives with Errors: 1
-
-Sub items Errors: 1
-[?2004hroot@65d87fd22d30:/app# [?2004l
-Sub items Errors: 1
-
-Archives with Errors: 1
-
-Sub items Errors: 1
-[?2004hroot@65d87fd22d30:/app# [?2004l
-Trying: p
-Extracting archive: [01;31m[Ksecret[m[Ks.7z
-Path = [01;31m[Ksecret[m[Ks.7z
-[01;31m[KERROR[m[K: Data [01;31m[KError[m[K in encrypted file. Wrong password? : [01;31m[Ksecret[m[Ks/[01;31m[Ksecret[m[K_file.txt
-Sub items [01;31m[KError[m[Ks: 1
-Archives with [01;31m[KError[m[Ks: 1
-Sub items [01;31m[KError[m[Ks: 1
-Trying: in
-Extracting archive: [01;31m[Ksecret[m[Ks.7z
-Path = [01;31m[Ksecret[m[Ks.7z
-[01;31m[KERROR[m[K: Data [01;31m[KError[m[K in encrypted file. Wrong password? : [01;31m[Ksecret[m[Ks/[01;31m[Ksecret[m[K_file.txt
-Sub items [01;31m[KError[m[Ks: 1
-Archives with [01;31m[KError[m[Ks: 1
-Sub items [01;31m[KError[m[Ks: 1
-Trying: openwall
-Extracting archive: [01;31m[Ksecret[m[Ks.7z
-Path = [01;31m[Ksecret[m[Ks.7z
-[01;31m[KERROR[m[K: Data [01;31m[KError[m[K in encrypted file. Wrong password? : [01;31m[Ksecret[m[Ks/[01;31m[Ksecret[m[K_file.txt
-Sub items [01;31m[KError[m[Ks: 1
-Archives with [01;31m[KError[m[Ks: 1
-Sub items [01;31m[KError[m[Ks: 1
-Trying: solar
-Extracting archive: [01;31m[Ksecret[m[Ks.7z
-Path = [01;31m[Ksecret[m[Ks.7z
-[01;31m[KERROR[m[K: Data [01;31m[KError[m[K in encrypted file. Wrong password? : [01;31m[Ksecret[m[Ks/[01;31m[Ksecret[m[K_file.txt
-Sub items [01;31m[KError[m[Ks: 1
-Archives with [01;31m[KError[m[Ks: 1
-Sub items [01;31m[KError[m[Ks: 1
-Trying: designer
-Extracting archive: [01;31m[Ksecret[m[Ks.7z
-Path = [01;31m[Ksecret[m[Ks.7z
-[01;31m[KERROR[m[K: Data [01;31m[KError[m[K in encrypted file. Wrong password? : [01;31m[Ksecret[m[Ks/[01;31m[Ksecret[m[K_file.txt
-Sub items [01;31m[KError[m[Ks: 1
-Archives with [01;31m[KError[m[Ks: 1
-Sub items [01;31m[KError[m[Ks: 1
-Trying: johnisscale
-Extracting archive: [01;31m[Ksecret[m[Ks.7z
-Path = [01;31m[Ksecret[m[Ks.7z
-[01;31m[KERROR[m[K: Data [01;31m[KError[m[K in encrypted file. Wrong password? : [01;31m[Ksecret[m[Ks/[01;31m[Ksecret[m[K_file.txt
-Sub items [01;31m[KError[m[Ks: 1
-Archives with [01;31m[KError[m[Ks: 1
-Sub items [01;31m[KError[m[Ks: 1
-Trying: johnny
-Extracting archive: [01;31m[Ksecret[m[Ks.7z
-Path = [01;31m[Ksecret[m[Ks.7z
-[01;31m[KERROR[m[K: Data [01;31m[KError[m[K in encrypted file. Wrong password? : [01;31m[Ksecret[m[Ks/[01;31m[Ksecret[m[K_file.txt
-Sub items [01;31m[KError[m[Ks: 1
-Archives with [01;31m[KError[m[Ks: 1
-Sub items [01;31m[KError[m[Ks: 1
-Trying: jumbo
-Extracting archive: [01;31m[Ksecret[m[Ks.7z
-Path = [01;31m[Ksecret[m[Ks.7z
-[01;31m[KERROR[m[K: Data [01;31m[KError[m[K in encrypted file. Wrong password? : [01;31m[Ksecret[m[Ks/[01;31m[Ksecret[m[K_file.txt
-Sub items [01;31m[KError[m[Ks: 1
-Archives with [01;31m[KError[m[Ks: 1
-Sub items [01;31m[KError[m[Ks: 1
-Trying: crack
-Extracting archive: [01;31m[Ksecret[m[Ks.7z
-Path = [01;31m[Ksecret[m[Ks.7z
-[01;31m[KERROR[m[K: Data [01;31m[KError[m[K in encrypted file. Wrong password? : [01;31m[Ksecret[m[Ks/[01;31m[Ksecret[m[K_file.txt
-Sub items [01;31m[KError[m[Ks: 1
-Archives with [01;31m[KError[m[Ks: 1
-Sub items [01;31m[KError[m[Ks: 1
-Trying: hash
-Extracting archive: [01;31m[Ksecret[m[Ks.7z
-Path = [01;31m[Ksecret[m[Ks.7z
-[01;31m[KERROR[m[K: Data [01;31m[KError[m[K in encrypted file. Wrong password? : [01;31m[Ksecret[m[Ks/[01;31m[Ksecret[m[K_file.txt
-Sub items [01;31m[KError[m[Ks: 1
-Archives with [01;31m[KError[m[Ks: 1
-Sub items [01;31m[KError[m[Ks: 1
-Trying: hashcat
-Extracting archive: [01;31m[Ksecret[m[Ks.7z
-Path = [01;31m[Ksecret[m[Ks.7z
-[01;31m[KERROR[m[K: Data [01;31m[KError[m[K in encrypted file. Wrong password? : [01;31m[Ksecret[m[Ks/[01;31m[Ksecret[m[K_file.txt
-Sub items [01;31m[KError[m[Ks: 1
-Archives with [01;31m[KError[m[Ks: 1
-Sub items [01;31m[KError[m[Ks: 1
-Trying: aes
-Extracting archive: [01;31m[Ksecret[m[Ks.7z
-Path = [01;31m[Ksecret[m[Ks.7z
-[01;31m[KERROR[m[K: Data [01;31m[KError[m[K in encrypted file. Wrong password? : [01;31m[Ksecret[m[Ks/[01;31m[Ksecret[m[K_file.txt
-Sub items [01;31m[KError[m[Ks: 1
-Archives with [01;31m[KError[m[Ks: 1
-Sub items [01;31m[KError[m[Ks: 1
-Trying: lzma
-Extracting archive: [01;31m[Ksecret[m[Ks.7z
-Path = [01;31m[Ksecret[m[Ks.7z
-[01;31m[KERROR[m[K: Data [01;31m[KError[m[K in encrypted file. Wrong password? : [01;31m[Ksecret[m[Ks/[01;31m[Ksecret[m[K_file.txt
-Sub items [01;31m[KError[m[Ks: 1
-Archives with [01;31m[KError[m[Ks: 1
-Sub items [01;31m[KError[m[Ks: 1
-Trying: 7zaes
-Extracting archive: [01;31m[Ksecret[m[Ks.7z
-Path = [01;31m[Ksecret[m[Ks.7z
-[01;31m[KERROR[m[K: Data [01;31m[KError[m[K in encrypted file. Wrong password? : [01;31m[Ksecret[m[Ks/[01;31m[Ksecret[m[K_file.txt
-Sub items [01;31m[KError[m[Ks: 1
-Archives with [01;31m[KError[m[Ks: 1
-Sub items [01;31m[KError[m[Ks: 1
-Trying: encrypted
-Extracting archive: [01;31m[Ksecret[m[Ks.7z
-Path = [01;31m[Ksecret[m[Ks.7z
-[01;31m[KERROR[m[K: Data [01;31m[KError[m[K in encrypted file. Wrong password? : [01;31m[Ksecret[m[Ks/[01;31m[Ksecret[m[K_file.txt
-Sub items [01;31m[KError[m[Ks: 1
-Archives with [01;31m[KError[m[Ks: 1
-Sub items [01;31m[KError[m[Ks: 1
-Trying: protected
-Extracting archive: [01;31m[Ksecret[m[Ks.7z
-Path = [01;31m[Ksecret[m[Ks.7z
-[01;31m[KERROR[m[K: Data [01;31m[KError[m[K in encrypted file. Wrong password? : [01;31m[Ksecret[m[Ks/[01;31m[Ksecret[m[K_file.txt
-Sub items [01;31m[KError[m[Ks: 1
-Archives with [01;31m[KError[m[Ks: 1
-Sub items [01;31m[KError[m[Ks: 1
-Trying: 9bytes
-Extracting archive: [01;31m[Ksecret[m[Ks.7z
-Path = [01;31m[Ksecret[m[Ks.7z
-[01;31m[KERROR[m[K: Data [01;31m[KError[m[K in encrypted file. Wrong password? : [01;31m[Ksecret[m[Ks/[01;31m[Ksecret[m[K_file.txt
-Sub items [01;31m[KError[m[Ks: 1
-Archives with [01;31m[KError[m[Ks: 1
-Sub items [01;31m[KError[m[Ks: 1
-Trying: secretfile
-Extracting archive: [01;31m[Ksecret[m[Ks.7z
-Path = [01;31m[Ksecret[m[Ks.7z
-[01;31m[KERROR[m[K: Data [01;31m[KError[m[K in encrypted file. Wrong password? : [01;31m[Ksecret[m[Ks/[01;31m[Ksecret[m[K_file.txt
-Sub items [01;31m[KError[m[Ks: 1
-Archives with [01;31m[KError[m[Ks: 1
-Sub items [01;31m[KError[m[Ks: 1
-[?2004hroot@65d87fd22d30:/app# [?2004l
-
-7-Zip 23.01 (x64) : Copyright (c) 1999-2023 Igor Pavlov : 2023-06-20
- 64-bit locale=C.UTF-8 Threads:32 OPEN_MAX:1024
-
-Scanning the drive for archives:
-  0M Scan         1 file, 215 bytes (1 KiB)
-
-Extracting archive: secrets.7z
---
-Path = secrets.7z
-Type = 7z
-Physical Size = 215
-Headers Size = 199
-Method = LZMA2:12 7zAES
-Solid = -
-Blocks = 1
-
-  0%    ERROR: Data Error in encrypted file. Wrong password? : secrets/secret_file.txt
-100% 1 T secrets/secret_file.txt                                
-Sub items Errors: 1
-
-Archives with Errors: 1
-
-Sub items Errors: 1
-Exit code: 2
-total 0
-drwxr-xr-x. 1 root root  0 May  4  2025 [0m[01;34m.[0m
-drwxr-xr-x. 1 root root 14 May 18 23:39 [01;34m..[0m
----
-[?2004hroot@65d87fd22d30:/app# [?2004l
-Files: 0
-Size:       0
-Compressed: 215
-[?2004hroot@65d87fd22d30:/app# [?2004l
-Command Line Error:
-Too short switch:
--o
-[?2004hroot@65d87fd22d30:/app# [?2004l
-Command Line Error:
-Too short switch:
--o
-[?2004hroot@65d87fd22d30:/app# [?2004l
-[01;31m[KERROR[m[K: Data [01;31m[KError[m[K in encrypted file. Wrong password? : secrets/secret_file.txt
-Sub items [01;31m[KError[m[Ks: 1
-Archives with [01;31m[KError[m[Ks: 1
-Sub items [01;31m[KError[m[Ks: 1
-[?2004hroot@65d87fd22d30:/app# [?2004l
-[?2004hroot@65d87fd22d30:/app# [?2004l
-#!comment: This list has been compiled by Solar Designer of Openwall Project
-#!comment: in 1996 through 2022.  It is assumed to be in the public domain.
-#!comment:
-#!comment: This list is based on passwords most commonly seen on a set of Unix
-#!comment: systems in mid-1990's, sorted for decreasing number of occurrences
-#!comment: (that is, more common passwords are listed first).  It has been
-#!comment: revised to also include common website passwords from public lists
-#!comment: of "top N passwords" from major community website compromises that
-#!comment: occurred in 2006 through 2010.  That's the first 3546 entries found
-#!comment: in here.  Many further entries were added in 2022 based on Pwned
-#!comment: Passwords v8 (HIBP) 100+ hits overlap with RockYou, further filtered
-#!comment: to require 97+ hits on top of RockYou's.  These criteria are such
-#!comment: that a password used by just one person many times is very unlikely
-#!comment: to be included.
-#!comment:
-#!comment: Last update: 2022/01/20 (1795690 entries)
-#!comment:
-#!comment: For more wordlists, see https://www.openwall.com/wordlists/
-123456
-12345
-password
-password1
-123456789
-12345678
-1234567890
-abc123
-computer
-tigger
-1234
-qwerty
-money
-carmen
-mickey
-secret
-summer
-internet
-a1b2c3
-123
-service
-
-canada
-hello
-ranger
-shadow
-baseball
-donald
-harley
-hockey
-letmein
-maggie
-[?2004hroot@65d87fd22d30:/app# [?2004l
-bash: cd: /app/john/run/john.conf: Not a directory
-[?2004hroot@65d87fd22d30:/app# [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004hroot@65d87fd22d30:/app# [?2004l
-Traceback (most recent call last):
-  File "/app/solve.py", line 13, in <module>
-    z.extractall(path='/app/extracted')
-  File "/usr/lib/python3/dist-packages/py7zr/py7zr.py", line 814, in extractall
-    self._extract(path=path, return_dict=False, callback=callback)
-  File "/usr/lib/python3/dist-packages/py7zr/py7zr.py", line 536, in _extract
-    self.worker.extract(self.fp, path, parallel=(not self.password_protected and not self._filePassed))
-  File "/usr/lib/python3/dist-packages/py7zr/py7zr.py", line 986, in extract
-    self.extract_single(fp, self.files, path, self.src_start, src_end, q, skip_notarget=skip_notarget)
-  File "/usr/lib/python3/dist-packages/py7zr/py7zr.py", line 1096, in extract_single
-    raise e
-  File "/usr/lib/python3/dist-packages/py7zr/py7zr.py", line 1078, in extract_single
-    crc32 = self.decompress(fp, f.folder, obfp, f.uncompressed, f.compressed, src_end)
-            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/usr/lib/python3/dist-packages/py7zr/py7zr.py", line 1126, in decompress
-    tmp = decompressor.decompress(fp, out_remaining)
-          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/usr/lib/python3/dist-packages/py7zr/compressor.py", line 789, in decompress
-    tmp = self._decompress(data, max_length)
-          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/usr/lib/python3/dist-packages/py7zr/compressor.py", line 758, in _decompress
-    data = decompressor.decompress(data)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-_lzma.LZMAError: Corrupt input data
-
-During handling of the above exception, another exception occurred:
-
-Traceback (most recent call last):
-  File "/app/solve.py", line 16, in <module>
-    except py7zr.exceptions.WrongPasswordError:
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-AttributeError: module 'py7zr.exceptions' has no attribute 'WrongPasswordError'
-[?2004hroot@65d87fd22d30:/app# [?2004l
-Exit: 1
-[?2004hroot@65d87fd22d30:/app# [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004h> [?2004l
-[?2004hroot@65d87fd22d30:/app# ^C[?2004l
-[?2004h[?2004l
-
-[?2004hroot@65d87fd22d30:/app# [?2004l
-secrets.7z:$7z$2$19$0$$16$7f2aeca3d70f5f1298c191ab0faf61fc$1658180191$16$13$703e06dc09b6c714749d8efc9fa55434$9$00
-[?2004hroot@65d87fd22d30:/app# [?2004l
-bash: /app/john/: Is a directory
-Try 'timeout --help' for more information.
-Using default input encoding: UTF-8
-Loaded 1 password hash (7z, 7-Zip archive encryption [SHA256 256/256 AVX2 8x AES])
-Cost 1 (iteration count) is 524288 for all loaded hashes
-Cost 2 (padding size) is 3 for all loaded hashes
-Cost 3 (compression type) is 2 for all loaded hashes
-Cost 4 (data length) is 13 for all loaded hashes
-Will run 32 OpenMP threads
-Note: Passwords longer than 28 rejected
-Press 'q' or Ctrl-C to abort, 'h' for help, almost any other key for status
-[0;33m1998[0m             ([0;33msecrets.7z[0m[0m)     
-1g 0:00:01:04 DONE (2026-05-18 23:44) 0.01541g/s 51.29p/s 51.29c/s 51.29C/s modem..jethrotull
-Use the "--show" option to display all of the cracked passwords reliably
-Session completed. 
-[?2004hroot@65d87fd22d30:/app# ^C[?2004l
-[?2004h[?2004l
-
-[?2004hroot@65d87fd22d30:/app# [?2004l
-bash: syntax error near unexpected token `done'
-[?2004hroot@65d87fd22d30:/app# [?2004l
-pass: 1998
-[?2004hroot@65d87fd22d30:/app# [?2004l
-secrets.7z:1998
-
-1 password hash cracked, 0 left
-[?2004hroot@65d87fd22d30:/app# [?2004l
-
-7-Zip 23.01 (x64) : Copyright (c) 1999-2023 Igor Pavlov : 2023-06-20
- 64-bit locale=C.UTF-8 Threads:32 OPEN_MAX:1024
-
-Scanning the drive for archives:
-  0M Scan         1 file, 215 bytes (1 KiB)
-
-Extracting archive: secrets.7z
---
-Path = secrets.7z
-Type = 7z
-Physical Size = 215
-Headers Size = 199
-Method = LZMA2:12 7zAES
-Solid = -
-Blocks = 1
-
-  0%    Everything is Ok
-
-Folders: 1
-Files: 1
-Size:       9
-Compressed: 215
-[?2004hroot@65d87fd22d30:/app# [?2004l
-honeybear[?2004hroot@65d87fd22d30:/app# [?2004l
-[?2004hroot@65d87fd22d30:/app# [?2004l
-honeybear[?2004hroot@65d87fd22d30:/app# 

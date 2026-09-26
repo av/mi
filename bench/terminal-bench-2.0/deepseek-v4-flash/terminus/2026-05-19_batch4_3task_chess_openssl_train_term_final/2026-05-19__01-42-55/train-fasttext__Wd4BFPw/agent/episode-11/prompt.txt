@@ -1,9 +1,0 @@
-New Terminal Output:
-
-root@fc9984fcd95c:/app# head -640000 train.txt > train_split.txt
-root@fc9984fcd95c:/app# tail -10000 train.txt > valid.txt
-root@fc9984fcd95c:/app# fasttext supervised -input train_split.txt -output model -dim 50 -lr 0.1 -epoch 15 -wordNgrams 2 -bucket 200000 -minCount 5 2>&1
-Read 87M words
-Number of words:  196680
-Number of labels: 5
-Progress:   4.8% words/sec/thread:  208262 lr:  0.095236 avg.loss:  1.108702 ETA:   0h 8m17s

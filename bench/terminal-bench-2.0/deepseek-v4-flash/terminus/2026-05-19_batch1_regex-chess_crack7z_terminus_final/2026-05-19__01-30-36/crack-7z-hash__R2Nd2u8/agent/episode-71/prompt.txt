@@ -1,5 +1,0 @@
-Previous response had parsing errors:
-ERROR: Invalid JSON: Expecting ',' delimiter: line 6 column 26 (char 458) | Content preview: '{\n  "analysis": "I\'m having JSON format errors. Let me write a simpler approach: create the Python s'...
-WARNINGS: - Extra text detected after JSON object
-
-Please fix these issues and provide a proper JSON response.
