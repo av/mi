@@ -1,0 +1,14 @@
+# Reference harness: Terminus 2 (Harbor built-in) on DeepSeek V4.1 Flash.
+# Settings follow Artificial Analysis' Terminus 2 runs of the DeepSeek V4 family on
+# TB 2.1 ("Reasoning, Max Effort", temperature 0.6 for reasoning models). No
+# published TB 2.x number exists for V4.1 Flash yet, so this run is the baseline.
+# Pinned to DeepInfra FP8 (the account's privacy settings exclude DeepSeek's own API).
+agents:
+  - name: terminus-2
+    model_name: openrouter/deepseek/deepseek-v4.1-flash
+    kwargs:
+      temperature: 0.6
+      llm_call_kwargs:
+        extra_body:
+          reasoning: {effort: max}
+          provider: {order: [deepinfra/fp8], allow_fallbacks: false}
