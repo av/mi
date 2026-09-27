@@ -4,8 +4,8 @@
   bench/compare.py JOB_DIR [JOB_DIR ...]          per-task pass rates (all trials pooled)
   bench/compare.py --a JOB_DIR... --b JOB_DIR...  A/B: per-task Fisher exact + signal/noise verdict
 
-JOB_DIR@AGENT keeps only one agent's trials (e.g. jobs/tb2@terminus-2, jobs/tb2@mi)
-when a job ran several agents.
+JOB_DIR@AGENT[/MODEL] keeps only one agent's trials when a job ran several
+(e.g. jobs/x@mi, jobs/x@terminus-2/deepseek-v4.1-flash).
 
 Reads Harbor's own files only: each job's result.json (Harbor's mean and
 pass@k are shown as computed by Harbor) and each trial's result.json
@@ -43,7 +43,7 @@ def load(dirs):
                 continue
             if "task_name" not in r or not r.get("finished_at"):
                 continue
-            if agent and (r.get("agent_info") or {}).get("name") != agent:
+            if agent and not selected(r, agent):
                 continue
             rewards = (r.get("verifier_result") or {}).get("rewards") or {}
             t = tasks[r["task_name"].split("/")[-1]]
@@ -59,10 +59,19 @@ def load(dirs):
     return tasks, jobs
 
 
+def selected(r, sel):
+    """AGENT or AGENT/MODEL (model matched on its last path segment or full name)."""
+    info = r.get("agent_info") or {}
+    name, _, model = sel.partition("/")
+    full = (info.get("model_info") or {}).get("name") or ""
+    return info.get("name") == name and (not model or model in (full, full.split("/")[-1]))
+
+
 def harbor_summary(jobs):
     for path, r, agent in jobs:
         for key, s in (r["stats"].get("evals") or {}).items():
-            if agent and not key.startswith(f"{agent}__"):
+            name, _, model = agent.partition("/")
+            if agent and not (key.startswith(f"{name}__") and model in key.split("__")[1]):
                 continue
             metrics = ", ".join(f"{k}={v:.3f}" for m in s.get("metrics", []) for k, v in m.items())
             pak = ", ".join(f"pass@{k}={v:.3f}" for k, v in sorted(s.get("pass_at_k", {}).items(), key=lambda x: int(x[0])))

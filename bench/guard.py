@@ -34,8 +34,17 @@ def usage():
 
 
 def harbor_pids(job):
-    out = subprocess.run(["pgrep", "-f", f"bin/harbor .*{job.name}"], capture_output=True, text=True).stdout
-    return [int(p) for p in out.split() if int(p) != os.getpid()]
+    """PIDs of `.../bin/python .../bin/harbor ...` processes whose arguments name the job
+    (shells that merely mention the job in a command string do not count)."""
+    pids = []
+    for d in Path("/proc").iterdir():
+        try:
+            args = [a.decode(errors="replace") for a in (d / "cmdline").read_bytes().split(b"\0") if a]
+        except (OSError, ValueError):
+            continue
+        if len(args) > 1 and args[1].endswith("/bin/harbor") and any(job.name in a for a in args[2:]):
+            pids.append(int(d.name))
+    return pids
 
 
 def docker_root():
