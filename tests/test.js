@@ -559,32 +559,32 @@ test('goal parses inline-refined and mid-line DECISION forms', async () => {
 });
 
 test('goal mode passes deadline from -d flag and MI_DEADLINE env', async () => {
-  let calls = 0;
+  // With a fresh deadline budget the pre-work judge is skipped: planner, then worker 1, then judges that see budget info.
+  let order = [];
   requestHandler = (req, res, body) => {
-    calls++;
     const prompt = body.messages.at(-1).content;
-    if (calls === 1) {
-      assert.match(prompt, /you are the planner for a goal loop/);
+    if (/you are the planner for a goal loop/.test(prompt)) {
+      order.push('planner');
       sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- done\nVERIFIER_SHAPE_CONTRACT\n- checked\nVERIFICATION_PLAN\n- inspect\nCURRENT_STATE\n- clean' });
-    } else {
-      // Judge should see budget info when deadline is set
-      assert.match(prompt, /you are a judge for a goal loop/);
+    } else if (/you are a judge for a goal loop/.test(prompt)) {
+      order.push('judge');
       assert.match(prompt, /budget:.*remaining of.*total/);
       sse(res, { role: 'assistant', content: 'done [PASS]\nACK' });
+    } else if (/you are worker/.test(prompt)) {
+      order.push('worker');
+      sse(res, { role: 'assistant', content: 'did it\nSTRATEGY: s\nFILES_MODIFIED: x\nCOMMANDS_SUCCEEDED: y\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
+    } else {
+      order.push('other');
+      sse(res, { role: 'assistant', content: 'confirmed [PASS]\nACK' });
     }
   };
-
-  // Test with -d flag
   const dl = Math.floor(Date.now() / 1000) + 300;
-  const result = await runMi(['-g', 'deadline test', '-c', 'check it', '-d', String(dl)]);
-  assert.strictEqual(result.status, 0);
-  assert.strictEqual(calls, 2);
-
-  // Test with MI_DEADLINE env var
-  calls = 0;
-  const result2 = await runMi(['-g', 'deadline test', '-c', 'check it'], { MI_DEADLINE: String(dl) });
-  assert.strictEqual(result2.status, 0);
-  assert.strictEqual(calls, 2);
+  for (const [args, env] of [[['-g', 'deadline test', '-c', 'check it', '-d', String(dl)], {}], [['-g', 'deadline test', '-c', 'check it'], { MI_DEADLINE: String(dl) }]]) {
+    order = [];
+    const result = await runMi(args, env);
+    assert.strictEqual(result.status, 0);
+    assert.deepStrictEqual(order.slice(0, 3), ['planner', 'worker', 'judge'], order.join(','));
+  }
 });
 
 test('goal NACK iteration includes strategy fingerprint and diversity warning in next worker', async () => {
@@ -2924,7 +2924,12 @@ import { tmpdir } from 'node:os';
 test('Harbor adapter routes tasks through goal mode with the eval prompts', async () => {
   const adapter = readFileSync(join(__dirname, '../bench/mi_agent.py'), 'utf8');
   assert.match(adapter, /class MiAgent\(BaseInstalledAgent\)/);
-  assert.match(adapter, /index\.mjs -g "\$1" -c "\$MI_GOAL_CHECK"/);
+  // goal comes from a file via launch.mjs: no process argv carries task text (kv-store-grpc self-kill, exit 143)
+  assert.match(adapter, /readFileSync\(process\.env\.MI_GOAL_FILE, 'utf8'\), '-c', process\.env\.MI_GOAL_CHECK/);
+  assert.match(adapter, /"\$NODE" \/opt\/mi\/launch\.mjs < \/dev\/null/);
+  assert.match(adapter, /bench-run\.sh \/opt\/mi\/task\.md"/);
+  assert.doesNotMatch(adapter, /bench-run\.sh \{shlex/);
+  assert.match(adapter, /cp \/tmp\/mi-goal-\*\.md \/tmp\/mi-goal-\*\.jsonl "\$LOG\/"/);
   assert.match(adapter, /"MI_GOAL_CHECK": TERMINAL_BENCH_CHECK/);
   assert.match(adapter, /hidden external verifier/);
   assert.match(adapter, /never NACK for margin/);
@@ -3137,39 +3142,38 @@ test('goal first iteration capped to 1/3 budget with partition hint', async () =
 });
 
 test('goal EXPLORE iterations keep full remaining budget (verification-cost cap only bites past EXPLORE)', async () => {
-  // Regression guard for the phase-gated iterFrac: iteration 1 is capped to ~1/3 of usable budget, but a later
-  // EXPLORE iteration must still get the FULL remaining budget (frac 1) — the 50% verification-cost cap applies
-  // only in COMMIT/URGENT, so legitimately-long many-iteration tasks are not truncated while in EXPLORE.
+  // Regression guard for the phase-gated iterFrac: every EXPLORE iteration, including iteration 1, gets the FULL
+  // usable remaining budget (frac 1). Iteration 1 used to be capped at ~1/3, which killed slow reasoning-model
+  // workers mid-work (TB 2.1, DeepSeek V4.1 Flash at max effort: 43 of 74 failing iterations ended at their cap).
+  // The 50% verification-cost cap applies only in COMMIT/URGENT. With a fresh budget the pre-work judge is skipped.
   const prompts = [];
+  let judges = 0;
   requestHandler = (req, res, body) => {
     const prompt = body.messages.at(-1).content;
     prompts.push(prompt);
-    if (prompts.length === 1) {
+    if (/you are the planner for a goal loop/.test(prompt)) {
       sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- done\nARTIFACTS: none\nVERIFIER_SHAPE_CONTRACT\n- ok\nVERIFICATION_PLAN\n- inspect\nCURRENT_STATE\n- empty' });
-    } else if (prompts.length === 2) {
-      sse(res, { role: 'assistant', content: 'not done [FAIL]\nNACK' }); // precheck NACK
-    } else if (prompts.length === 3) {
-      sse(res, { role: 'assistant', content: 'did work\nSTRATEGY: attempt 1\nFILES_MODIFIED: x\nCOMMANDS_SUCCEEDED: y\nCOMMANDS_FAILED: z\nBLOCKERS: b\nREMAINING: r' });
-    } else if (prompts.length === 4) {
-      sse(res, { role: 'assistant', content: 'still broken [FAIL]\nNACK' }); // judge 1 NACK
-    } else if (prompts.length === 5) {
-      sse(res, { role: 'assistant', content: 'did more\nSTRATEGY: attempt 2\nFILES_MODIFIED: x\nCOMMANDS_SUCCEEDED: y\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
+    } else if (/you are a judge for a goal loop/.test(prompt)) {
+      judges++;
+      sse(res, { role: 'assistant', content: judges === 1 ? 'still broken [FAIL]\nNACK' : 'all good [PASS]\nACK' });
+    } else if (/skeptical|blind/i.test(prompt) && !/you are worker/.test(prompt)) {
+      sse(res, { role: 'assistant', content: 'confirmed [PASS]\nACK' });
     } else {
-      sse(res, { role: 'assistant', content: 'all good [PASS]\nACK' }); // judge 2 ACK
+      sse(res, { role: 'assistant', content: 'did work\nSTRATEGY: attempt\nFILES_MODIFIED: x\nCOMMANDS_SUCCEEDED: y\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
     }
   };
   const deadline = Math.floor(Date.now() / 1000) + 900; // 15 min budget → stays in EXPLORE across instant mocks
   const t0 = Date.now();
   const result = await runMi(['-g', 'long task', '-c', 'check it', '-d', String(deadline)]);
   assert.strictEqual(result.status, 0);
-  // newest mi-goal event log written during this run (tool result isn't echoed to stdout)
+  assert.ok(!prompts.slice(0, 2).some(p => /you are a judge for a goal loop/.test(p)), 'no pre-work judge on a fresh deadline budget');
   const events = readdirSync('/tmp').filter(f => /^mi-goal-\d+\.jsonl$/.test(f)).map(f => `/tmp/${f}`).filter(p => statSync(p).mtimeMs >= t0).sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs)[0];
   assert.ok(events && existsSync(events), 'event log present');
   const iters = readFileSync(events, 'utf8').trim().split('\n').map(l => JSON.parse(l)).filter(e => e.type === 'iteration');
-  assert.strictEqual(iters.length, 2);
-  // iteration 1 is partitioned to ~1/3; iteration 2 (EXPLORE) keeps the full budget → ratio ~3, well above 2.
-  // If EXPLORE were wrongly capped to 0.5 the ratio would collapse to ~1.5.
-  assert.ok(iters[1].iter_timeout_ms > iters[0].iter_timeout_ms * 2, `EXPLORE iter2 (${iters[1].iter_timeout_ms}) not full vs iter1 (${iters[0].iter_timeout_ms})`);
+  assert.ok(iters.length >= 2, `expected >= 2 iterations, got ${iters.length}`);
+  const full = (deadline - Math.floor(t0 / 1000) - 120) * 1000;
+  // Both EXPLORE iterations get ~the full usable budget (a 1/3 cap on iteration 1 would be ~0.33x; a 0.5 cap ~0.5x).
+  for (const it of iters.slice(0, 2)) assert.ok(it.iter_timeout_ms > full * 0.9, `EXPLORE iteration ${it.iteration} capped: ${it.iter_timeout_ms} vs ${full}`);
 });
 
 test('goal COMMIT/URGENT iterations cap the verification cost at 50% of remaining budget', async () => {

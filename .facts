@@ -109,8 +109,8 @@
 - label: goal salvage/urgent phases trigger adaptively from an EMA of iteration duration (SALVAGE at max(60, 1.3*EMA); URGENT at max(2.5*EMA, 20% total)), EMA contribution clamped to 25% of total budget
   command: grep -q '1.3 \* e' tools/goal.mjs && grep -q '2.5 \* e' tools/goal.mjs
   tags: [implemented]
-- label: goal per-iteration verification-cost cap — iteration 1 gets 1/3 of usable budget, later EXPLORE iterations the full remaining, but COMMIT/URGENT iterations are bounded to 50% of remaining (matching the judge wallT cap) so a runaway refine/verify sweep on a working-enough artifact is cut off with budget left for SALVAGE
-  command: grep -qF 'iterFrac = i === 1 ? 0.333 : phase === ' tools/goal.mjs && grep -qF "* 1000 * iterFrac" tools/goal.mjs
+- label: goal per-iteration verification-cost cap — EXPLORE iterations (including iteration 1) get the full usable remaining budget, but COMMIT/URGENT iterations are bounded to 50% of remaining (matching the judge wallT cap) so a runaway refine/verify sweep on a working-enough artifact is cut off with budget left for SALVAGE
+  command: grep -qF "iterFrac = phase === 'EXPLORE' ? 1 : 0.5" tools/goal.mjs && grep -qF "* 1000 * iterFrac" tools/goal.mjs
   tags: [implemented]
 - label: goal draft-gate escalates one-shot past 40% elapsed budget with no live jobs: worker prompt becomes an artifacts-first salvage-style directive whose NACK is exempt from strategy/blockerSig accounting
   command: grep -q 'ARTIFACT ESCALATION' tools/goal.mjs && grep -q 'escalated' tools/goal.mjs && grep -qF '> 0.4' tools/goal.mjs
@@ -218,8 +218,8 @@
   command: test -f bench/configs/smoke.yaml && test -f bench/configs/subset.yaml && test -f bench/configs/full.yaml && grep -q 'bench/configs/mi.yaml -c bench/configs/subset.yaml' package.json && grep -q 'harbor==${HARBOR_VERSION:-0.23.0}' bench/harbor.sh
 - label: tasks are pulled from the Harbor registry (terminal-bench/terminal-bench-2-1), never vendored
   command: grep -q 'name: terminal-bench/terminal-bench-2-1' bench/configs/full.yaml && ! test -d bench/terminal-bench-2.1
-- label: harbor adapter uploads the local checkout to /opt/mi and runs mi in goal mode with TERMINAL_BENCH_CHECK and the eval system prompt
-  command: grep -q 'upload_dir(self._staged_checkout(), "/opt/mi")' bench/mi_agent.py && grep -q -- '-g "$1" -c "$MI_GOAL_CHECK"' bench/mi_agent.py && grep -q 'EVAL_SYSTEM_PROMPT' bench/mi_agent.py
+- label: harbor adapter uploads the local checkout to /opt/mi and runs mi in goal mode (goal read from a file by launch.mjs so no process argv carries task text) with TERMINAL_BENCH_CHECK and the eval system prompt
+  command: grep -q 'upload_dir(self._staged_checkout(), "/opt/mi")' bench/mi_agent.py && grep -q 'MI_GOAL_FILE' bench/mi_agent.py && grep -q '/opt/mi/launch.mjs' bench/mi_agent.py && grep -q 'EVAL_SYSTEM_PROMPT' bench/mi_agent.py
 - label: harbor adapter recomputes the trial's agent timeout from config.json + task.toml and sets MI_TASK_TIMEOUT, MI_DEADLINE (60s verifier buffer) and MI_GOAL_MAX (4-12)
   command: grep -q 'TrialConfig.model_validate_json' bench/mi_agent.py && grep -q 'MI_TASK_TIMEOUT - 60' bench/mi_agent.py && grep -q 'MI_GOAL_MAX' tools/goal.mjs
 - label: harbor TERMINAL_BENCH_CHECK treats /tests/ results as ground truth for what they cover, requires every goal-stated path/threshold with measured values, never NACKs for margin, and warns about the hidden external verifier
@@ -254,4 +254,7 @@
 # observability
 - label: SSE parser prints '[provider] Name (model)' to stderr once per distinct provider value per process when chunks carry a top-level provider field (OpenRouter); no-op when absent
   command: grep -q 'seenProviders' index.mjs && grep -q '\[provider\]' index.mjs
+  tags: [implemented]
+- label: under a deadline with more than half the budget left, the goal loop skips the pre-work LLM judge and every EXPLORE iteration (including iteration 1) gets the full usable remaining budget
+  command: grep -q "deadline && budget() > totalS \* 0.5" tools/goal.mjs && grep -qF "const iterFrac = phase === 'EXPLORE' ? 1 : 0.5;" tools/goal.mjs
   tags: [implemented]

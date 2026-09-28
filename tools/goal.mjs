@@ -112,7 +112,7 @@ export default {
       return { ok: verdict(out), out, duration: Date.now() - started };
     };
     const preMiss = missingAll();
-    let pre = preMiss ? mechNack(preMiss) : await judge(budgetGuidance());
+    let pre = preMiss ? mechNack(preMiss) : deadline && budget() > totalS * 0.5 ? { ok: false, mech: true, duration: 0, out: 'NACK — work not started; under a deadline the pre-work LLM judge is skipped (it never finds the goal met and can eat a third of the budget).' } : await judge(budgetGuidance());
     emit('precheck', { status: pre.ok ? 'ACK' : 'NACK', duration_ms: pre.duration, budget_remaining_s: budget(), excerpt: tail(pre.out) });
     if (pre.ok) return `goal already met.\nprogress log: ${log}\nevent log: ${events}\n${pre.out}`;
     if (isFatal(pre.out)) { emit('fatal', { phase: 'precheck' }); return `goal aborted: API credit exhaustion.\nprogress log: ${log}\nevent log: ${events}`; }
@@ -154,8 +154,8 @@ export default {
       // verification-cost cap: EXPLORE iterations may spend the full usable remaining budget, but once past EXPLORE
       // (COMMIT/URGENT) a single refine/verify cycle is bounded to 50% of remaining — matching the judge's own wallT
       // 50% cap — so a runaway sweep on a working-enough artifact is cut off with budget left for a SALVAGE artifact-write
-      // instead of grinding to the wall (tune-mjcf/sparql over-explore timeouts). iteration 1 keeps its 1/3 partition.
-      const iterFrac = i === 1 ? 0.333 : phase === 'EXPLORE' ? 1 : 0.5;
+      // instead of grinding to the wall (tune-mjcf/sparql over-explore timeouts).
+      const iterFrac = phase === 'EXPLORE' ? 1 : 0.5; // iteration 1 no longer capped at 1/3: slow (reasoning) models were killed mid-work
       const iterTimeout = deadline ? Math.min(timeout ?? Infinity, Math.max(i === 1 ? 60000 : 30000, (budget() - 120) * 1000 * iterFrac)) : timeout;
       const esc = !fastLane && !piv && !escalated && missing.length && (totalS - budget()) / totalS > 0.4 && !liveJobs().length ? (escalated = true) : false;
       if (missing.length) emit('draft_gate', { iteration: i, missing, escalated: esc });
