@@ -13,7 +13,6 @@ import atexit
 import json
 import os
 import re
-import shlex
 import shutil
 import subprocess
 import tempfile
@@ -90,7 +89,15 @@ echo "$NODE" > /opt/mi/NODE
 "$NODE" /opt/mi/index.mjs -v
 """
 
-# $1 = task instruction. Workdir detection and the AGENTS.md snapshot match the
+# Starts mi in goal mode with the goal read from $MI_GOAL_FILE: no process's argv
+# carries task text, so an agent's `pkill -f <word from the task>` cannot kill mi
+# or this wrapper (TB 2.1 kv-store-grpc: a cleanup matching `server.py` did, exit 143).
+LAUNCH = """import { readFileSync } from 'fs';
+process.argv = [process.argv[0], '/opt/mi/index.mjs', '-g', readFileSync(process.env.MI_GOAL_FILE, 'utf8'), '-c', process.env.MI_GOAL_CHECK];
+await import('/opt/mi/index.mjs');
+"""
+
+# $1 = file holding the task instruction. Workdir detection and the AGENTS.md snapshot match the
 # historical adapter; the budget env (MI_DEADLINE, MI_GOAL_MAX) drives the
 # goal loop's EXPLORE/COMMIT/URGENT/SALVAGE phases.
 WRAPPER = r"""
@@ -135,7 +142,10 @@ stamp() { while IFS= read -r line; do printf '[%6ds] %s\n' "$SECONDS" "$line"; d
 SECONDS=0
 # Process substitutions, not a pipeline: services mi leaves running for the
 # verifier may keep the log pipes open, and the wrapper must not wait for them.
-"$NODE" /opt/mi/index.mjs -g "$1" -c "$MI_GOAL_CHECK" < /dev/null \
+export MI_GOAL_FILE="$1"
+# the goal loop's own progress and event logs live in /tmp; keep them with the trial for trajectory analysis
+trap 'cp /tmp/mi-goal-*.md /tmp/mi-goal-*.jsonl "$LOG/" 2>/dev/null' EXIT
+"$NODE" /opt/mi/launch.mjs < /dev/null \
   > >(exec > "$LOG/mi-output.txt" 2>/dev/null; stamp) 2> >(exec > "$LOG/mi-stderr.txt" 2>/dev/null; stamp)
 CODE=$?
 sleep 1  # let the stampers flush
@@ -203,6 +213,7 @@ class MiAgent(BaseInstalledAgent):
             sha, dirty = git("rev-parse", "--short", "HEAD"), git("status", "--porcelain", "--", *PACKAGE_PATHS)
             (stage / "VERSION").write_text(f"{version}+{sha or 'nogit'}{'-dirty' if dirty else ''}\n")
             (stage / "bench-run.sh").write_text(WRAPPER)
+            (stage / "launch.mjs").write_text(LAUNCH)
             cls._stage = stage
         return cls._stage
 
@@ -278,9 +289,15 @@ class MiAgent(BaseInstalledAgent):
             env["OPENAI_BASE_URL"] = base_url
         if timeout := self._task_timeout():
             env["MI_TASK_TIMEOUT"] = str(timeout)
-        await self.exec_as_agent(
-            environment, command=f"bash /opt/mi/bench-run.sh {shlex.quote(instruction)}", env=env, cwd="/"
-        )
+        fd, task = tempfile.mkstemp(prefix="mi-task-", suffix=".md")
+        os.close(fd)
+        Path(task).write_text(instruction)
+        try:
+            await environment.upload_file(task, "/opt/mi/task.md")
+        finally:
+            os.unlink(task)
+        await self.exec_as_root(environment, command="chmod a+r /opt/mi/task.md")
+        await self.exec_as_agent(environment, command="bash /opt/mi/bench-run.sh /opt/mi/task.md", env=env, cwd="/")
 
     def populate_context_post_run(self, context: AgentContext) -> None:
         run = self.logs_dir / "run.txt"
