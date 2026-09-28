@@ -62,6 +62,29 @@ Protocol: one run is a smoke test, not a measurement. Single runs of the same
 commit differed by 6/22 before the pins and by ~3/22 after. Decide A/B
 questions with `-k 3` or more on both sides.
 
+## Harness comparison (mi vs Terminus 2)
+
+Stack a dataset config with agent configs; Harbor interleaves the agents task
+by task, so both harnesses meet the same host and provider conditions.
+
+```sh
+export OPENROUTER_API_KEY=...
+J=tb21-deepseek-v4-$(date +%Y%m%d)
+bench/harbor.sh run -y -c bench/configs/full.yaml \
+  -c bench/configs/agent-terminus2-deepseek-v4.1-flash.yaml \
+  -c bench/configs/agent-mi-deepseek-v4.1-flash.yaml \
+  -c bench/configs/agent-terminus2-deepseek-v4-flash-0731.yaml \
+  -n 4 --job-name $J &
+bench/guard.py jobs/$J --cap 40 &     # stops the job on spend, low disk or API refusals
+bench/compare.py --a jobs/$J@terminus-2/deepseek-v4.1-flash --b jobs/$J@mi
+bench/compare.py jobs/$J@terminus-2/deepseek-v4-flash-0731   # vs published 78.65%
+```
+
+Pilot first on a few tasks (same command plus
+`-d terminal-bench/terminal-bench-2-1 -i terminal-bench/<task> ...`) and
+scale Harbor's per-trial `cost_usd` before a full run. Results of the
+2026-09-27 run: `docs/benchmark-history.md`.
+
 ## Parameters
 
 Model and determinism knobs live in `bench/configs/mi.yaml`. Override kwargs

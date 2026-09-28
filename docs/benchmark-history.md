@@ -178,3 +178,52 @@ server, nginx) held the pipe open. kv-store-grpc and nginx-request-logging
 ACKed at ~230 s but ran until Harbor's 900 s kill. The verifier still passed
 them, but the trials logged `AgentTimeoutError`. `66a1d9e` fixes it, and the
 recheck ended at 247 s and 289 s, matching July's 250–450 s.
+
+## 2026-09-28: mi vs Terminus 2 on DeepSeek V4.1 Flash (TB 2.1, full)
+
+One Harbor job, `jobs/tb21-deepseek-v4-20260927` (gitignored), running all
+89 Terminal-Bench 2.1 tasks from the registry, k=1, n=4, with three agents
+interleaved per task. All agents used the same request settings:
+temperature 0.6, `reasoning.effort=max`, and OpenRouter pinned to DeepInfra
+FP8 with no fallbacks. The adapter was at `d94212a`.
+
+| Agent | Model | Pass | Rate | Agent timeouts | Spend |
+|---|---|---:|---:|---:|---:|
+| Terminus 2 | DeepSeek V4.1 Flash | 55/89 | 61.8% | 36 (6 still passed) | $2.48 (Harbor) |
+| **mi** | DeepSeek V4.1 Flash | **37/89** | **41.6%** | 8 (4 still passed); 1 self-kill | ~$4.90 (key delta − Harbor) |
+| Terminus 2 | DeepSeek V4 Flash 0731 | 60/89 | 67.4% | 31 (7 still passed) | $1.50 (Harbor) |
+
+Total model spend $9.34, including a $0.44 pilot (12 trials). The
+estimate from the pilot was ~$34; the actual cost was lower because the
+pilot tasks ran longer per token than the average task.
+
+**mi vs Terminus 2, same model and settings.** Both passed 34 tasks,
+Terminus 2 alone 21, mi alone 3 (`pytorch-model-recovery`, `sam-cell-seg`,
+`train-fasttext`), neither 31. McNemar exact p = 0.0003; `compare.py` gives
+SIGNAL (p = 0.004), −18 ± 6.3 tasks. The failure modes differ:
+- **mi:** 47 of its 52 failures exited cleanly after an ACK, with no timeout
+  or error. That is the false-ACK mode again.
+- **Terminus 2:** 30 of its 34 failures were agent timeouts.
+
+**Reference check.** Artificial Analysis publishes Terminus 2 + DeepSeek V4
+Flash 0731 (Reasoning, Max Effort) at 78.65% on TB 2.1 (pass@1 over 3
+repeats). Our run of the same pairing scored 67.4%: −11.2 points, about
+2.2 binomial SEs. Likely cause (inferred): generation speed. At max effort
+the model writes 20–55k output tokens per call, at about 60–75 tokens/s on
+DeepInfra. Terminus steps took a median 75–165 s, and 24 of its 29 failures
+were timeouts. AA's provider and sandbox (e2b) are not published per model,
+so this cannot be checked directly. No published TB 2.x number exists for
+V4.1 Flash or MiMo-V2.6-Pro (AA lists only TB 4.0 for them), so the V4.1
+Terminus 2 run above is our own baseline.
+
+**mi self-kill.** On `kv-store-grpc`, mi ran a cleanup that killed every
+process whose command line contained `server.py`. The task text is passed
+to mi as `-g "<task>"`, so the cleanup killed mi and its wrapper too (exit
+143). Terminus 2 never puts the instruction in a process's arguments.
+Fixing this needs mi to read the goal from a file or stdin (`index.mjs`).
+
+Earlier attempts on 09-26 are superseded:
+- A DeepSeek-V3.2 / TB 2.0 plan, dropped as not relevant to current models.
+- A run lost to a full host `/tmp`.
+- A run lost to an exhausted OpenRouter balance, kept as
+  `jobs/INVALID-no-credits-tb2-deepseek-v3.2-20260926`.
