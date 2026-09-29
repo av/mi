@@ -3104,41 +3104,30 @@ test('goal forced salvage after 5 identical blockers in deadline mode', async ()
   assert.ok(sawSalvage, 'forced salvage should have triggered after 5 identical blockers');
 });
 
-test('goal first iteration capped to 1/3 budget with partition hint', async () => {
+test('goal worker 1 states its time cap and gets DRAFT FIRST for missing artifacts from the start', async () => {
+  // Iteration 1 is one long attempt now (no 1/3 partition), so the draft-first directive must apply from iteration 1:
+  // on TB 2.1 (DeepSeek V4.1 Flash, max effort) 20 of 26 remaining failures ended with the declared artifact never written.
   const prompts = [];
   requestHandler = (req, res, body) => {
     const prompt = body.messages.at(-1).content;
     prompts.push(prompt);
-    if (prompts.length === 1) {
-      sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- done\nVERIFIER_SHAPE_CONTRACT\n- checked\nVERIFICATION_PLAN\n- inspect\nCURRENT_STATE\n- empty' });
-    } else if (prompts.length === 2) {
-      // Pre-check judge → NACK
-      sse(res, { role: 'assistant', content: 'not done [FAIL]\nNACK' });
-    } else if (prompts.length === 3) {
-      // Worker 1 — should have time partition hint
-      assert.match(prompt, /you are worker 1/);
-      assert.match(prompt, /budget is partitioned to guarantee retries/);
-      assert.match(prompt, /capped at ~\d+min/);
-      sse(res, { role: 'assistant', content: 'did work\nSTRATEGY: attempt 1\nFILES_MODIFIED: x\nCOMMANDS_SUCCEEDED: y\nCOMMANDS_FAILED: z\nBLOCKERS: b\nREMAINING: r' });
-    } else if (prompts.length === 4) {
-      // Judge 1 → NACK
-      sse(res, { role: 'assistant', content: 'still broken [FAIL]\nNACK' });
-    } else if (prompts.length === 5) {
-      // Worker 2 — should NOT have partition hint (only applies to iteration 1)
-      assert.match(prompt, /you are worker 2/);
-      assert.doesNotMatch(prompt, /budget is partitioned to guarantee retries/);
-      sse(res, { role: 'assistant', content: 'fixed\nSTRATEGY: attempt 2\nFILES_MODIFIED: x\nCOMMANDS_SUCCEEDED: all\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
-    } else {
-      // Judge 2 → ACK
+    if (/you are the planner for a goal loop/.test(prompt)) {
+      sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- done\nARTIFACTS: /tmp/mi-test-never-written-artifact.txt\nVERIFIER_SHAPE_CONTRACT\n- ok\nVERIFICATION_PLAN\n- inspect\nCURRENT_STATE\n- empty' });
+    } else if (/you are a judge for a goal loop/.test(prompt)) {
       sse(res, { role: 'assistant', content: 'all good [PASS]\nACK' });
+    } else {
+      sse(res, { role: 'assistant', content: 'wrote it\nSTRATEGY: s\nFILES_MODIFIED: x\nCOMMANDS_SUCCEEDED: y\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
     }
   };
-
+  rmSync('/tmp/mi-test-never-written-artifact.txt', { force: true });
   const deadline = Math.floor(Date.now() / 1000) + 900; // 15 min budget
-  const result = await runMi(['-g', 'partition test', '-c', 'check it', '-d', String(deadline)]);
+  const result = await runMi(['-g', 'make the artifact', '-c', 'check it', '-d', String(deadline)]);
   assert.strictEqual(result.status, 0);
-  // 1 planner + 1 precheck + 1 worker1 + 1 judge1(NACK) + 1 worker2 + 1 judge2(ACK) + 1 skeptical(ACK) = 7
-  assert.strictEqual(prompts.length, 7);
+  const w1 = prompts.find(p => /you are worker 1\//.test(p));
+  assert.ok(w1, 'worker 1 prompt seen');
+  assert.match(w1, /DRAFT FIRST: required artifact\(s\) still missing: \/tmp\/mi-test-never-written-artifact\.txt/);
+  assert.match(w1, /capped at ~\d+min — the required artifacts must exist before then/);
+  assert.doesNotMatch(w1, /partitioned to guarantee retries/);
 });
 
 test('goal EXPLORE iterations keep full remaining budget (verification-cost cap only bites past EXPLORE)', async () => {
@@ -3171,7 +3160,7 @@ test('goal EXPLORE iterations keep full remaining budget (verification-cost cap 
   assert.ok(events && existsSync(events), 'event log present');
   const iters = readFileSync(events, 'utf8').trim().split('\n').map(l => JSON.parse(l)).filter(e => e.type === 'iteration');
   assert.ok(iters.length >= 2, `expected >= 2 iterations, got ${iters.length}`);
-  const full = (deadline - Math.floor(t0 / 1000) - 120) * 1000;
+  const total = deadline - Math.floor(t0 / 1000), full = (total - Math.max(120, total * 0.2)) * 1000; // minus the salvage reserve
   // Both EXPLORE iterations get ~the full usable budget (a 1/3 cap on iteration 1 would be ~0.33x; a 0.5 cap ~0.5x).
   for (const it of iters.slice(0, 2)) assert.ok(it.iter_timeout_ms > full * 0.9, `EXPLORE iteration ${it.iteration} capped: ${it.iter_timeout_ms} vs ${full}`);
 });
@@ -3216,9 +3205,11 @@ test('goal COMMIT/URGENT iterations cap the verification cost at 50% of remainin
     assert.ok(events && existsSync(events), 'event log present');
     const iters = readFileSync(events, 'utf8').trim().split('\n').map(l => JSON.parse(l)).filter(e => e.type === 'iteration');
     assert.strictEqual(iters.length, 2);
-    // iteration 2 (COMMIT) is capped at 0.5 * (budget-120)*1000 — distinct from the EXPLORE-full case above.
-    const b2 = iters[1].budget_remaining_s, expected = 0.5 * (b2 - 120) * 1000;
-    assert.ok(Math.abs(iters[1].iter_timeout_ms - expected) < 4000, `COMMIT iter2 cap ${iters[1].iter_timeout_ms} not ~half of (${b2}-120)*1000 = ${expected}`);
+    // iteration 2 (COMMIT) is capped at 0.5 * (budget - salvage reserve)*1000, reserve = max(120s, 20% of total) —
+    // distinct from the EXPLORE-full case above.
+    const reserve = Math.max(120, (deadline - Math.floor(t0 / 1000)) * 0.2);
+    const b2 = iters[1].budget_remaining_s, expected = 0.5 * (b2 - reserve) * 1000;
+    assert.ok(Math.abs(iters[1].iter_timeout_ms - expected) < 4000, `COMMIT iter2 cap ${iters[1].iter_timeout_ms} not ~half of (${b2}-${reserve})*1000 = ${expected}`);
     // and it must be strictly below iteration 1's cap (EXPLORE-full frac would have kept it far higher).
     assert.ok(iters[1].iter_timeout_ms < iters[0].iter_timeout_ms, `COMMIT iter2 (${iters[1].iter_timeout_ms}) not below iter1 (${iters[0].iter_timeout_ms})`);
   } finally { rmSync(offsetFile, { force: true }); }

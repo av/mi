@@ -89,8 +89,8 @@
   command: test $(grep -c 'STRICTLY READ-ONLY' tools/goal.mjs) -eq 2 && grep -q 'commit/merge/cherry-pick/rebase/checkout/reset/branch/clean/stash/apply' tools/goal.mjs && grep -q 'so the WORKER performs the repair' tools/goal.mjs
 - label: goal worker restart-before-ACK guidance carves out VMs/emulators/long-boot systems — never restart those
   command: grep -q 'VM/emulator/long-boot system — never restart those' tools/goal.mjs
-- label: goal planner emits ARTIFACTS: line; draft gate prefixes worker with draft-first directive when artifacts missing past 15% budget, without producing NACKs or feeding blockerSigs
-  command: grep -q 'ARTIFACTS:' tools/goal.mjs && grep -q 'draftGate' tools/goal.mjs && grep -qF '> 0.15' tools/goal.mjs && grep -q 'DRAFT FIRST' tools/goal.mjs && grep -q "emit('draft_gate'" tools/goal.mjs
+- label: goal planner emits ARTIFACTS: line; draft gate prefixes every worker (from iteration 1) with a draft-first directive while declared artifacts are missing, without producing NACKs or feeding blockerSigs
+  command: grep -q 'ARTIFACTS:' tools/goal.mjs && grep -q 'draftGate' tools/goal.mjs && grep -qF "deadline && artifacts.length ? artifacts.filter" tools/goal.mjs && grep -q 'DRAFT FIRST' tools/goal.mjs && grep -q "emit('draft_gate'" tools/goal.mjs
 - label: MI_JUDGE_MODEL and MI_JUDGE_PARAMS optionally override model/params for judge and skeptical recheck delegates only
   command: grep -q 'MI_JUDGE_MODEL' tools/goal.mjs && grep -q 'MI_JUDGE_PARAMS' tools/goal.mjs && test $(grep -c 'env: jenv' tools/goal.mjs) -eq 2
 - label: goal loop shares one bg-jobs registry per session (MI_SESSION_ID) and polls live jobs without LLM calls — MI_JOB_POLL_MS interval, stall guard, cumulative 50%-of-budget cap
@@ -257,4 +257,7 @@
   tags: [implemented]
 - label: under a deadline with more than half the budget left, the goal loop skips the pre-work LLM judge and every EXPLORE iteration (including iteration 1) gets the full usable remaining budget
   command: grep -q "deadline && budget() > totalS \* 0.5" tools/goal.mjs && grep -qF "const iterFrac = phase === 'EXPLORE' ? 1 : 0.5;" tools/goal.mjs
+  tags: [implemented]
+- label: under a deadline, EXPLORE/COMMIT worker iterations leave max(120s, 20% of the total budget) for salvage, and salvage keeps no 90s judge bank when no declared artifact exists yet
+  command: grep -qF "(budget() - Math.max(120, totalS * 0.2)) * 1000 * iterFrac" tools/goal.mjs && grep -qF "(budget() - (missingAll() ? 20 : 90)) * 1000" tools/goal.mjs
   tags: [implemented]
