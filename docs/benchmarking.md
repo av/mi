@@ -85,6 +85,21 @@ Pilot first on a few tasks (same command plus
 scale Harbor's per-trial `cost_usd` before a full run. Results of the
 2026-09-27 run: `docs/benchmark-history.md`.
 
+## Rerunning a failure set
+
+To measure a harness change cheaply, rerun only the tasks a previous run failed,
+with the same agent config:
+
+```sh
+bench/harbor.sh run -y -c bench/configs/tb21-mi-v4.1-failed.yaml \
+  -c bench/configs/agent-mi-deepseek-v4.1-flash.yaml -n 4 --job-name tb21-mi-fix-$(date +%Y%m%d) &
+bench/guard.py jobs/tb21-mi-fix-$(date +%Y%m%d) --cap 5 &
+```
+
+Each trial's `agent/mi-goal-*.md` holds the goal loop's planner, worker and
+judge log. Its "judge summary" shows whether an iteration ended at its cap or
+with the declared artifact still missing.
+
 ## Parameters
 
 Model and determinism knobs live in `bench/configs/mi.yaml`. Override kwargs

@@ -227,3 +227,106 @@ Earlier attempts on 09-26 are superseded:
 - A run lost to a full host `/tmp`.
 - A run lost to an exhausted OpenRouter balance, kept as
   `jobs/INVALID-no-credits-tb2-deepseek-v3.2-20260926`.
+
+
+## 2026-09-29: harness fixes from the V4.1 Flash trajectories, remeasured on the failed set
+
+**Correction to the section above.** The claim that most of mi's failures were
+false ACKs was an inference from "clean exit" and it was wrong. All 47
+clean-exit failures ended with the goal loop's own NACK (0 ACKs) after 1–2
+worker iterations. The trajectories show time starvation:
+- Worker iterations were killed exactly at their cap: 43 of 74 in failing
+  tasks, 9 of 50 in passing ones.
+- A pre-work LLM judge timed out twice in 9 failures (~360 s lost) and never
+  once found a goal already met (0 of 80 trials).
+- The first worker was capped at ⅓ of the budget. At max reasoning effort one
+  model call can take minutes, so workers were still exploring when killed.
+
+Fixes, with the same model, provider and sampling as the 37/89 run (`agent-mi-deepseek-v4.1-flash.yaml`):
+
+| Commit | Fix | Evidence it came from |
+|---|---|---|
+| `8abafe2` | skip the pre-work LLM judge on a fresh deadline budget; iteration 1 gets the full EXPLORE budget, not ⅓ | baseline `mi-output.txt` timelines (e.g. `regex-log`: goal 1 at 90 s, NACK at 299 s = the 209 s cap) |
+| `50d6f11` | goal read from a file via the `LAUNCH` script in `bench/mi_agent.py`, so no process argv carries task text; goal logs copied to `/logs/agent` | `kv-store-grpc` baseline: cleanup matching `server.py` killed mi (exit 143) |
+| `d17ae0d` | DRAFT FIRST from iteration 1; EXPLORE/COMMIT iterations keep max(120 s, 20%) for salvage; no 90 s judge bank when nothing exists yet | round-1 goal logs: 20 of 26 remaining failures ended with the declared artifact never written, salvage got 0–30 s |
+
+**Rerun set:** the 47 clean-exit failures plus `kv-store-grpc`
+(`bench/configs/tb21-mi-v4.1-failed.yaml`). Round 2 reran only the 31
+still failing (`bench/configs/tb21-mi-v4.1-failed-r2.yaml`).
+
+| | Round 1 (`8abafe2`+`50d6f11`) | Round 2 (+`d17ae0d`) | Set total |
+|---|---:|---:|---:|
+| Tasks run | 48 | 31 | 48 |
+| New passes | 17 | 3 | **20/48** (was 0/48) |
+| Agent timeouts | 20 | 0 | |
+| "Artifact never written" among failures | 20 of 26 logged | 4 of 28 | |
+| Spend | $2.81 | $1.41 | $4.22 |
+
+The round-1 passes were not rerun with round-2 code, so their status under
+`d17ae0d` is inferred, not measured. Tasks outside the set (mi's 33 baseline
+passes and 4 agent-timeout failures) were not rerun either; that they are
+unchanged is inferred. With those assumptions mi would be at 57/89, against
+Terminus 2's 55/89 on the same model. That total is inferred and k=1: a
+claim needs a full rerun.
+
+Attribution rule (from the timelines):
+- **"iter-1 budget":** the passing iteration ran longer than the old ⅓ cap.
+- **"argv":** the task that self-killed before.
+- **"draft-first":** every judge in the round-2 log saw the artifact present.
+- `mteb-leaderboard` shows no iteration marker, so it is left as unattributed
+  or variance.
+
+Trajectories live under `jobs/tb21-mi-fix-r1-20260928/` (r1) and
+`jobs/tb21-mi-fix-r2-20260929/` (r2), gitignored, each with `mi-output.txt`
+and the goal loop's `mi-goal-*.md` / `.jsonl`.
+
+| task | before (37/89 run) | round 1 | round 2 | pass attributed to | trajectory |
+|---|---|---|---|---|---|
+| adaptive-rejection-sampler | fail (clean NACK exit) | pass | — | R1: iter-1 budget | `r1/adaptive-rejection-sampler__hPq5kVo/agent/` |
+| build-cython-ext | fail (clean NACK exit) | pass | — | R1: iter-1 budget | `r1/build-cython-ext__eJP3PP6/agent/` |
+| chess-best-move | fail (clean NACK exit) | NACK: artifact never written | NACK (loop ended unfinished) |  | `r2/chess-best-move__3FTcgWS/agent/` |
+| circuit-fibsqrt | fail (clean NACK exit) | pass | — | R1: iter-1 budget | `r1/circuit-fibsqrt__iD9wiDv/agent/` |
+| cobol-modernization | fail (clean NACK exit) | NACK: artifact never written | pass | R2: draft-first (artifact existed at every judge) | `r2/cobol-modernization__3w8M9aR/agent/` |
+| compile-compcert | fail (clean NACK exit) | pass | — | R1: iter-1 budget | `r1/compile-compcert__MUhyiDE/agent/` |
+| custom-memory-heap-crash | fail (clean NACK exit) | AgentTimeoutError | NACK (loop ended unfinished) |  | `r2/custom-memory-heap-crash__yd6wZjb/agent/` |
+| db-wal-recovery | fail (clean NACK exit) | pass | — | R1: iter-1 budget | `r1/db-wal-recovery__ArEMv4S/agent/` |
+| dna-assembly | fail (clean NACK exit) | NACK: artifact never written | NACK (loop ended unfinished) |  | `r2/dna-assembly__SWubpmh/agent/` |
+| extract-elf | fail (clean NACK exit) | pass | — | R1: iter-1 budget | `r1/extract-elf__fpr3mmK/agent/` |
+| extract-moves-from-video | fail (clean NACK exit) | NACK: artifact never written | VerifierTimeoutError |  | `r2/extract-moves-from-video__a2w3qVf/agent/` |
+| feal-differential-cryptanalysis | fail (clean NACK exit) | NACK: artifact never written | NACK (loop ended unfinished) |  | `r2/feal-differential-cryptanalysis__UFLCnyS/agent/` |
+| feal-linear-cryptanalysis | fail (clean NACK exit) | NACK: artifact never written | NACK (loop ended unfinished) |  | `r2/feal-linear-cryptanalysis__KeqxELU/agent/` |
+| filter-js-from-html | fail (clean NACK exit) | AgentTimeoutError | NACK (loop ended unfinished) |  | `r2/filter-js-from-html__o3MdwTg/agent/` |
+| git-leak-recovery | fail (clean NACK exit) | NACK (loop ended unfinished) | NACK (loop ended unfinished) |  | `r2/git-leak-recovery__fxYNBKc/agent/` |
+| gpt2-codegolf | fail (clean NACK exit) | NACK: artifact never written | NACK (loop ended unfinished) |  | `r2/gpt2-codegolf__sYVoBpA/agent/` |
+| hf-model-inference | fail (clean NACK exit) | pass | — | R1: iter-1 budget | `r1/hf-model-inference__hwVexzD/agent/` |
+| install-windows-3.11 | fail (clean NACK exit) | pass | — | R1: iter-1 budget | `r1/install-windows-3.11__3SRyGWe/agent/` |
+| kv-store-grpc | fail (NonZeroAgentExitCodeError) | pass | — | R1: argv (self-kill) | `r1/kv-store-grpc__mZLx8Sc/agent/` |
+| large-scale-text-editing | fail (clean NACK exit) | AgentTimeoutError | NACK (loop ended unfinished) |  | `r2/large-scale-text-editing__FRVNLZC/agent/` |
+| largest-eigenval | fail (clean NACK exit) | AgentTimeoutError | NACK (loop ended unfinished) |  | `r2/largest-eigenval__KJJbTBB/agent/` |
+| mailman | fail (clean NACK exit) | AgentTimeoutError | NACK (loop ended unfinished) |  | `r2/mailman__6d37bSW/agent/` |
+| make-doom-for-mips | fail (clean NACK exit) | NACK: artifact never written | NACK (loop ended unfinished) |  | `r2/make-doom-for-mips__iSYDQw5/agent/` |
+| make-mips-interpreter | fail (clean NACK exit) | NACK: artifact never written | NACK (loop ended unfinished) |  | `r2/make-mips-interpreter__Z7JTU9J/agent/` |
+| model-extraction-relu-logits | fail (clean NACK exit) | NACK: artifact never written | NACK (loop ended unfinished) |  | `r2/model-extraction-relu-logits__ZypnR39/agent/` |
+| mteb-leaderboard | fail (clean NACK exit) | pass | — | R1: unattributed (variance?) | `r1/mteb-leaderboard__ALpLXXD/agent/` |
+| mteb-retrieve | fail (clean NACK exit) | pass | — | R1: iter-1 budget | `r1/mteb-retrieve__7QHoQBi/agent/` |
+| overfull-hbox | fail (clean NACK exit) | pass | — | R1: iter-1 budget | `r1/overfull-hbox__LRhdxRx/agent/` |
+| path-tracing | fail (clean NACK exit) | pass | — | R1: iter-1 budget | `r1/path-tracing__kWU5yif/agent/` |
+| path-tracing-reverse | fail (clean NACK exit) | NACK: artifact never written | NACK (loop ended unfinished) |  | `r2/path-tracing-reverse__5WTMaef/agent/` |
+| polyglot-c-py | fail (clean NACK exit) | pass | — | R1: iter-1 budget | `r1/polyglot-c-py__EkxKGmY/agent/` |
+| polyglot-rust-c | fail (clean NACK exit) | NACK: artifact never written | NACK: artifact never written |  | `r2/polyglot-rust-c__EWruq54/agent/` |
+| protein-assembly | fail (clean NACK exit) | NACK: artifact never written | NACK (loop ended unfinished) |  | `r2/protein-assembly__t8G6T4i/agent/` |
+| pytorch-model-cli | fail (clean NACK exit) | AgentTimeoutError | NACK (loop ended unfinished) |  | `r2/pytorch-model-cli__AUec95p/agent/` |
+| qemu-alpine-ssh | fail (clean NACK exit) | NACK (loop ended unfinished) | NACK (loop ended unfinished) |  | `r2/qemu-alpine-ssh__dNywDYB/agent/` |
+| qemu-startup | fail (clean NACK exit) | AgentTimeoutError | NACK (loop ended unfinished) |  | `r2/qemu-startup__E7hKN8j/agent/` |
+| query-optimize | fail (clean NACK exit) | VerifierTimeoutError | pass | R2: draft-first (artifact existed at every judge) | `r2/query-optimize__BJx289v/agent/` |
+| raman-fitting | fail (clean NACK exit) | NACK: artifact never written | NACK (loop ended unfinished) |  | `r2/raman-fitting__pEwv99s/agent/` |
+| regex-chess | fail (clean NACK exit) | NACK: artifact never written | NACK: artifact never written |  | `r2/regex-chess__xcKRL26/agent/` |
+| regex-log | fail (clean NACK exit) | pass | — | R1: iter-1 budget | `r1/regex-log__RmQKRm3/agent/` |
+| rstan-to-pystan | fail (clean NACK exit) | pass | — | R1: iter-1 budget | `r1/rstan-to-pystan__fr83mmf/agent/` |
+| schemelike-metacircular-eval | fail (clean NACK exit) | NACK: artifact never written | NACK: artifact never written |  | `r2/schemelike-metacircular-eval__6h5wLxC/agent/` |
+| sparql-university | fail (clean NACK exit) | NACK: artifact never written | NACK (loop ended unfinished) |  | `r2/sparql-university__vY37dpg/agent/` |
+| sqlite-db-truncate | fail (clean NACK exit) | NACK: artifact never written | pass | R2: draft-first (artifact existed at every judge) | `r2/sqlite-db-truncate__aNiGKcK/agent/` |
+| torch-pipeline-parallelism | fail (clean NACK exit) | AgentTimeoutError | NACK: artifact never written |  | `r2/torch-pipeline-parallelism__FXcXq7i/agent/` |
+| torch-tensor-parallelism | fail (clean NACK exit) | pass | — | R1: iter-1 budget | `r1/torch-tensor-parallelism__ckhM3Sa/agent/` |
+| tune-mjcf | fail (clean NACK exit) | AgentTimeoutError | NACK (loop ended unfinished) |  | `r2/tune-mjcf__DXnVH8t/agent/` |
+| write-compressor | fail (clean NACK exit) | NACK: artifact never written | NACK (loop ended unfinished) |  | `r2/write-compressor__Ww7MEzt/agent/` |
