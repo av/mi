@@ -2909,6 +2909,52 @@ test('error .code preserved on HTTP error enables compaction', async () => {
   assert.match(result.stdout, /recovered after compaction/);
 });
 
+test('goal does not treat task text about funds/balances as API credit exhaustion', async () => {
+  // cobol-modernization (TB 2.1): planner output quoting the task's "insufficient funds" / balance checks tripped
+  // isFatal and aborted the goal loop at planning (91s, no worker ever ran).
+  const prompts = [];
+  requestHandler = (req, res, body) => {
+    const prompt = body.messages.at(-1).content;
+    prompts.push(prompt);
+    if (/you are the planner for a goal loop/.test(prompt)) sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- balances correct\nCURRENT_STATE\n- Transaction failed: insufficient funds; balance 0000000880 below amount; payment rejected' });
+    else if (/you are a judge for a goal loop/.test(prompt)) sse(res, { role: 'assistant', content: 'ok [PASS]\nACK' });
+    else sse(res, { role: 'assistant', content: 'done\nSTRATEGY: s\nFILES_MODIFIED: x\nCOMMANDS_SUCCEEDED: y\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
+  };
+  const result = await runMi(['-g', 'fix the ledger', '-c', 'check', '-d', String(Math.floor(Date.now() / 1000) + 600)]);
+  assert.strictEqual(result.status, 0);
+  assert.ok(prompts.some(p => /you are worker 1/.test(p)), 'worker ran (no false fatal abort)');
+  assert.doesNotMatch(result.stdout, /API credit exhaustion/);
+});
+
+test('empty completion (no text, no tool calls) is retried instead of ending the turn', async () => {
+  // A reasoning model at max effort can spend its whole output budget thinking and return no answer
+  // (probe: DeepSeek V4.1 Flash, 131072 reasoning tokens, 0 content, 821s). That must not read as "done".
+  let calls = 0;
+  requestHandler = (req, res) => {
+    calls++;
+    if (calls === 1) sse(res, { role: 'assistant', content: '' });
+    else sse(res, { role: 'assistant', content: 'real answer' });
+  };
+  const result = await runMi(['-p', 'hi']);
+  assert.strictEqual(result.status, 0);
+  assert.strictEqual(calls, 2);
+  assert.match(result.stdout, /real answer/);
+});
+
+test('request that exceeds MI_REQUEST_TIMEOUT is aborted and retried', async () => {
+  // Runaway reasoning streams for many minutes; the per-request timeout (default 600s) cuts it and retries.
+  let calls = 0;
+  requestHandler = (req, res) => {
+    calls++;
+    if (calls === 1) { res.writeHead(200, { 'Content-Type': 'text/event-stream' }); res.write(': thinking\n\n'); setTimeout(() => { try { res.end(); } catch {} }, 4000); return; }
+    sse(res, { role: 'assistant', content: 'after retry' });
+  };
+  const result = await runMi(['-p', 'hi'], { MI_REQUEST_TIMEOUT: '1' });
+  assert.strictEqual(result.status, 0);
+  assert.ok(calls >= 2, `expected a retry, got ${calls} call(s)`);
+  assert.match(result.stdout, /after retry/);
+});
+
 test('MI_API_PARAMS with invalid JSON gives clean error', async () => {
   const result = await runMi(['-p', 'hello'], { MI_API_PARAMS: '{bad json' });
   assert.notStrictEqual(result.status, 0, 'Should exit with error');
@@ -3161,7 +3207,7 @@ test('goal EXPLORE iterations keep full remaining budget (verification-cost cap 
   assert.ok(events && existsSync(events), 'event log present');
   const iters = readFileSync(events, 'utf8').trim().split('\n').map(l => JSON.parse(l)).filter(e => e.type === 'iteration');
   assert.ok(iters.length >= 2, `expected >= 2 iterations, got ${iters.length}`);
-  const total = deadline - Math.floor(t0 / 1000), full = (total - Math.max(120, total * 0.2)) * 1000; // minus the salvage reserve
+  const total = deadline - Math.floor(t0 / 1000), full = (total - Math.max(60, total * 0.05)) * 1000; // minus the (artifacts-present) salvage reserve
   // Both EXPLORE iterations get ~the full usable budget (a 1/3 cap on iteration 1 would be ~0.33x; a 0.5 cap ~0.5x).
   for (const it of iters.slice(0, 2)) assert.ok(it.iter_timeout_ms > full * 0.9, `EXPLORE iteration ${it.iteration} capped: ${it.iter_timeout_ms} vs ${full}`);
 });
@@ -3206,9 +3252,9 @@ test('goal COMMIT/URGENT iterations cap the verification cost at 50% of remainin
     assert.ok(events && existsSync(events), 'event log present');
     const iters = readFileSync(events, 'utf8').trim().split('\n').map(l => JSON.parse(l)).filter(e => e.type === 'iteration');
     assert.strictEqual(iters.length, 2);
-    // iteration 2 (COMMIT) is capped at 0.5 * (budget - salvage reserve)*1000, reserve = max(120s, 20% of total) —
-    // distinct from the EXPLORE-full case above.
-    const reserve = Math.max(120, (deadline - Math.floor(t0 / 1000)) * 0.2);
+    // iteration 2 (COMMIT) is capped at 0.5 * (budget - salvage reserve)*1000; with no declared artifacts missing the
+    // reserve is max(60s, 5% of total) — distinct from the EXPLORE-full case above.
+    const reserve = Math.max(60, (deadline - Math.floor(t0 / 1000)) * 0.05);
     const b2 = iters[1].budget_remaining_s, expected = 0.5 * (b2 - reserve) * 1000;
     assert.ok(Math.abs(iters[1].iter_timeout_ms - expected) < 4000, `COMMIT iter2 cap ${iters[1].iter_timeout_ms} not ~half of (${b2}-${reserve})*1000 = ${expected}`);
     // and it must be strictly below iteration 1's cap (EXPLORE-full frac would have kept it far higher).

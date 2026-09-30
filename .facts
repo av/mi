@@ -258,6 +258,15 @@
 - label: under a deadline with more than half the budget left, the goal loop skips the pre-work LLM judge and every EXPLORE iteration (including iteration 1) gets the full usable remaining budget
   command: grep -q "deadline && budget() > totalS \* 0.5" tools/goal.mjs && grep -qF "const iterFrac = phase === 'EXPLORE' ? 1 : 0.5;" tools/goal.mjs
   tags: [implemented]
-- label: under a deadline, EXPLORE/COMMIT worker iterations leave max(120s, 20% of the total budget) for salvage, and salvage keeps no 90s judge bank when no declared artifact exists yet
-  command: grep -qF "(budget() - Math.max(120, totalS * 0.2)) * 1000 * iterFrac" tools/goal.mjs && grep -qF "(budget() - (missingAll() ? 20 : 90)) * 1000" tools/goal.mjs
+- label: under a deadline, worker iterations leave max(120s, 20%) for salvage only while no declared artifact exists (otherwise max(60s, 5%)); salvage keeps no 90s judge bank when nothing exists yet; judge wall clamp can grow to 600s
+  command: grep -qF "missingAll() ? Math.max(120, totalS * 0.2) : Math.max(60, totalS * 0.05)" tools/goal.mjs && grep -qF "(budget() - (missingAll() ? 20 : 90)) * 1000" tools/goal.mjs && grep -qF "Math.min(600000, Math.max(45000, (budget() - 60) * 500))" tools/goal.mjs
+  tags: [implemented]
+- label: every API request has a wall timeout (MI_REQUEST_TIMEOUT, default 600s); timeouts and empty completions (no text, no tool calls) are retried instead of ending the turn
+  command: grep -qF "AbortSignal.timeout(1000 * (+process.env.MI_REQUEST_TIMEOUT || 600))" index.mjs && grep -qF "code: 'empty'" index.mjs && grep -qF "e.name === 'TimeoutError'" index.mjs
+  tags: [implemented]
+- label: goal isFatal matches only API credit wording (requires more credits, HTTP 402), not task text about funds or balances
+  command: grep -qF "const isFatal = s => /requires more credits|HTTP 402\\b/i" tools/goal.mjs
+  tags: [implemented]
+- label: harbor adapter passes the workspace snapshot through SYSTEM_PROMPT and writes nothing into the task directory
+  command: grep -qF 'export SYSTEM_PROMPT="$SYSTEM_PROMPT' bench/mi_agent.py && ! grep -q '} > AGENTS.md' bench/mi_agent.py
   tags: [implemented]

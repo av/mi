@@ -37,7 +37,7 @@ export default {
     const budget = () => deadline ? Math.max(0, Math.floor(deadline - Date.now() / 1000)) : null;
     let ema = 0; // EMA of full iteration duration (worker+judge, seconds) — adaptive salvage/urgent triggers; contribution clamped to 25% of total budget
     const budgetPhase = () => { const r = budget(); if (r === null) return ''; const e = Math.min(ema, totalS * 0.25); return r < Math.max(60, 1.3 * e) ? 'SALVAGE' : r < Math.max(2.5 * e, totalS * 0.2) ? 'URGENT' : r / totalS < 0.5 ? 'COMMIT' : 'EXPLORE'; };
-    const wallT = () => deadline ? Math.min(180000, Math.max(45000, (budget() - 90) * 500)) : 180000; // wall clamp for judge/recheck delegates
+    const wallT = () => deadline ? Math.min(600000, Math.max(45000, (budget() - 60) * 500)) : 180000; // wall clamp for judge/recheck delegates; a 180s cap cut slow reasoning judges off before any verdict (227 invalid judge calls in 89 TB 2.1 trials)
     const budgetGuidance = () => { const phase = budgetPhase(), r = budget(); if (!phase) return ''; const lines = [`\nbudget: ${r}s remaining of ${totalS}s total (phase: ${phase}).`]; if (phase === 'EXPLORE') lines.push('explore freely, try your best approach.'); else if (phase === 'COMMIT') lines.push('commit to the most promising path. stop exploring alternatives. refine and fix existing implementation only — do not start a new approach or rewrite from scratch.'); else if (phase === 'URGENT') lines.push('write your best-effort artifact NOW. do not start new exploration.'); else lines.push('FINAL SALVAGE: write the best artifact you can from current state immediately. do not debug, do not explore, just produce the deliverable.'); return lines.join(' '); };
     const strategies = [], blockerSigs = [];
     // Stable blocker signature: criterion NAMES from FAIL lines (immune to measured-value variation so
@@ -60,7 +60,7 @@ export default {
     const failLines = s => (s || '').split('\n').filter(l => { const c = l.trim(); return isFailRow(c) || (!/^\|.*\|$/.test(c) && /\[FAIL\]/i.test(c)); });
     const withHist = s => s + Object.entries(ledger).filter(([, e]) => new Set(e.map(x => x.got)).size >= 2).map(([k, e]) => `\nPARAMETER HISTORY ${k}: tried→got: [${e.map(x => x.got).join(', ')}]; expected ${e.at(-1).want} — interpolate/bisect from this table; do NOT re-guess blindly.`).join('');
     let checkpoint = '', fatal = false, escalated = false, pivoted = false, fastLaneUsed = false;
-    const isFatal = s => /requires more credits|insufficient.{0,20}(credits|balance|funds)|payment required|HTTP 402/i.test(s?.slice?.(-2000) || '');
+    const isFatal = s => /requires more credits|HTTP 402\b/i.test(s?.slice?.(-2000) || ''); // API wording only: task output about balances/funds aborted cobol-modernization at planning
     writeFileSync(log, `# Goal\n${goal}\n\n# User Criteria\n${check}\n${deadline ? `\n# Budget\n- total: ${totalS}s\n- deadline: ${new Date(deadline * 1000).toISOString()}\n` : ''}\n# Logs\n- markdown: ${log}\n- events: ${events}\n\n# Log\n`);
     writeFileSync(events, '');
     emit('start', { goal, check, max: limit, timeout: timeout ?? null, deadline: deadline ?? null, totalBudgetS: totalS, log });
@@ -156,7 +156,7 @@ export default {
       // 50% cap — so a runaway sweep on a working-enough artifact is cut off with budget left for a SALVAGE artifact-write
       // instead of grinding to the wall (tune-mjcf/sparql over-explore timeouts).
       const iterFrac = phase === 'EXPLORE' ? 1 : 0.5; // iteration 1 no longer capped at 1/3: slow (reasoning) models were killed mid-work
-      const iterTimeout = deadline ? Math.min(timeout ?? Infinity, Math.max(i === 1 ? 60000 : 30000, (budget() - Math.max(120, totalS * 0.2)) * 1000 * iterFrac)) : timeout; // keep >=20% of the budget for salvage
+      const iterTimeout = deadline ? Math.min(timeout ?? Infinity, Math.max(i === 1 ? 60000 : 30000, (budget() - (missingAll() ? Math.max(120, totalS * 0.2) : Math.max(60, totalS * 0.05))) * 1000 * iterFrac)) : timeout; // salvage reserve only while nothing is written; otherwise the worker keeps the budget (it was killed at its cap in 20 of 22 terminus-only losses)
       const esc = !fastLane && !piv && !escalated && missing.length && (totalS - budget()) / totalS > 0.4 && !liveJobs().length ? (escalated = true) : false;
       if (missing.length) emit('draft_gate', { iteration: i, missing, escalated: esc });
       const work = fastLane ? await delegate.handler({
