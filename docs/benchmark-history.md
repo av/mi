@@ -330,3 +330,164 @@ and the goal loop's `mi-goal-*.md` / `.jsonl`.
 | torch-tensor-parallelism | fail (clean NACK exit) | pass | — | R1: iter-1 budget | `r1/torch-tensor-parallelism__ckhM3Sa/agent/` |
 | tune-mjcf | fail (clean NACK exit) | AgentTimeoutError | NACK (loop ended unfinished) |  | `r2/tune-mjcf__DXnVH8t/agent/` |
 | write-compressor | fail (clean NACK exit) | NACK: artifact never written | NACK (loop ended unfinished) |  | `r2/write-compressor__Ww7MEzt/agent/` |
+
+
+## 2026-09-30: head-to-head, mi (fixed) vs Terminus 2 on DeepSeek V4.1 Flash
+
+One Harbor job, `jobs/tb21-h2h-mi-vs-terminus2-20260929` (gitignored). mi ran
+at `1801ed1`, which includes the fixes above. The job covered all 89
+Terminal-Bench 2.1 tasks, one attempt per task per harness, with both
+harnesses interleaved task by task at concurrency 4. Settings were identical:
+DeepSeek V4.1 Flash, temperature 0.6, `reasoning.effort=max`, DeepInfra FP8
+without fallbacks, and the tasks' default time limits.
+
+| | Terminus 2 | mi |
+|---|---:|---:|
+| Passed | **62/89 (69.7%)** | 49/89 (55.1%) |
+| Failures by end reason | 15 agent timeout, 11 finished but verifier failed, 1 tmux start error | 35 goal loop ended unfinished (NACK), 2 artifact never written, 2 ACKed but verifier failed, 1 agent timeout |
+| Spend | $3.05 (Harbor `cost_usd`), $0.034/trial | $6.60 (key total − Terminus 2), $0.074/trial |
+| Agent time | 20.5 h total, 13.8 min/trial | 33.2 h total, 22.4 min/trial |
+
+Job wall time was 14 h 26 min for both arms together; the arms share the four
+slots and run interleaved. Total spend was $9.66.
+
+**Paired result.** Both passed 40 tasks, Terminus 2 alone 22, mi alone 9,
+neither 18. McNemar exact p = 0.029 and `compare.py` gives SIGNAL (p = 0.039):
+Terminus 2 is ahead by 13 tasks.
+- mi alone: code-from-image, crack-7z-hash, custom-memory-heap-crash,
+  db-wal-recovery, extract-elf, pytorch-model-cli, query-optimize,
+  sam-cell-seg, torch-pipeline-parallelism.
+- Terminus 2 alone: chess-best-move, circuit-fibsqrt, cobol-modernization,
+  compile-compcert, count-dataset-tokens, feal-differential/linear-cryptanalysis,
+  fix-ocaml-gc, git-leak-recovery, large-scale-text-editing,
+  llm-inference-batching-scheduler, mailman, model-extraction-relu-logits,
+  overfull-hbox, polyglot-c-py, protein-assembly, regex-chess,
+  sanitize-git-repo, sqlite-db-truncate, torch-tensor-parallelism,
+  winning-avg-corewars, write-compressor.
+
+**By category** (from each task's `task.toml`):
+
+| category | tasks | Terminus 2 | mi | Δ (mi − T2) |
+|---|---:|---:|---:|---:|
+| software-engineering | 26 | 19 | 12 | −7 |
+| mathematics | 4 | 3 | 0 | −3 |
+| system-administration | 9 | 6 | 4 | −2 |
+| scientific-computing | 8 | 4 | 3 | −1 |
+| debugging | 5 | 4 | 3 | −1 |
+| machine-learning | 3 | 3 | 2 | −1 |
+| games | 1 | 1 | 0 | −1 |
+| data-science | 8 | 6 | 8 | +2 |
+| file-operations | 5 | 1 | 2 | +1 |
+| security | 8 | 6 | 6 | 0 |
+| data-processing, model-training, others (8) | 12 | 9 | 9 | 0 |
+
+**Noise check.** The same Terminus 2 config scored 55/89 on 09-27 and 62/89
+here, and mi went 37 → 49 across its fixes. Single-attempt totals move by
+several tasks from run to run, so read this as "Terminus 2 ahead with
+p ≈ 0.03 at k=1", not as an exact 13-task gap.
+
+Rerun:
+
+```sh
+export OPENROUTER_API_KEY=...
+J=tb21-h2h-$(date +%Y%m%d)
+bench/harbor.sh run -y -c bench/configs/full.yaml \
+  -c bench/configs/agent-terminus2-deepseek-v4.1-flash.yaml \
+  -c bench/configs/agent-mi-deepseek-v4.1-flash.yaml -n 4 --job-name $J &
+bench/guard.py jobs/$J --cap 28 &
+bench/compare.py --a jobs/$J@terminus-2 --b jobs/$J@mi    # verdict + McNemar
+```
+
+Paired per-task table (end reason; mi's comes from its goal log):
+
+| task | category | Terminus 2 | mi | Terminus 2 end | mi end |
+|---|---|---|---|---|---|
+| adaptive-rejection-sampler | scientific-computing | ✗ | ✗ | AgentTimeoutError | AgentTimeoutError |
+| bn-fit-modify | scientific-computing | ✓ | ✓ | pass | pass |
+| break-filter-js-from-html | security | ✓ | ✓ | pass | pass |
+| build-cython-ext | debugging | ✓ | ✓ | pass | pass |
+| build-pmars | software-engineering | ✓ | ✓ | pass | pass |
+| build-pov-ray | software-engineering | ✓ | ✓ | pass | pass |
+| caffe-cifar-10 | machine-learning | ✓ | ✓ | pass | pass |
+| cancel-async-tasks | software-engineering | ✓ | ✓ | pass | pass |
+| chess-best-move | games | ✓ | ✗ | pass (agent timeout) | NACK: unfinished |
+| circuit-fibsqrt | software-engineering | ✓ | ✗ | pass | NACK: unfinished |
+| cobol-modernization | software-engineering | ✓ | ✗ | pass (agent timeout) | NACK: unfinished |
+| code-from-image | software-engineering | ✗ | ✓ | finished, verifier failed | pass |
+| compile-compcert | system-administration | ✓ | ✗ | pass | NACK: unfinished |
+| configure-git-webserver | system-administration | ✓ | ✓ | pass | pass |
+| constraints-scheduling | personal-assistant | ✓ | ✓ | pass | pass |
+| count-dataset-tokens | model-training | ✓ | ✗ | pass (agent timeout) | NACK: unfinished |
+| crack-7z-hash | security | ✗ | ✓ | finished, verifier failed | pass |
+| custom-memory-heap-crash | debugging | ✗ | ✓ | finished, verifier failed | pass |
+| db-wal-recovery | file-operations | ✗ | ✓ | RuntimeError | pass |
+| distribution-search | machine-learning | ✓ | ✓ | pass | pass |
+| dna-assembly | scientific-computing | ✗ | ✗ | AgentTimeoutError | NACK: unfinished |
+| dna-insert | scientific-computing | ✗ | ✗ | finished, verifier failed | NACK: unfinished |
+| extract-elf | file-operations | ✗ | ✓ | AgentTimeoutError | pass |
+| extract-moves-from-video | file-operations | ✗ | ✗ | AgentTimeoutError | ACK, verifier failed |
+| feal-differential-cryptanalysis | mathematics | ✓ | ✗ | pass | NACK: unfinished |
+| feal-linear-cryptanalysis | mathematics | ✓ | ✗ | pass | NACK: unfinished |
+| filter-js-from-html | security | ✗ | ✗ | AgentTimeoutError | NACK: unfinished |
+| financial-document-processor | data-processing | ✓ | ✓ | pass | pass |
+| fix-code-vulnerability | security | ✓ | ✓ | pass | pass |
+| fix-git | software-engineering | ✓ | ✓ | pass | pass |
+| fix-ocaml-gc | software-engineering | ✓ | ✗ | pass | NACK: unfinished |
+| gcode-to-text | file-operations | ✗ | ✗ | AgentTimeoutError | NACK: unfinished |
+| git-leak-recovery | software-engineering | ✓ | ✗ | pass | NACK: unfinished |
+| git-multibranch | system-administration | ✓ | ✓ | pass | pass |
+| gpt2-codegolf | software-engineering | ✗ | ✗ | AgentTimeoutError | NACK: unfinished |
+| headless-terminal | software-engineering | ✓ | ✓ | pass | pass |
+| hf-model-inference | data-science | ✓ | ✓ | pass | pass |
+| install-windows-3.11 | system-administration | ✗ | ✗ | finished, verifier failed | NACK: unfinished |
+| kv-store-grpc | software-engineering | ✓ | ✓ | pass | pass |
+| large-scale-text-editing | file-operations | ✓ | ✗ | pass | NACK: unfinished |
+| largest-eigenval | mathematics | ✗ | ✗ | finished, verifier failed | NACK: unfinished |
+| llm-inference-batching-scheduler | machine-learning | ✓ | ✗ | pass | NACK: unfinished |
+| log-summary-date-ranges | data-processing | ✓ | ✓ | pass | pass |
+| mailman | system-administration | ✓ | ✗ | pass (agent timeout) | NACK: unfinished |
+| make-doom-for-mips | software-engineering | ✗ | ✗ | AgentTimeoutError | NACK: unfinished |
+| make-mips-interpreter | software-engineering | ✗ | ✗ | AgentTimeoutError | NACK: unfinished |
+| mcmc-sampling-stan | data-science | ✓ | ✓ | pass | pass |
+| merge-diff-arc-agi-task | debugging | ✓ | ✓ | pass | pass |
+| model-extraction-relu-logits | mathematics | ✓ | ✗ | pass | NACK: unfinished |
+| modernize-scientific-stack | scientific-computing | ✓ | ✓ | pass | pass |
+| mteb-leaderboard | data-science | ✓ | ✓ | pass | pass |
+| mteb-retrieve | data-science | ✓ | ✓ | pass | pass |
+| multi-source-data-merger | data-processing | ✓ | ✓ | pass | pass |
+| nginx-request-logging | system-administration | ✓ | ✓ | pass | pass |
+| openssl-selfsigned-cert | security | ✓ | ✓ | pass | pass |
+| overfull-hbox | debugging | ✓ | ✗ | pass | NACK: unfinished |
+| password-recovery | security | ✓ | ✓ | pass | pass |
+| path-tracing | software-engineering | ✗ | ✗ | AgentTimeoutError | NACK: unfinished |
+| path-tracing-reverse | software-engineering | ✗ | ✗ | AgentTimeoutError | NACK: unfinished |
+| polyglot-c-py | software-engineering | ✓ | ✗ | pass | NACK: unfinished |
+| polyglot-rust-c | software-engineering | ✓ | ✓ | pass | pass |
+| portfolio-optimization | optimization | ✓ | ✓ | pass | pass |
+| protein-assembly | scientific-computing | ✓ | ✗ | pass (agent timeout) | NACK: unfinished |
+| prove-plus-comm | software-engineering | ✓ | ✓ | pass | pass |
+| pypi-server | software-engineering | ✓ | ✓ | pass | pass |
+| pytorch-model-cli | model-training | ✗ | ✓ | finished, verifier failed | pass |
+| pytorch-model-recovery | model-training | ✓ | ✓ | pass | pass |
+| qemu-alpine-ssh | system-administration | ✗ | ✗ | AgentTimeoutError | ACK, verifier failed |
+| qemu-startup | system-administration | ✗ | ✗ | finished, verifier failed | NACK: unfinished |
+| query-optimize | data-science | ✗ | ✓ | finished, verifier failed | pass |
+| raman-fitting | scientific-computing | ✗ | ✗ | AgentTimeoutError | NACK: unfinished |
+| regex-chess | software-engineering | ✓ | ✗ | pass (agent timeout) | NACK: unfinished |
+| regex-log | data-processing | ✓ | ✓ | pass (agent timeout) | pass |
+| reshard-c4-data | data-science | ✓ | ✓ | pass | pass |
+| rstan-to-pystan | data-science | ✓ | ✓ | pass | pass |
+| sam-cell-seg | data-science | ✗ | ✓ | finished, verifier failed | pass |
+| sanitize-git-repo | security | ✓ | ✗ | pass | NACK: unfinished |
+| schemelike-metacircular-eval | software-engineering | ✓ | ✓ | pass (agent timeout) | pass |
+| sparql-university | data-querying | ✓ | ✓ | pass | pass |
+| sqlite-db-truncate | debugging | ✓ | ✗ | pass | NACK: unfinished |
+| sqlite-with-gcov | system-administration | ✓ | ✓ | pass | pass |
+| torch-pipeline-parallelism | software-engineering | ✗ | ✓ | AgentTimeoutError | pass |
+| torch-tensor-parallelism | software-engineering | ✓ | ✗ | pass (agent timeout) | NACK: unfinished |
+| train-fasttext | model-training | ✗ | ✗ | AgentTimeoutError | NACK: unfinished |
+| tune-mjcf | scientific-computing | ✓ | ✓ | pass | pass |
+| video-processing | video-processing | ✗ | ✗ | finished, verifier failed | NACK: unfinished |
+| vulnerable-secret | security | ✓ | ✓ | pass | pass |
+| winning-avg-corewars | software-engineering | ✓ | ✗ | pass | NACK: artifact never written |
+| write-compressor | software-engineering | ✓ | ✗ | pass | NACK: artifact never written |

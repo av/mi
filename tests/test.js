@@ -2992,6 +2992,7 @@ test('bench/compare.py pools Harbor trials per task and calls a single-run flip 
   assert.deepStrictEqual(ab.not_compared, ['only-a']);
   assert.strictEqual(ab.delta, 1);
   assert.match(ab.verdict, /^NOISE/);
+  assert.deepStrictEqual(ab.mcnemar, { a_only: 0, b_only: 1, p: 1 }); // k=1 per side: paired exact test on discordant tasks
   const fisher = execFileSync('python3', ['-c', `import sys; sys.path.insert(0, ${JSON.stringify(dirname(script))}); import compare as c; print(round(c.fisher_exact_two_sided(3,0,0,3), 6), round(c.fisher_exact_two_sided(5,0,0,5), 6))`], { encoding: 'utf8' });
   assert.strictEqual(fisher.trim(), '0.1 0.007937');
   rmSync(root, { recursive: true, force: true });

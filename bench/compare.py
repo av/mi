@@ -123,6 +123,13 @@ def ab(ta, tb, as_json):
         va, vb = va + smoothed_var(ka, na), vb + smoothed_var(kb, nb)
         rows.append({"task": t, "a": f"{ka}/{na}", "b": f"{kb}/{nb}", "delta": round(kb / nb - ka / na, 3),
                      "fisher_p": round(fisher_exact_two_sided(ka, na - ka, kb, nb - kb), 4)})
+    # Paired single-trial runs (k=1 per side): exact McNemar on the discordant tasks.
+    mcn = None
+    if all(ta[t]["n"] == 1 and tb[t]["n"] == 1 for t in common):
+        a_only = sum(1 for t in common if ta[t]["pass"] and not tb[t]["pass"])
+        b_only = sum(1 for t in common if tb[t]["pass"] and not ta[t]["pass"])
+        k, m = min(a_only, b_only), a_only + b_only
+        mcn = (a_only, b_only, min(1.0, 2 * sum(math.comb(m, i) for i in range(k + 1)) / 2 ** m) if m else 1.0)
     delta, se = sb - sa, math.sqrt(va + vb)
     p = math.erfc(abs(delta / se) / math.sqrt(2)) if se else 1.0
     # Trials per task per side for 80% power at this effect size.
@@ -135,7 +142,8 @@ def ab(ta, tb, as_json):
     if as_json:
         return print(json.dumps({"tasks": rows, "score_a": round(sa, 3), "score_b": round(sb, 3), "delta": round(delta, 3),
                                  "se": round(se, 3), "p_value": round(p, 6), "k_needed": k_needed,
-                                 "verdict": verdict, "not_compared": only}, indent=2))
+                                 "verdict": verdict, "not_compared": only,
+                                 "mcnemar": {"a_only": mcn[0], "b_only": mcn[1], "p": round(mcn[2], 6)} if mcn else None}, indent=2))
     w = max(len(r["task"]) for r in rows)
     print(f"{'task':<{w}}  A       B       delta  fisher_p")
     for r in rows:
@@ -144,6 +152,8 @@ def ab(ta, tb, as_json):
     print(f"\n{len(common)} common tasks" + (f" ({len(only)} not in both: {', '.join(only)})" if only else ""))
     print(f"score A {sa:.2f}  score B {sb:.2f}  delta {delta:+.2f} ± {se:.2f} (SE)")
     print(f"verdict: {verdict}")
+    if mcn:
+        print(f"paired (k=1): A-only {mcn[0]}, B-only {mcn[1]}, McNemar exact p={mcn[2]:.4g}")
 
 
 def main():
