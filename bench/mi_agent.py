@@ -55,7 +55,7 @@ TERMINAL_BENCH_CHECK = (
 EVAL_SYSTEM_PROMPT = (
     "You are an autonomous coding agent in a Linux terminal inside a Docker container. "
     "Your tools are bash and file editing.\n\n"
-    "Act, don't speculate. Read the task description, AGENTS.md snapshot, and any README. "
+    "Act, don't speculate. Read the task description, the workspace snapshot below, and any README. "
     "A hidden verifier grades your work after you finish — the goal text defines success; "
     "visible /tests/ may be incomplete. Write required output files early as drafts, then refine. "
     "Explore briefly, then solve. One step at a time, verify each requirement with measured values.\n\n"
@@ -97,7 +97,7 @@ process.argv = [process.argv[0], '/opt/mi/index.mjs', '-g', readFileSync(process
 await import('/opt/mi/index.mjs');
 """
 
-# $1 = file holding the task instruction. Workdir detection and the AGENTS.md snapshot match the
+# $1 = file holding the task instruction. Workdir detection and the workspace snapshot match the
 # historical adapter; the budget env (MI_DEADLINE, MI_GOAL_MAX) drives the
 # goal loop's EXPLORE/COMMIT/URGENT/SALVAGE phases.
 WRAPPER = r"""
@@ -126,7 +126,10 @@ detect_workdir() {
 }
 WORKDIR=$(detect_workdir)
 cd "$WORKDIR" || cd /
-{
+# Workspace snapshot for every mi subagent, via SYSTEM_PROMPT (inherited) rather than an AGENTS.md
+# file in the task's directory: that file broke checksum/"no other files changed" verifiers
+# (TB 2.1 git-leak-recovery hashes every file under /app/repo).
+SNAP=$({
   echo "# Task Context"; echo
   for rf in README.md README.txt README readme.md; do [ -f "$rf" ] && { head -100 "$rf"; break; }; done
   echo; echo "## Workspace Snapshot"; echo '```'
@@ -134,7 +137,10 @@ cd "$WORKDIR" || cd /
   [ -d /tests ] && { echo "--- /tests/ ---"; ls -la /tests/ 2>/dev/null | head -20; }
   find . -maxdepth 2 -type f 2>/dev/null | head -40
   echo '```'
-} > AGENTS.md
+})
+export SYSTEM_PROMPT="$SYSTEM_PROMPT
+
+$SNAP"
 { echo "workdir=$WORKDIR"; echo "task_timeout=${MI_TASK_TIMEOUT:-unset}"; echo "deadline=${MI_DEADLINE:-unset}"
   echo "goal_max=${MI_GOAL_MAX:-unset}"; echo "node=$NODE"; echo "start=$START"; } > "$LOG/run.txt"
 
