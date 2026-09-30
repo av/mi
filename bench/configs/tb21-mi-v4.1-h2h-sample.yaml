@@ -1,0 +1,44 @@
+# Sample for the core-fix rerun (2026-10-01): the 22 tasks only Terminus 2 passed in
+# jobs/tb21-h2h-mi-vs-terminus2-20260929, plus 10 tasks both passed (every 4th of the 40, sorted)
+# as a regression guard. mi only, same agent config as the h2h run:
+#   bench/harbor.sh run -y -c bench/configs/tb21-mi-v4.1-h2h-sample.yaml -c bench/configs/agent-mi-deepseek-v4.1-flash.yaml -n 4
+jobs_dir: jobs
+n_attempts: 1
+n_concurrent_trials: 4
+datasets:
+  - name: terminal-bench/terminal-bench-2-1
+    task_names:
+      # terminus-only (22)
+      - terminal-bench/chess-best-move
+      - terminal-bench/circuit-fibsqrt
+      - terminal-bench/cobol-modernization
+      - terminal-bench/compile-compcert
+      - terminal-bench/count-dataset-tokens
+      - terminal-bench/feal-differential-cryptanalysis
+      - terminal-bench/feal-linear-cryptanalysis
+      - terminal-bench/fix-ocaml-gc
+      - terminal-bench/git-leak-recovery
+      - terminal-bench/large-scale-text-editing
+      - terminal-bench/llm-inference-batching-scheduler
+      - terminal-bench/mailman
+      - terminal-bench/model-extraction-relu-logits
+      - terminal-bench/overfull-hbox
+      - terminal-bench/polyglot-c-py
+      - terminal-bench/protein-assembly
+      - terminal-bench/regex-chess
+      - terminal-bench/sanitize-git-repo
+      - terminal-bench/sqlite-db-truncate
+      - terminal-bench/torch-tensor-parallelism
+      - terminal-bench/winning-avg-corewars
+      - terminal-bench/write-compressor
+      # both-pass regression guard (10)
+      - terminal-bench/bn-fit-modify
+      - terminal-bench/build-pov-ray
+      - terminal-bench/constraints-scheduling
+      - terminal-bench/fix-git
+      - terminal-bench/kv-store-grpc
+      - terminal-bench/modernize-scientific-stack
+      - terminal-bench/nginx-request-logging
+      - terminal-bench/portfolio-optimization
+      - terminal-bench/regex-log
+      - terminal-bench/sparql-university
