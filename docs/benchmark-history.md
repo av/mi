@@ -491,3 +491,136 @@ Paired per-task table (end reason; mi's comes from its goal log):
 | vulnerable-secret | security | ✓ | ✓ | pass | pass |
 | winning-avg-corewars | software-engineering | ✓ | ✗ | pass | NACK: artifact never written |
 | write-compressor | software-engineering | ✓ | ✗ | pass | NACK: artifact never written |
+
+
+## 2026-10-01: why Terminus 2 beat mi (h2h traces), core fixes, sample rerun
+
+### Causes, from the h2h traces
+
+`jobs/tb21-h2h-mi-vs-terminus2-20260929/` (gitignored). Of the 31 tasks where the two disagreed, Terminus 2
+alone passed 22 and mi alone 9.
+
+Two things are **not** the cause:
+- **Turn speed.** Over all 89 tasks mi's median gap between turns was 9 s
+  against Terminus 2's 22 s, and the p99 (232 s vs 248 s) and the share of
+  gaps of 300 s or more (0.6% each) match.
+- **Wrong ACKs.** Of 28 judge ACKs, 26 passed the verifier.
+
+The causes are in how mi's goal loop spends the task's time limit.
+
+Main cause per Terminus-only task (trajectories under `jobs/tb21-h2h-mi-vs-terminus2-20260929/<trial>/agent/`:
+`mi-output.txt`, `mi-goal-*.md`, `mi-goal-*.jsonl`):
+
+| # | Cause | Tasks (of 22) | Task ids | Evidence |
+|---|---|---:|---|---|
+| C1 | Worker killed at its iteration cap after about ⅔ of the limit. Planner 90 s, 60 s deadline buffer, 20% salvage reserve and the judge took the rest. Terminus 2 works one conversation for the whole limit. | 12 | chess-best-move, compile-compcert, count-dataset-tokens, feal-differential-cryptanalysis, large-scale-text-editing, llm-inference-batching-scheduler, mailman, overfull-hbox, polyglot-c-py, protein-assembly, torch-tensor-parallelism, write-compressor | event log `worker_duration_ms` = `iter_timeout_ms`; median worker share 0.68 of the limit, against 0.33 in both-pass tasks |
+| C2 | Runaway reasoning call: 600 s or more with no tool call, then the worker killed at its cap | 5 | circuit-fibsqrt, feal-linear-cryptanalysis, fix-ocaml-gc, regex-chess, winning-avg-corewars | `feal-linear-cryptanalysis__uxNsRXX/agent/mi-output.txt`: `[93s] ⟡ bash(cat /app/pairs.txt …)` then nothing until `[1202s]`. A probe of this model at max effort with no output cap reasoned 821 s to the provider's 131,072-token cap and returned **no text**; mi then read the empty reply as done. |
+| C5 | Worker finished on its own, result wrong | 3 | model-extraction-relu-logits, sanitize-git-repo, sqlite-db-truncate | e.g. sanitize-git-repo: verifier `SHA d6987af… could not be resolved`, the agent rewrote history |
+| C3 | False "API credit exhausted" abort at planning | 1 | cobol-modernization | `cobol-modernization__DxbmDU4/agent/mi-goal-*.jsonl`: `fatal {phase: plan}` at 91 s. `isFatal` matched "insufficient … funds/balance" in the task's own output. |
+| C4 | Adapter wrote `AGENTS.md` into a checksummed repo | 1 | git-leak-recovery | workdir `/app/repo`; verifier `Repository checksum mismatch` (hashes every file under /app/repo) |
+
+**Across all of them, the judge rarely got to a verdict.** The judge was cut
+off by its 180 s clamp (`judge_invalid`) in 20 of the 22. Over the whole run
+that was 227 judge calls without a verdict, e.g.
+`compile-compcert__WJshhT4`, where the judge tail ends `[timeout after
+180000ms]`. It gave the loop no feedback and no early ACK, while costing a
+median 156 s per task.
+
+For contrast, mi's 9 solo wins: 6 where the worker finished early and correctly
+(C5-shaped, right answer), and 3 where the worker was killed at its cap but its
+files were already right.
+
+### Fixes, at the core (`index.mjs` stays 29 lines)
+
+| Commit | Fix | Cause |
+|---|---|---|
+| `d475038` | every API request has a wall timeout (`MI_REQUEST_TIMEOUT`, default 600 s, as litellm's); timeouts and empty completions (no text, no tool calls) are retried instead of ending the turn | C2 |
+| `d475038` | `goal.mjs`: salvage reserve only while no declared artifact exists (else max(60 s, 5%)); judge clamp can grow to 600 s | C1 and the judge timeouts |
+| `d475038` | `isFatal` matches only API credit wording | C3 |
+| `03d876e` | adapter passes the workspace snapshot through `SYSTEM_PROMPT` and writes nothing into the task directory | C4 |
+
+### Sample rerun
+
+mi only, same model and settings as the h2h run. Config
+`bench/configs/tb21-mi-v4.1-h2h-sample.yaml`: the 22 Terminus-only tasks plus
+10 both-pass tasks as a regression guard. Round 1 ran the fixed code; round 2
+was a replicate of the same code (no further changes) to separate the effect
+of the fixes from run-to-run variance.
+
+| | Round 1 (`tb21-mi-corefix-r1-20261001`) | Round 2, replicate (`tb21-mi-corefix-r2-20261001`) |
+|---|---:|---:|
+| Terminus-only tasks passing | **10/22** | **10/22** |
+| Regression guard (both-pass) | 10/10 | 10/10 |
+| Spend | $1.73 | $2.27 |
+
+**Against the right baseline.** These 22 were selected because mi failed
+them, so some would pass on any rerun. In earlier mi runs (older code,
+excluding the selecting run) they passed 11/51 (22%), which predicts about 4.7/22
+on a plain rerun. The new code passed 20/44 over the two rounds (45%): Fisher
+p = 0.017 against 11/51. Six tasks passed in both rounds (feal-differential,
+git-leak-recovery, large-scale-text-editing, overfull-hbox, polyglot-c-py,
+sqlite-db-truncate). Eight passed in one round only.
+
+**Attribution.**
+- Two gains trace to a single fix: cobol-modernization to `isFatal` (round
+  1; round 2 then ran out of time) and git-leak-recovery to the snapshot
+  change (both rounds).
+- The other gains show no single mechanism in the trace. The request timeout
+  never fired: no request exceeded 600 s in either round. In most, the worker
+  finished before its cap.
+- The judge clamp and budget changes may explain them; the traces cannot
+  separate that from variance.
+
+**Not rerun.** Tasks outside the sample are unchanged by inference only. A new
+side effect: mi now ends by Harbor's timeout more often (14 and 12
+`AgentTimeoutError` of 32), because the worker keeps the budget to the end.
+The verifier still runs, so this only changes the end reason.
+
+Total spend $4.05: probe $0.055, round 1 $1.725, round 2 $2.270.
+
+Rerun:
+
+```sh
+J=tb21-mi-corefix-$(date +%Y%m%d)
+bench/harbor.sh run -y -c bench/configs/tb21-mi-v4.1-h2h-sample.yaml \
+  -c bench/configs/agent-mi-deepseek-v4.1-flash.yaml -n 4 --job-name $J &
+bench/guard.py jobs/$J --cap 4.8 &
+bench/compare.py --a jobs/tb21-h2h-mi-vs-terminus2-20260929@mi --b jobs/$J
+```
+
+Per-task rerun table:
+
+| task | group | h2h cause (mi) | h2h mi | round 1 | round 2 | round 1 end | round 2 end | gain attributed to |
+|---|---|---|---|---|---|---|---|---|
+| chess-best-move | T2-only | C1 | ✗ | ✗ | ✗ | AgentTimeoutError | AgentTimeoutError |  |
+| circuit-fibsqrt | T2-only | C2 | ✗ | ✗ | ✗ | worker killed at cap | NACK, worker finished |  |
+| cobol-modernization | T2-only | C3 | ✗ | ✓ | ✗ | pass | AgentTimeoutError | isFatal fix (r1); r2 ran out of time |
+| compile-compcert | T2-only | C1 | ✗ | ✗ | ✓ | worker killed at cap | pass | one round only: variance |
+| count-dataset-tokens | T2-only | C1 | ✗ | ✗ | ✓ | worker killed at cap | pass | one round only: variance |
+| feal-differential-cryptanalysis | T2-only | C1 | ✗ | ✓ | ✓ | pass | pass | both rounds; no single mechanism in trace (worker finished before its cap) |
+| feal-linear-cryptanalysis | T2-only | C2 | ✗ | ✓ | ✗ | pass | AgentTimeoutError | one round only: variance |
+| fix-ocaml-gc | T2-only | C2 | ✗ | ✗ | ✓ | AgentTimeoutError | pass | one round only: variance |
+| git-leak-recovery | T2-only | C4 | ✗ | ✓ | ✓ | pass | pass | snapshot via SYSTEM_PROMPT (both rounds) |
+| large-scale-text-editing | T2-only | C1 | ✗ | ✓ | ✓ | pass | pass | both rounds; no single mechanism in trace (worker finished before its cap) |
+| llm-inference-batching-scheduler | T2-only | C1 | ✗ | ✗ | ✗ | worker killed at cap | worker killed at cap |  |
+| mailman | T2-only | C1 | ✗ | ✗ | ✗ | AgentTimeoutError | AgentTimeoutError |  |
+| model-extraction-relu-logits | T2-only | C5 | ✗ | ✗ | ✗ | AgentTimeoutError | AgentTimeoutError |  |
+| overfull-hbox | T2-only | C1 | ✗ | ✓ | ✓ | pass | pass | both rounds; no single mechanism in trace (worker finished before its cap) |
+| polyglot-c-py | T2-only | C1 | ✗ | ✓ | ✓ | pass | pass | both rounds; no single mechanism in trace (worker finished before its cap) |
+| protein-assembly | T2-only | C1 | ✗ | ✓ | ✗ | pass | worker killed at cap | one round only: variance |
+| regex-chess | T2-only | C2 | ✗ | ✗ | ✗ | worker killed at cap | NACK, worker finished |  |
+| sanitize-git-repo | T2-only | C5 | ✗ | ✗ | ✗ | AgentTimeoutError | NACK, worker finished |  |
+| sqlite-db-truncate | T2-only | C5 | ✗ | ✓ | ✓ | pass | pass | both rounds; no single mechanism in trace (worker finished before its cap) |
+| torch-tensor-parallelism | T2-only | C1 | ✗ | ✓ | ✗ | pass | AgentTimeoutError | one round only: variance |
+| winning-avg-corewars | T2-only | C2 | ✗ | ✗ | ✓ | AgentTimeoutError | pass | one round only: variance |
+| write-compressor | T2-only | C1 | ✗ | ✗ | ✗ | AgentTimeoutError | worker killed at cap |  |
+| bn-fit-modify | guard | — | ✓ | ✓ | ✓ | pass | pass | regression guard |
+| build-pov-ray | guard | — | ✓ | ✓ | ✓ | pass | pass | regression guard |
+| constraints-scheduling | guard | — | ✓ | ✓ | ✓ | pass | pass | regression guard |
+| fix-git | guard | — | ✓ | ✓ | ✓ | pass | pass | regression guard |
+| kv-store-grpc | guard | — | ✓ | ✓ | ✓ | pass | pass | regression guard |
+| modernize-scientific-stack | guard | — | ✓ | ✓ | ✓ | pass | pass | regression guard |
+| nginx-request-logging | guard | — | ✓ | ✓ | ✓ | pass | pass | regression guard |
+| portfolio-optimization | guard | — | ✓ | ✓ | ✓ | pass | pass | regression guard |
+| regex-log | guard | — | ✓ | ✓ | ✓ | pass | pass | regression guard |
+| sparql-university | guard | — | ✓ | ✓ | ✓ | pass | pass | regression guard |
