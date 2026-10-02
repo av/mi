@@ -3249,21 +3249,24 @@ test('goal ends inside the deadline: no judge after a pass that leaves too littl
 });
 
 test('goal does not retry a judge call that timed out', async () => {
-  // the identical retry after a timeout produced the 2 × ~54s no-verdict pattern (12 of 27 no-verdict judges)
-  const prompts = [], t0 = Date.now();
-  requestHandler = (req, res, body) => {
-    const prompt = body.messages.at(-1).content;
-    prompts.push(prompt);
-    const k = kind(prompt);
-    if (k === 'planner') sse(res, { role: 'assistant', content: PLAN_NONE });
-    else if (k === 'judge') sse(res, { role: 'assistant', content: prompts.filter(p => kind(p) === 'judge').length === 1 ? 'still checking\n[timeout after 5000ms]' : 'ok [PASS]\nACK' });
-    else sse(res, { role: 'assistant', content: k === 'worker' ? WORK : 'confirmed [PASS]\nACK' });
-  };
-  const result = await runMi(['-g', 'long task', '-c', 'check it', '-d', String(Math.floor(Date.now() / 1000) + 900)]);
-  assert.strictEqual(result.status, 0);
-  assert.deepStrictEqual(prompts.map(kind).slice(0, 4), ['planner', 'worker', 'judge', 'worker'], 'timed-out judge counted as NACK without a retry');
-  const inv = latestEvents(t0).filter(e => e.type === 'judge_invalid');
-  assert.deepStrictEqual(inv.map(e => e.retry), [false]);
+  // the identical retry after a timeout produced the 2 × ~54s no-verdict pattern (12 of 27 no-verdict judges);
+  // a judge whose model request ran into its wall (MI_PASS_END) now exits cleanly with "[request timeout: …]" — same rule
+  for (const marker of ['[timeout after 5000ms]', '[request timeout: stopped early, work so far is on disk]']) {
+    const prompts = [], t0 = Date.now();
+    requestHandler = (req, res, body) => {
+      const prompt = body.messages.at(-1).content;
+      prompts.push(prompt);
+      const k = kind(prompt);
+      if (k === 'planner') sse(res, { role: 'assistant', content: PLAN_NONE });
+      else if (k === 'judge') sse(res, { role: 'assistant', content: prompts.filter(p => kind(p) === 'judge').length === 1 ? `still checking\n${marker}` : 'ok [PASS]\nACK' });
+      else sse(res, { role: 'assistant', content: k === 'worker' ? WORK : 'confirmed [PASS]\nACK' });
+    };
+    const result = await runMi(['-g', 'long task', '-c', 'check it', '-d', String(Math.floor(Date.now() / 1000) + 900)]);
+    assert.strictEqual(result.status, 0);
+    assert.deepStrictEqual(prompts.map(kind).slice(0, 4), ['planner', 'worker', 'judge', 'worker'], `${marker}: timed-out judge counted as NACK without a retry`);
+    const inv = latestEvents(t0).filter(e => e.type === 'judge_invalid');
+    assert.deepStrictEqual(inv.map(e => e.retry), [false], marker);
+  }
 });
 
 test('goal fastLane caps at one attempt — SALVAGE runs on second low-budget single-blocker NACK', async () => {
@@ -3503,4 +3506,104 @@ test('non-retryable SSE stream error still throws immediately', async () => {
   const result = await runMi(['-p', 'trigger non-retryable']);
   assert.notStrictEqual(result.status, 0);
   assert.match(result.stderr, /Unauthorized/);
+});
+
+// ── K2 (2026-10-02 analysis): request timeouts ─────────────────────────
+// circuit-fibsqrt r1/r2, regex-chess r1/r2, feal-linear-cryptanalysis r2: a 600s request timed out, the identical request was
+// resent (`⟡ retry 1 (23)`, `retry 2` ~600s later) and the third timeout crashed the worker (`DOMException [TimeoutError]`,
+// regex-chess r1 at 691/1293/1897s), discarding its conversation.
+const hang = (res) => { res.writeHead(200, { 'Content-Type': 'text/event-stream' }); res.write(': thinking\n\n'); const t = setTimeout(() => { try { res.end(); } catch {} }, 30000); res.on('close', () => clearTimeout(t)); };
+
+test('a timed-out request is resent with a smaller-steps nudge, not identically', async () => {
+  const bodies = [];
+  requestHandler = (req, res, body) => { bodies.push(body); if (bodies.length === 1) hang(res); else sse(res, { role: 'assistant', content: 'after nudge' }); };
+  const result = await runMi(['-p', 'write a big program'], { MI_REQUEST_TIMEOUT: '1' });
+  assert.strictEqual(result.status, 0);
+  assert.strictEqual(bodies.length, 2);
+  assert.notDeepStrictEqual(bodies[1].messages, bodies[0].messages, 'retry must not be the identical request');
+  const nudge = bodies[1].messages.at(-1);
+  assert.strictEqual(nudge.role, 'user');
+  assert.match(nudge.content, /request time limit/);
+  assert.match(nudge.content, /write long code to files in parts/);
+  assert.match(result.stdout, /after nudge/);
+});
+
+test('request timeouts that exhaust the retries end the turn cleanly instead of crashing', async () => {
+  let calls = 0;
+  requestHandler = (req, res) => { calls++; hang(res); };
+  const result = await runMi(['-p', 'think forever'], { MI_REQUEST_TIMEOUT: '1' });
+  assert.strictEqual(calls, 3);
+  assert.strictEqual(result.status, 0, result.stderr);
+  assert.doesNotMatch(result.stderr, /DOMException|triggerUncaughtException/);
+  assert.match(result.stdout, /\[request timeout: stopped early, work so far is on disk\]/);
+});
+
+test('request timeout is bounded by MI_PASS_END and is not retried near the end of the pass', async () => {
+  let calls = 0;
+  requestHandler = (req, res) => { calls++; hang(res); };
+  const t = Date.now();
+  const result = await runMi(['-p', 'long turn'], { MI_REQUEST_TIMEOUT: '600', MI_PASS_END: String(Date.now() / 1000 + 18) });
+  const took = Date.now() - t;
+  assert.strictEqual(result.status, 0, result.stderr);
+  assert.strictEqual(calls, 1, 'no retry with < 45s left in the pass');
+  assert.ok(took < 12000, `request should abort ~15s before the pass end, took ${took}ms`);
+  assert.match(result.stdout, /\[request timeout:/);
+});
+
+test('delegate passes MI_PASS_END (earliest of the inherited end and its own timeout) to the child', async () => {
+  const probe = `/tmp/mi-test-passend-${process.pid}.mjs`;
+  writeFileSync(probe, 'console.log("PASS_END=" + (process.env.MI_PASS_END ?? "unset"));');
+  const saved = { path: process.env.MI_PATH, end: process.env.MI_PASS_END };
+  global.spawn = spawn;
+  const delegate = (await import('../tools/delegate.mjs')).default;
+  const read = out => out.match(/PASS_END=(\S+)/)[1];
+  let own, nested, none;
+  try {
+    process.env.MI_PATH = probe; delete process.env.MI_PASS_END;
+    none = read(await delegate.handler({ prompt: 'x' }));
+    const now = Date.now() / 1000;
+    own = +read(await delegate.handler({ prompt: 'x', timeout: 60000 }));
+    process.env.MI_PASS_END = String(now + 20);
+    nested = +read(await delegate.handler({ prompt: 'x', timeout: 60000 }));
+    own -= now; nested -= now;
+  } finally {
+    process.env.MI_PATH = saved.path ?? ''; if (saved.end === undefined) delete process.env.MI_PASS_END; else process.env.MI_PASS_END = saved.end;
+    rmSync(probe, { force: true });
+  }
+  assert.strictEqual(none, 'unset');
+  assert.ok(own > 58 && own <= 61, `own timeout end ${own}`);
+  assert.ok(nested > 19 && nested <= 20.5, `nested keeps the earlier end ${nested}`);
+});
+
+// ── K3: preservation (sanitize-git-repo r1/r2 `git gc --prune=now` lost original commit d6987af; compile-compcert r1
+// `dpkg -i --force-downgrade` broke apt so the verifier's `apt-get install curl` failed) ──
+// ── K7: planner artifact paths with markdown/punctuation (`/app/answer.txt**`, `/app/dclm;`, `/app/interp.py)`) never existed ──
+test('goal: preservation rule in worker, environment check in judge, ORIGINAL_HEADS in planner; artifact paths are cleaned', async () => {
+  const a = `/tmp/mi-test-art-a-${process.pid}.txt`, b = `/tmp/mi-test-art-b-${process.pid}`;
+  writeFileSync(a, 'a'); writeFileSync(b, 'b');
+  const prompts = [], t0 = Date.now();
+  requestHandler = (req, res, body) => {
+    const prompt = body.messages.at(-1).content;
+    prompts.push(prompt);
+    const k = kind(prompt);
+    if (k === 'planner') sse(res, { role: 'assistant', content: `EXIT_CRITERIA\n- done\n**ARTIFACTS:** **${a}**, \`${b}\`; (${a})\nVERIFIER_SHAPE_CONTRACT\n- ok\nVERIFICATION_PLAN\n- inspect\nCURRENT_STATE\n- exists` });
+    else if (k === 'judge') sse(res, { role: 'assistant', content: 'all: measured=ok expected=ok [PASS]\nACK' });
+    else if (k === 'worker') { writeFileSync(a, 'new a'); writeFileSync(b, 'new b'); sse(res, { role: 'assistant', content: WORK }); }
+    else sse(res, { role: 'assistant', content: 'element: measured=ok required=ok [PASS]\nACK' });
+  };
+  try {
+    const result = await runMi(['-g', 'sanitize the repo', '-c', 'check it', '-d', String(Math.floor(Date.now() / 1000) + 900)]);
+    assert.strictEqual(result.status, 0);
+  } finally { rmSync(a, { force: true }); rmSync(b, { force: true }); }
+  const planner = prompts.find(p => kind(p) === 'planner'), worker = prompts.find(p => kind(p) === 'worker'), judge = prompts.find(p => kind(p) === 'judge');
+  assert.match(planner, /ORIGINAL_HEADS/);
+  assert.match(worker, /PRESERVE: unless the goal explicitly requires it, never rewrite or prune git history\/objects/);
+  assert.match(worker, /dpkg --force-\*/);
+  assert.match(judge, /6h\. environment intact/);
+  assert.match(judge, /apt-get check/);
+  assert.match(judge, /git cat-file -e <sha>/);
+  assert.ok(worker.includes(`declared artifacts: ${a}, ${b}\n`), worker.match(/declared artifacts: .*/)?.[0]);
+  const ev = latestEvents(t0);
+  assert.ok(!ev.some(e => e.type === 'judge_skipped' && e.reason !== 'deadline'), 'cleaned paths exist, so the judge is not mechanically skipped');
+  assert.ok(judge, 'judge ran');
 });
