@@ -4,7 +4,7 @@ import { spawn } from 'node:child_process';
 import * as http from 'node:http';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { readFileSync, writeFileSync, unlinkSync, existsSync, symlinkSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, writeFileSync, unlinkSync, existsSync, symlinkSync, readdirSync, statSync, utimesSync } from 'node:fs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const INDEX_PATH = join(__dirname, '../index.mjs');
@@ -370,7 +370,9 @@ test('goal workers do work instead of receiving judge criteria', async () => {
       assert.match(prompt, /verifier contract and plan:/);
       assert.match(prompt, /judge feedback and checkpoint:\n[\s\S]*missing files/);
       assert.match(prompt, /guidance:/);
-      assert.match(prompt, /one noninteractive bash script/);
+      assert.match(prompt, /PERSIST ON PASS: the moment you have a candidate result/);
+      assert.match(prompt, /small write-and-test steps/);
+      assert.doesNotMatch(prompt, /one noninteractive bash script/);
       assert.match(prompt, /do not judge/);
       assert.doesNotMatch(prompt, /criteria: inspect state/);
       assert.doesNotMatch(prompt, /judge criteria/);
@@ -734,94 +736,73 @@ test('goal ledger harvests markdown-table FAIL rows into PARAMETER HISTORY', asy
   assert.strictEqual(prompts.length, 8);
 });
 
-test('goal salvage triggers when deadline is near', async () => {
-  const prompts = [];
-  // Deadline 30s from now — after planner + precheck, budget should be in SALVAGE
-  const dl = Math.floor(Date.now() / 1000) + 30;
+// Low-budget helper: a fake clock (tests/fake-time.cjs) that jumps to `leftS` seconds before a 1000s deadline, so the
+// salvage / fast-lane paths run inside the deadline (a past deadline now ends the loop before anything starts).
+const lowBudget = () => {
+  const file = `/tmp/mi-test-lowbudget-${process.pid}-${Math.random().toString(36).slice(2)}`;
+  writeFileSync(file, '0');
+  const dl = Math.floor(Date.now() / 1000) + 1000;
+  return { dl, env: { NODE_OPTIONS: `--require ${join(__dirname, 'fake-time.cjs')}`, MI_FAKE_NOW_OFFSET_FILE: file }, jump: leftS => writeFileSync(file, String((dl - leftS) * 1000 - Date.now())), done: () => rmSync(file, { force: true }) };
+};
+const latestEvents = t0 => {
+  const f = readdirSync('/tmp').filter(f => /^mi-goal-\d+\.jsonl$/.test(f)).map(f => `/tmp/${f}`).filter(p => statSync(p).mtimeMs >= t0).sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs)[0];
+  return f ? readFileSync(f, 'utf8').trim().split('\n').map(l => JSON.parse(l)) : [];
+};
+const PLAN_NONE = 'EXIT_CRITERIA\n- done\nARTIFACTS: none\nVERIFIER_SHAPE_CONTRACT\n- checked\nVERIFICATION_PLAN\n- run\nCURRENT_STATE\n- empty';
+const WORK = 'did work\nSTRATEGY: attempt\nFILES_MODIFIED: x\nCOMMANDS_SUCCEEDED: y\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none';
+const kind = p => /you are the planner/.test(p) ? 'planner' : /you are a judge for a goal loop/.test(p) ? 'judge' : /FINAL SALVAGE/.test(p) ? 'salvage' : /SINGLE-BLOCKER FAST LANE/.test(p) ? 'fastlane' : /BLIND SKEPTICAL RECHECK/.test(p) ? 'recheck' : /you are worker/.test(p) ? 'worker' : 'other';
+
+test('goal salvage near the deadline is bounded by the time left and its judge is not started', async () => {
+  // 40s left after planning: too little for a verdict (median valid verdict 163s), so the pre-work judge and the post-salvage
+  // judge are skipped mechanically; salvage runs, capped at the time actually left (no 30s floor, no 90s judge bank).
+  const prompts = [], lb = lowBudget(), t0 = Date.now();
   requestHandler = (req, res, body) => {
     const prompt = body.messages.at(-1).content;
     prompts.push(prompt);
-    if (prompts.length === 1) {
-      // Planner
-      sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- file exists\nVERIFIER_SHAPE_CONTRACT\n- /app/out.txt\nVERIFICATION_PLAN\n- check file\nCURRENT_STATE\n- missing' });
-    } else if (prompts.length === 2) {
-      // Pre-check judge → NACK
-      sse(res, { role: 'assistant', content: 'file missing [FAIL]\nNACK' });
-    } else if (prompts.length === 3) {
-      // Should be salvage prompt (budget < 60s) with bounded pass timeout
-      assert.match(prompt, /FINAL SALVAGE/);
-      assert.match(prompt, /write output artifacts/);
-      assert.match(prompt, /this pass capped at/); // SALVAGE timeout is mechanically bounded when deadline is set
-      sse(res, { role: 'assistant', content: 'wrote /app/out.txt' });
-    } else {
-      // Judge after salvage
-      sse(res, { role: 'assistant', content: 'file exists [PASS]\nACK' });
-    }
+    if (kind(prompt) === 'planner') { lb.jump(40); sse(res, { role: 'assistant', content: PLAN_NONE }); }
+    else sse(res, { role: 'assistant', content: kind(prompt) === 'judge' ? 'file exists [PASS]\nACK' : 'wrote /app/out.txt' });
   };
-
-  const result = await runMi(['-g', 'create output', '-c', 'check output', '-d', String(dl)]);
-  assert.strictEqual(result.status, 0);
-  assert.strictEqual(prompts.length, 4);
-  assert.match(result.stdout, /salvage/);
+  try {
+    const result = await runMi(['-g', 'create output', '-c', 'check output', '-d', String(lb.dl)], lb.env);
+    assert.strictEqual(result.status, 0);
+  } finally { lb.done(); }
+  assert.deepStrictEqual(prompts.map(kind), ['planner', 'salvage']);
+  assert.match(prompts[1], /write output artifacts/);
+  const cap = +prompts[1].match(/this pass capped at (\d+)s/)[1];
+  assert.ok(cap > 0 && cap <= 35, `salvage cap ${cap}s must fit in the 40s left`);
+  const ev = latestEvents(t0);
+  assert.strictEqual(ev.filter(e => e.type === 'judge_skipped' && e.reason === 'deadline').length, 2, 'pre-work and post-salvage judges skipped');
+  assert.ok(ev.some(e => e.type === 'salvage'));
 });
 
-test('goal with past deadline triggers immediate salvage', async () => {
+test('goal with a past deadline starts nothing', async () => {
   const prompts = [];
-  // Deadline in the past
-  const dl = Math.floor(Date.now() / 1000) - 100;
-  requestHandler = (req, res, body) => {
-    const prompt = body.messages.at(-1).content;
-    prompts.push(prompt);
-    if (prompts.length === 1) {
-      // Planner
-      sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- done\nVERIFIER_SHAPE_CONTRACT\n- checked\nVERIFICATION_PLAN\n- run\nCURRENT_STATE\n- empty' });
-    } else if (prompts.length === 2) {
-      // Pre-check judge → NACK with TWO failing criteria (multi-FAIL → not fast lane, stays salvage)
-      sse(res, { role: 'assistant', content: 'not ready [FAIL]\nalso broken [FAIL]\nNACK' });
-    } else if (prompts.length === 3) {
-      // Should be salvage (budget is 0, past deadline)
-      assert.match(prompt, /FINAL SALVAGE/);
-      sse(res, { role: 'assistant', content: 'salvaged something' });
-    } else {
-      // Judge after salvage → NACK (doesn't matter for test)
-      sse(res, { role: 'assistant', content: 'incomplete [FAIL]\nNACK' });
-    }
-  };
-
-  const result = await runMi(['-g', 'past deadline', '-c', 'check', '-d', String(dl)]);
-  // Should exit (NACK after salvage breaks the loop)
+  requestHandler = (req, res, body) => { prompts.push(body.messages.at(-1).content); sse(res, { role: 'assistant', content: 'x [FAIL]\nNACK' }); };
+  const result = await runMi(['-g', 'past deadline', '-c', 'check', '-d', String(Math.floor(Date.now() / 1000) - 100)]);
   assert.strictEqual(result.status, 0);
-  assert.strictEqual(prompts.length, 4);
+  assert.strictEqual(prompts.length, 0, 'no planner, worker, salvage or judge after the deadline');
+  assert.match(result.stdout, /deadline has passed/);
 });
 
 test('goal single-blocker fast lane: low budget + one FAIL → surgical brief', async () => {
-  const prompts = [];
-  const dl = Math.floor(Date.now() / 1000) - 100; // past deadline → budget fraction 0 < 0.3
+  const prompts = [], lb = lowBudget();
   requestHandler = (req, res, body) => {
     const prompt = body.messages.at(-1).content;
     prompts.push(prompt);
-    if (prompts.length === 1) {
-      sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- constant right\nVERIFIER_SHAPE_CONTRACT\n- check R\nVERIFICATION_PLAN\n- run\nCURRENT_STATE\n- off' });
-    } else if (prompts.length === 2) {
-      // Pre-check judge → NACK with exactly ONE failing criterion
-      sse(res, { role: 'assistant', content: 'R integration constant: measured=0.5 expected=1.0 [FAIL]\nNACK' });
-    } else if (prompts.length === 3) {
-      // Worker should get the SURGICAL brief, not salvage/strategy scaffolding
-      assert.match(prompt, /SINGLE-BLOCKER FAST LANE/);
-      assert.match(prompt, /fix ONLY this criterion/);
-      assert.match(prompt, /R integration constant: measured=0.5 expected=1.0 \[FAIL\]/);
-      assert.doesNotMatch(prompt, /FINAL SALVAGE/);
-      assert.doesNotMatch(prompt, /failed strategies/);
-      assert.doesNotMatch(prompt, /BLOCKED/);
-      sse(res, { role: 'assistant', content: 'fixed the constant\nSTRATEGY: one-line fix\nFILES_MODIFIED: r.py\nCOMMANDS_SUCCEEDED: check\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
-    } else {
-      sse(res, { role: 'assistant', content: 'R integration constant: measured=1.0 expected=1.0 [PASS]\nACK' });
-    }
+    if (prompts.length === 1) { lb.jump(100); sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- constant right\nVERIFIER_SHAPE_CONTRACT\n- check R\nVERIFICATION_PLAN\n- run\nCURRENT_STATE\n- off' }); } // 10% budget left
+    else if (prompts.length === 2) sse(res, { role: 'assistant', content: 'R integration constant: measured=0.5 expected=1.0 [FAIL]\nNACK' }); // pre-check: exactly ONE failing criterion
+    else if (prompts.length === 3) sse(res, { role: 'assistant', content: 'fixed the constant\nSTRATEGY: one-line fix\nFILES_MODIFIED: r.py\nCOMMANDS_SUCCEEDED: check\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
+    else sse(res, { role: 'assistant', content: 'R integration constant: measured=1.0 expected=1.0 [PASS]\nACK' });
   };
-  const result = await runMi(['-g', 'fix sampler', '-c', 'check R', '-d', String(dl)]);
-  assert.strictEqual(result.status, 0);
+  try {
+    const result = await runMi(['-g', 'fix sampler', '-c', 'check R', '-d', String(lb.dl)], lb.env);
+    assert.strictEqual(result.status, 0);
+  } finally { lb.done(); }
   // planner + precheck + surgical worker + judge(ACK); recheck skipped (budget < 180s)
-  assert.strictEqual(prompts.length, 4);
+  assert.deepStrictEqual(prompts.map(kind), ['planner', 'judge', 'fastlane', 'judge']);
+  assert.match(prompts[2], /fix ONLY this criterion/);
+  assert.match(prompts[2], /R integration constant: measured=0.5 expected=1.0 \[FAIL\]/);
+  assert.doesNotMatch(prompts[2], /FINAL SALVAGE|failed strategies|BLOCKED/);
 });
 
 test('goal fast lane suppressed: high budget one FAIL → normal worker prompt', async () => {
@@ -896,48 +877,37 @@ test('goal without DECISION lines emits no DECISIONS block', async () => {
 });
 
 test('goal DECISIONS block echoed into fast-lane surgical brief', async () => {
-  const prompts = [];
-  const dl = Math.floor(Date.now() / 1000) - 100; // past deadline → fast lane on single FAIL
+  const prompts = [], lb = lowBudget();
   requestHandler = (req, res, body) => {
     const prompt = body.messages.at(-1).content;
     prompts.push(prompt);
-    if (prompts.length === 1) {
-      sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- ok\nAMBIGUITIES\nDECISION: edge orientation → A->B BECAUSE "A causes B" [DERIVED]\nVERIFIER_SHAPE_CONTRACT\n- check\nVERIFICATION_PLAN\n- run\nCURRENT_STATE\n- off' });
-    } else if (prompts.length === 2) {
-      sse(res, { role: 'assistant', content: 'edge: measured=B->A expected=A->B [FAIL]\nNACK' });
-    } else if (prompts.length === 3) {
-      assert.match(prompt, /SINGLE-BLOCKER FAST LANE/);
-      assert.match(prompt, /DECISION: edge orientation → A->B BECAUSE "A causes B" \[DERIVED\]/);
-      sse(res, { role: 'assistant', content: 'flipped edge\nSTRATEGY: fix\nFILES_MODIFIED: g\nCOMMANDS_SUCCEEDED: c\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
-    } else {
-      sse(res, { role: 'assistant', content: 'edge: measured=A->B expected=A->B [PASS]\nACK' });
-    }
+    if (prompts.length === 1) { lb.jump(100); sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- ok\nAMBIGUITIES\nDECISION: edge orientation → A->B BECAUSE "A causes B" [DERIVED]\nVERIFIER_SHAPE_CONTRACT\n- check\nVERIFICATION_PLAN\n- run\nCURRENT_STATE\n- off' }); }
+    else if (prompts.length === 2) sse(res, { role: 'assistant', content: 'edge: measured=B->A expected=A->B [FAIL]\nNACK' });
+    else if (prompts.length === 3) sse(res, { role: 'assistant', content: 'flipped edge\nSTRATEGY: fix\nFILES_MODIFIED: g\nCOMMANDS_SUCCEEDED: c\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
+    else sse(res, { role: 'assistant', content: 'edge: measured=A->B expected=A->B [PASS]\nACK' });
   };
-  const result = await runMi(['-g', 'orient edges', '-c', 'check edges', '-d', String(dl)]);
-  assert.strictEqual(result.status, 0);
+  try {
+    const result = await runMi(['-g', 'orient edges', '-c', 'check edges', '-d', String(lb.dl)], lb.env);
+    assert.strictEqual(result.status, 0);
+  } finally { lb.done(); }
+  assert.strictEqual(kind(prompts[2]), 'fastlane');
+  assert.match(prompts[2], /DECISION: edge orientation → A->B BECAUSE "A causes B" \[DERIVED\]/);
 });
 
 test('goal DECISIONS block echoed into salvage brief', async () => {
-  const prompts = [];
-  const dl = Math.floor(Date.now() / 1000) - 100; // past deadline, multi-FAIL → salvage
+  const prompts = [], lb = lowBudget();
   requestHandler = (req, res, body) => {
     const prompt = body.messages.at(-1).content;
     prompts.push(prompt);
-    if (prompts.length === 1) {
-      sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- done\nAMBIGUITIES\nDECISION: prompt usage → use model prompts BECAUSE "model config declares query prompts" [DERIVED]\nVERIFIER_SHAPE_CONTRACT\n- checked\nVERIFICATION_PLAN\n- run\nCURRENT_STATE\n- empty' });
-    } else if (prompts.length === 2) {
-      sse(res, { role: 'assistant', content: 'not ready [FAIL]\nalso broken [FAIL]\nNACK' });
-    } else if (prompts.length === 3) {
-      assert.match(prompt, /FINAL SALVAGE/);
-      assert.match(prompt, /DECISION: prompt usage → use model prompts BECAUSE "model config declares query prompts" \[DERIVED\]/);
-      sse(res, { role: 'assistant', content: 'salvaged' });
-    } else {
-      sse(res, { role: 'assistant', content: 'incomplete [FAIL]\nNACK' });
-    }
+    if (prompts.length === 1) { lb.jump(40); sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- done\nAMBIGUITIES\nDECISION: prompt usage → use model prompts BECAUSE "model config declares query prompts" [DERIVED]\nVERIFIER_SHAPE_CONTRACT\n- checked\nVERIFICATION_PLAN\n- run\nCURRENT_STATE\n- empty' }); }
+    else sse(res, { role: 'assistant', content: 'salvaged' });
   };
-  const result = await runMi(['-g', 'encode corpus', '-c', 'check', '-d', String(dl)]);
-  assert.strictEqual(result.status, 0);
-  assert.strictEqual(prompts.length, 4);
+  try {
+    const result = await runMi(['-g', 'encode corpus', '-c', 'check', '-d', String(lb.dl)], lb.env);
+    assert.strictEqual(result.status, 0);
+  } finally { lb.done(); }
+  assert.deepStrictEqual(prompts.map(kind), ['planner', 'salvage']);
+  assert.match(prompts[1], /DECISION: prompt usage → use model prompts BECAUSE "model config declares query prompts" \[DERIVED\]/);
 });
 
 test('goal budget phase shows in console output', async () => {
@@ -2976,6 +2946,13 @@ test('Harbor adapter routes tasks through goal mode with the eval prompts', asyn
   assert.match(adapter, /bench-run\.sh \/opt\/mi\/task\.md"/);
   assert.doesNotMatch(adapter, /bench-run\.sh \{shlex/);
   assert.match(adapter, /cp \/tmp\/mi-goal-\*\.md \/tmp\/mi-goal-\*\.jsonl "\$LOG\/"/);
+  // goal logs are copied periodically during the run (Harbor kills skip the EXIT trap: 7 of 64 trials lost them), and on EXIT
+  assert.match(adapter, /\( while sleep 20; do synclogs; done \) < \/dev\/null > \/dev\/null 2>&1 &\nSYNC=\$!/);
+  assert.match(adapter, /trap 'kill \$SYNC 2>\/dev\/null; synclogs' EXIT/);
+  assert.ok(adapter.indexOf('SYNC=$!') < adapter.indexOf('"$NODE" /opt/mi/launch.mjs'), 'log copier starts before mi');
+  const wrapper = adapter.match(/WRAPPER = r"""([\s\S]*?)"""/)[1], wfile = join(tmpdir(), `mi-wrapper-${process.pid}.sh`);
+  writeFileSync(wfile, wrapper);
+  try { execFileSync('bash', ['-n', wfile]); } finally { rmSync(wfile, { force: true }); } // the wrapper must stay valid bash
   assert.match(adapter, /"MI_GOAL_CHECK": TERMINAL_BENCH_CHECK/);
   assert.match(adapter, /hidden external verifier/);
   assert.match(adapter, /never NACK for margin/);
@@ -3152,8 +3129,8 @@ test('goal forced salvage after 5 identical blockers in deadline mode', async ()
 });
 
 test('goal worker 1 states its time cap and gets DRAFT FIRST for missing artifacts from the start', async () => {
-  // Iteration 1 is one long attempt now (no 1/3 partition), so the draft-first directive must apply from iteration 1:
-  // on TB 2.1 (DeepSeek V4.1 Flash, max effort) 20 of 26 remaining failures ended with the declared artifact never written.
+  // K1 (2026-10-02 analysis): the best answer often never reached the artifact path (count-dataset-tokens r1 printed 79586 at
+  // t=273s, the file still held the placeholder at the cap), so every pass is told to persist its best candidate at once.
   const prompts = [];
   requestHandler = (req, res, body) => {
     const prompt = body.messages.at(-1).content;
@@ -3172,134 +3149,144 @@ test('goal worker 1 states its time cap and gets DRAFT FIRST for missing artifac
   assert.strictEqual(result.status, 0);
   const w1 = prompts.find(p => /you are worker 1\//.test(p));
   assert.ok(w1, 'worker 1 prompt seen');
-  assert.match(w1, /DRAFT FIRST: required artifact\(s\) still missing: \/tmp\/mi-test-never-written-artifact\.txt/);
-  assert.match(w1, /capped at ~\d+min — the required artifacts must exist before then/);
-  assert.doesNotMatch(w1, /partitioned to guarantee retries/);
+  assert.match(w1, /DRAFT FIRST: required artifact\(s\) not yet written in this run \(missing, or unchanged since it started\): \/tmp\/mi-test-never-written-artifact\.txt/);
+  assert.match(w1, /this pass is capped at ~\d+min and is followed by a judge review and another pass with its feedback/);
+  assert.match(w1, /declared artifacts: \/tmp\/mi-test-never-written-artifact\.txt/);
+  assert.match(w1, /PERSIST ON PASS/);
+  assert.doesNotMatch(w1, /explore freely|one noninteractive bash script/);
 });
 
-test('goal EXPLORE iterations keep full remaining budget (verification-cost cap only bites past EXPLORE)', async () => {
-  // Regression guard for the phase-gated iterFrac: every EXPLORE iteration, including iteration 1, gets the FULL
-  // usable remaining budget (frac 1). Iteration 1 used to be capped at ~1/3, which killed slow reasoning-model
-  // workers mid-work (TB 2.1, DeepSeek V4.1 Flash at max effort: 43 of 74 failing iterations ended at their cap).
-  // The 50% verification-cost cap applies only in COMMIT/URGENT. With a fresh budget the pre-work judge is skipped.
-  const prompts = [];
+test('goal draft gate fires for a declared artifact that exists but was not written in this run', async () => {
+  // mailman r1/r2: the declared /etc/mailman3/mailman.cfg already existed, so the existence-only gate never fired
+  // and the single worker spent ~1,500s on read-only commands.
+  const art = `/tmp/mi-test-stale-artifact-${process.pid}.txt`, prompts = [];
+  writeFileSync(art, 'pre-existing');
+  utimesSync(art, new Date(Date.now() - 3600e3), new Date(Date.now() - 3600e3));
   let judges = 0;
   requestHandler = (req, res, body) => {
     const prompt = body.messages.at(-1).content;
     prompts.push(prompt);
-    if (/you are the planner for a goal loop/.test(prompt)) {
-      sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- done\nARTIFACTS: none\nVERIFIER_SHAPE_CONTRACT\n- ok\nVERIFICATION_PLAN\n- inspect\nCURRENT_STATE\n- empty' });
-    } else if (/you are a judge for a goal loop/.test(prompt)) {
-      judges++;
-      sse(res, { role: 'assistant', content: judges === 1 ? 'still broken [FAIL]\nNACK' : 'all good [PASS]\nACK' });
-    } else if (/skeptical|blind/i.test(prompt) && !/you are worker/.test(prompt)) {
-      sse(res, { role: 'assistant', content: 'confirmed [PASS]\nACK' });
-    } else {
-      sse(res, { role: 'assistant', content: 'did work\nSTRATEGY: attempt\nFILES_MODIFIED: x\nCOMMANDS_SUCCEEDED: y\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
-    }
+    if (kind(prompt) === 'planner') sse(res, { role: 'assistant', content: `EXIT_CRITERIA\n- done\nARTIFACTS: ${art}\nVERIFIER_SHAPE_CONTRACT\n- ok\nVERIFICATION_PLAN\n- inspect\nCURRENT_STATE\n- exists` });
+    else if (kind(prompt) === 'judge') sse(res, { role: 'assistant', content: ++judges === 1 ? 'config: measured=old expected=new [FAIL]\nNACK' : 'config: measured=new expected=new [PASS]\nACK' });
+    else if (kind(prompt) === 'worker') { if (/you are worker 1\//.test(prompt)) writeFileSync(art, 'written by worker 1'); sse(res, { role: 'assistant', content: WORK }); }
+    else sse(res, { role: 'assistant', content: 'element: measured=new required=new [PASS]\nACK' });
   };
-  const deadline = Math.floor(Date.now() / 1000) + 900; // 15 min budget → stays in EXPLORE across instant mocks
   const t0 = Date.now();
-  const result = await runMi(['-g', 'long task', '-c', 'check it', '-d', String(deadline)]);
-  assert.strictEqual(result.status, 0);
-  assert.ok(!prompts.slice(0, 2).some(p => /you are a judge for a goal loop/.test(p)), 'no pre-work judge on a fresh deadline budget');
-  const events = readdirSync('/tmp').filter(f => /^mi-goal-\d+\.jsonl$/.test(f)).map(f => `/tmp/${f}`).filter(p => statSync(p).mtimeMs >= t0).sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs)[0];
-  assert.ok(events && existsSync(events), 'event log present');
-  const iters = readFileSync(events, 'utf8').trim().split('\n').map(l => JSON.parse(l)).filter(e => e.type === 'iteration');
-  assert.ok(iters.length >= 2, `expected >= 2 iterations, got ${iters.length}`);
-  const total = deadline - Math.floor(t0 / 1000), full = (total - Math.max(60, total * 0.05)) * 1000; // minus the (artifacts-present) salvage reserve
-  // Both EXPLORE iterations get ~the full usable budget (a 1/3 cap on iteration 1 would be ~0.33x; a 0.5 cap ~0.5x).
-  for (const it of iters.slice(0, 2)) assert.ok(it.iter_timeout_ms > full * 0.9, `EXPLORE iteration ${it.iteration} capped: ${it.iter_timeout_ms} vs ${full}`);
+  try {
+    const result = await runMi(['-g', 'configure it', '-c', 'check it', '-d', String(Math.floor(Date.now() / 1000) + 900)]);
+    assert.strictEqual(result.status, 0);
+  } finally { rmSync(art, { force: true }); }
+  const workers = prompts.filter(p => kind(p) === 'worker');
+  assert.ok(workers.length >= 2, `expected 2 worker passes, got ${workers.length}`);
+  assert.match(workers[0], new RegExp(`DRAFT FIRST: required artifact\\(s\\) not yet written in this run \\(missing, or unchanged since it started\\): ${art}`));
+  assert.doesNotMatch(workers[1], /DRAFT FIRST/, 'artifact written during the run: no gate on pass 2');
+  assert.strictEqual(prompts.filter(p => kind(p) === 'judge').length, 2, 'existing artifact: the iteration judge is not mechanically skipped');
+  const gates = latestEvents(t0).filter(e => e.type === 'draft_gate');
+  assert.deepStrictEqual(gates.map(g => g.iteration), [1]);
 });
 
-test('goal COMMIT/URGENT iterations cap the verification cost at 50% of remaining budget', async () => {
-  // Regression guard for the 0.5 side of the phase-gated iterFrac: past EXPLORE, a later iteration's
-  // per-iteration worker timeout must be bounded to ~half of (budget-120)*1000. Reaching COMMIT in the
-  // instant-mock harness requires advancing the loop clock: fake-time preloads a Date.now offset that we
-  // bump on the iteration-1 judge response so iteration 2's phase computes with ~45% of budget elapsed
-  // (r/totalS < 0.5) without tripping the 60s SALVAGE floor. NB: the fake-time jump inflates the measured
-  // iteration-1 duration, so `ema` grows and the loop reports URGENT rather than COMMIT — both share the same
-  // 0.5 iterFrac, which is exactly the branch under test.
-  const prompts = [];
-  const offsetFile = `/tmp/mi-test-commitcap-off-${process.pid}`;
-  writeFileSync(offsetFile, '0');
+test('goal pass caps: non-last passes get half of (remaining − judge window), the last pass takes the rest', async () => {
+  // K1/K6 (2026-10-02 analysis): 54 of 57 logged trials ran one worker iteration and judge feedback reached a second worker
+  // in only 3, because iteration 1 kept the whole budget. Now each pass gets (remaining − judgeWin)/2 while a judge window
+  // plus minPass would remain after it; judgeWin = min(240, max(180, 15% total)) ≥ the 163s median verdict.
+  const prompts = [], lb = lowBudget(), t0 = Date.now();
+  let judges = 0;
   requestHandler = (req, res, body) => {
     const prompt = body.messages.at(-1).content;
     prompts.push(prompt);
-    if (prompts.length === 1) {
-      sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- done\nARTIFACTS: none\nVERIFIER_SHAPE_CONTRACT\n- ok\nVERIFICATION_PLAN\n- inspect\nCURRENT_STATE\n- empty' });
-    } else if (prompts.length === 2) {
-      sse(res, { role: 'assistant', content: 'not done [FAIL]\nNACK' }); // precheck NACK (EXPLORE, offset 0)
-    } else if (prompts.length === 3) {
-      sse(res, { role: 'assistant', content: 'did work\nSTRATEGY: attempt 1\nFILES_MODIFIED: x\nCOMMANDS_SUCCEEDED: y\nCOMMANDS_FAILED: z\nBLOCKERS: b\nREMAINING: r' });
-    } else if (prompts.length === 4) {
-      // judge 1 NACK — advance clock to 550s elapsed of ~1000s so iteration 2 lands in COMMIT (0.45 < 0.5)
-      writeFileSync(offsetFile, '550000');
-      sse(res, { role: 'assistant', content: 'still broken [FAIL]\nNACK' });
-    } else if (prompts.length === 5) {
-      sse(res, { role: 'assistant', content: 'did more\nSTRATEGY: attempt 2\nFILES_MODIFIED: x\nCOMMANDS_SUCCEEDED: y\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
-    } else {
-      sse(res, { role: 'assistant', content: 'all good [PASS]\nACK' }); // judge 2 ACK (+ skeptical recheck)
-    }
+    const k = kind(prompt);
+    if (k === 'planner') sse(res, { role: 'assistant', content: PLAN_NONE });
+    // 270s left after judge 1 (two FAILs: no fast lane): the inflated EMA would have made this a no-debug SALVAGE pass under the old 1.3×EMA trigger
+    else if (k === 'judge') { if (++judges === 1) lb.jump(270); sse(res, { role: 'assistant', content: judges === 1 ? 'a: measured=1 expected=2 [FAIL]\nb: measured=1 expected=2 [FAIL]\nNACK' : 'all good [PASS]\nACK' }); }
+    else if (k === 'worker') sse(res, { role: 'assistant', content: WORK });
+    else sse(res, { role: 'assistant', content: 'confirmed [PASS]\nACK' });
   };
-  const deadline = Math.floor(Date.now() / 1000) + 1000; // totalS ~1000s
-  const t0 = Date.now();
   try {
-    const result = await runMi(['-g', 'long task', '-c', 'check it', '-d', String(deadline)], fakeTimeEnv(offsetFile));
+    const result = await runMi(['-g', 'long task', '-c', 'check it', '-d', String(lb.dl)], lb.env);
     assert.strictEqual(result.status, 0);
-    assert.match(result.stdout, /left, (COMMIT|URGENT)/); // iteration 2 ran past EXPLORE (0.5 cap branch)
-    const events = readdirSync('/tmp').filter(f => /^mi-goal-\d+\.jsonl$/.test(f)).map(f => `/tmp/${f}`).filter(p => statSync(p).mtimeMs >= t0).sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs)[0];
-    assert.ok(events && existsSync(events), 'event log present');
-    const iters = readFileSync(events, 'utf8').trim().split('\n').map(l => JSON.parse(l)).filter(e => e.type === 'iteration');
-    assert.strictEqual(iters.length, 2);
-    // iteration 2 (COMMIT) is capped at 0.5 * (budget - salvage reserve)*1000; with no declared artifacts missing the
-    // reserve is max(60s, 5% of total) — distinct from the EXPLORE-full case above.
-    const reserve = Math.max(60, (deadline - Math.floor(t0 / 1000)) * 0.05);
-    const b2 = iters[1].budget_remaining_s, expected = 0.5 * (b2 - reserve) * 1000;
-    assert.ok(Math.abs(iters[1].iter_timeout_ms - expected) < 4000, `COMMIT iter2 cap ${iters[1].iter_timeout_ms} not ~half of (${b2}-${reserve})*1000 = ${expected}`);
-    // and it must be strictly below iteration 1's cap (EXPLORE-full frac would have kept it far higher).
-    assert.ok(iters[1].iter_timeout_ms < iters[0].iter_timeout_ms, `COMMIT iter2 (${iters[1].iter_timeout_ms}) not below iter1 (${iters[0].iter_timeout_ms})`);
-  } finally { rmSync(offsetFile, { force: true }); }
+  } finally { lb.done(); }
+  assert.ok(!prompts.slice(0, 2).some(p => kind(p) === 'judge'), 'no pre-work judge on a fresh deadline budget');
+  const ev = latestEvents(t0), passes = ev.filter(e => e.type === 'pass'), iters = ev.filter(e => e.type === 'iteration');
+  assert.strictEqual(passes.length, 2);
+  const judgeWin = 180; // totalS ≈ 1000: min(240, max(180, 150), 300)
+  assert.strictEqual(passes[0].last, false);
+  assert.ok(Math.abs(passes[0].iter_timeout_ms - (passes[0].budget_remaining_s - judgeWin) * 500) <= 1000, `pass 1 cap ${passes[0].iter_timeout_ms}`);
+  assert.ok(iters[0].judge_timeout_ms >= judgeWin * 1000, `iteration 1 judge wall ${iters[0].judge_timeout_ms} below the judge window`);
+  assert.strictEqual(passes[1].last, true);
+  assert.ok(Math.abs(passes[1].iter_timeout_ms - (passes[1].budget_remaining_s - 5) * 1000) <= 1000, `last pass cap ${passes[1].iter_timeout_ms}`);
+  const w = prompts.filter(p => kind(p) === 'worker');
+  assert.strictEqual(w.length, 2, prompts.map(kind).join(','));
+  assert.match(w[0], /followed by a judge review and another pass/);
+  assert.match(w[1], /is the LAST one/);
+  assert.match(w[1], /a: measured=1 expected=2 \[FAIL\]/, 'judge feedback reaches the second pass');
+  assert.ok(!prompts.some(p => kind(p) === 'salvage'), 'no salvage while ≥ minPass is left');
+});
+
+test('goal ends inside the deadline: no judge after a pass that leaves too little time, no salvage under 15s', async () => {
+  // K6: 26 of 64 trials ended in AgentTimeoutError; on 900s tasks the judge (2 × 54s) and salvage (30s floor + 2 × 45s judge)
+  // ran past the 840s deadline to t≈899s. Now a judge needs ≥60s left, salvage is capped by the time left, and nothing starts under 15s.
+  for (const [left, expected] of [[40, ['planner', 'worker', 'salvage']], [10, ['planner', 'worker']]]) {
+    const prompts = [], lb = lowBudget(), t0 = Date.now();
+    requestHandler = (req, res, body) => {
+      const prompt = body.messages.at(-1).content;
+      prompts.push(prompt);
+      const k = kind(prompt);
+      if (k === 'planner') sse(res, { role: 'assistant', content: PLAN_NONE });
+      else if (k === 'worker') { lb.jump(left); sse(res, { role: 'assistant', content: WORK }); }
+      else sse(res, { role: 'assistant', content: k === 'judge' ? 'ok [PASS]\nACK' : 'salvaged' });
+    };
+    try {
+      const result = await runMi(['-g', 'long task', '-c', 'check it', '-d', String(lb.dl)], lb.env);
+      assert.strictEqual(result.status, 0);
+    } finally { lb.done(); }
+    assert.deepStrictEqual(prompts.map(kind), expected, `left=${left}s`);
+    const ev = latestEvents(t0);
+    assert.ok(ev.some(e => e.type === 'judge_skipped' && e.reason === 'deadline'), `left=${left}s: judge skipped`);
+    if (left === 40) assert.ok(+prompts[2].match(/this pass capped at (\d+)s/)[1] <= 35);
+    else assert.ok(ev.some(e => e.type === 'deadline_reached'), 'deadline_reached logged');
+    assert.strictEqual(ev.at(-1).type, 'complete');
+  }
+});
+
+test('goal does not retry a judge call that timed out', async () => {
+  // the identical retry after a timeout produced the 2 × ~54s no-verdict pattern (12 of 27 no-verdict judges)
+  const prompts = [], t0 = Date.now();
+  requestHandler = (req, res, body) => {
+    const prompt = body.messages.at(-1).content;
+    prompts.push(prompt);
+    const k = kind(prompt);
+    if (k === 'planner') sse(res, { role: 'assistant', content: PLAN_NONE });
+    else if (k === 'judge') sse(res, { role: 'assistant', content: prompts.filter(p => kind(p) === 'judge').length === 1 ? 'still checking\n[timeout after 5000ms]' : 'ok [PASS]\nACK' });
+    else sse(res, { role: 'assistant', content: k === 'worker' ? WORK : 'confirmed [PASS]\nACK' });
+  };
+  const result = await runMi(['-g', 'long task', '-c', 'check it', '-d', String(Math.floor(Date.now() / 1000) + 900)]);
+  assert.strictEqual(result.status, 0);
+  assert.deepStrictEqual(prompts.map(kind).slice(0, 4), ['planner', 'worker', 'judge', 'worker'], 'timed-out judge counted as NACK without a retry');
+  const inv = latestEvents(t0).filter(e => e.type === 'judge_invalid');
+  assert.deepStrictEqual(inv.map(e => e.retry), [false]);
 });
 
 test('goal fastLane caps at one attempt — SALVAGE runs on second low-budget single-blocker NACK', async () => {
   // Regression: fastLane used to preempt SALVAGE every iteration when budget < 30% and exactly one FAIL.
   // A persistent single blocker would burn all remaining budget on repeated surgical-fix attempts without
   // the final artifact-write salvage pass ever firing. Fix: fastLaneUsed flag caps fastLane at 1 attempt.
-  const prompts = [];
-  const dl = Math.floor(Date.now() / 1000) - 100; // past deadline → budget fraction 0 < 0.3, phase SALVAGE
+  const prompts = [], lb = lowBudget(), t0 = Date.now();
   requestHandler = (req, res, body) => {
     const prompt = body.messages.at(-1).content;
     prompts.push(prompt);
-    if (prompts.length === 1) {
-      sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- ok\nARTIFACTS: none\nVERIFIER_SHAPE_CONTRACT\n- check\nVERIFICATION_PLAN\n- run\nCURRENT_STATE\n- off' });
-    } else if (prompts.length === 2) {
-      sse(res, { role: 'assistant', content: 'criterion: measured=0.5 expected=1.0 [FAIL]\nNACK' }); // precheck single-FAIL
-    } else if (prompts.length === 3) {
-      // iter 1: fastLane surgical brief fires
-      assert.match(prompt, /SINGLE-BLOCKER FAST LANE/);
-      assert.doesNotMatch(prompt, /FINAL SALVAGE/);
-      sse(res, { role: 'assistant', content: 'tried fix\nSTRATEGY: surgical\nFILES_MODIFIED: x\nCOMMANDS_SUCCEEDED: y\nCOMMANDS_FAILED: z\nBLOCKERS: b\nREMAINING: r' });
-    } else if (prompts.length === 4) {
-      // judge after fastLane → same single FAIL (fastLane didn't fix it)
-      sse(res, { role: 'assistant', content: 'criterion: measured=0.5 expected=1.0 [FAIL]\nNACK' });
-    } else if (prompts.length === 5) {
-      // iter 2: fastLaneUsed=true → SALVAGE runs, NOT fastLane
-      assert.match(prompt, /FINAL SALVAGE/);
-      assert.doesNotMatch(prompt, /SINGLE-BLOCKER FAST LANE/);
-      sse(res, { role: 'assistant', content: 'salvaged best-effort artifact' });
-    } else {
-      // judge after salvage → NACK (loop breaks)
-      sse(res, { role: 'assistant', content: 'still broken [FAIL]\nNACK' });
-    }
+    if (prompts.length === 1) { lb.jump(100); sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- ok\nARTIFACTS: none\nVERIFIER_SHAPE_CONTRACT\n- check\nVERIFICATION_PLAN\n- run\nCURRENT_STATE\n- off' }); }
+    else if (prompts.length === 2) sse(res, { role: 'assistant', content: 'criterion: measured=0.5 expected=1.0 [FAIL]\nNACK' }); // precheck single-FAIL
+    else if (prompts.length === 3) sse(res, { role: 'assistant', content: 'tried fix\nSTRATEGY: surgical\nFILES_MODIFIED: x\nCOMMANDS_SUCCEEDED: y\nCOMMANDS_FAILED: z\nBLOCKERS: b\nREMAINING: r' });
+    else if (prompts.length === 4) { lb.jump(40); sse(res, { role: 'assistant', content: 'criterion: measured=0.5 expected=1.0 [FAIL]\nNACK' }); } // same single FAIL; 40s left → SALVAGE phase
+    else sse(res, { role: 'assistant', content: 'salvaged best-effort artifact' });
   };
-  const t0 = Date.now();
-  const result = await runMi(['-g', 'fix one thing', '-c', 'check', '-d', String(dl)]);
-  assert.strictEqual(result.status, 0);
-  assert.strictEqual(prompts.length, 6);
-  const events = readdirSync('/tmp').filter(f => /^mi-goal-\d+\.jsonl$/.test(f)).map(f => `/tmp/${f}`).filter(p => statSync(p).mtimeMs >= t0).sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs)[0];
-  assert.ok(events && existsSync(events), 'event log present');
-  const ev = readFileSync(events, 'utf8').trim().split('\n').map(l => JSON.parse(l));
+  try {
+    const result = await runMi(['-g', 'fix one thing', '-c', 'check', '-d', String(lb.dl)], lb.env);
+    assert.strictEqual(result.status, 0);
+  } finally { lb.done(); }
+  // salvage's judge is not started with 40s left
+  assert.deepStrictEqual(prompts.map(kind), ['planner', 'judge', 'fastlane', 'judge', 'salvage']);
+  const ev = latestEvents(t0);
   assert.ok(ev.some(e => e.type === 'fast_lane'), 'fast_lane event fired on iter 1');
   assert.ok(ev.some(e => e.type === 'salvage'), 'salvage event fired on iter 2');
 });

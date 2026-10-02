@@ -53,7 +53,7 @@
 - label: goal planner synthesizes verifier shape contract from visible task evidence
   command: grep -q 'infer verifier shape' tools/goal.mjs && grep -q 'exact artifact paths' tools/goal.mjs && grep -q 'numeric thresholds' tools/goal.mjs && grep -q 'preservation constraints' tools/goal.mjs
 - label: goal worker iterations receive refined exit criteria and prior feedback, not raw judge criteria
-  command: grep -q 'verifier contract and plan' tools/goal.mjs && grep -q 'judge feedback and checkpoint' tools/goal.mjs && grep -q 'one noninteractive bash script' tools/goal.mjs && ! grep -q 'judge criteria: ${check}' tools/goal.mjs
+  command: grep -q 'verifier contract and plan' tools/goal.mjs && grep -q 'judge feedback and checkpoint' tools/goal.mjs && grep -q 'PERSIST ON PASS' tools/goal.mjs && ! grep -q 'judge criteria: ${check}' tools/goal.mjs
 - label: goal loop appends structured iteration summaries to its progress log
   command: grep -q 'Iteration ${i} Summary' tools/goal.mjs && grep -q 'worker summary:' tools/goal.mjs && grep -q 'judge summary:' tools/goal.mjs && grep -q 'worker tail:' tools/goal.mjs && grep -q 'judge tail:' tools/goal.mjs
 - label: goal loop writes markdown and JSONL progress logs with iteration events
@@ -74,10 +74,10 @@
   command: grep -q 'slice(-5)' tools/goal.mjs
 - label: goal planner runs explicit inspection checklist before reasoning (directory listing, project structure, output file check)
   command: grep -q 'run at most 12 commands' tools/goal.mjs && grep -q 'pwd && ls -la' tools/goal.mjs && grep -q 'check if output files from the goal already exist' tools/goal.mjs
-- label: goal worker prompt includes bash discipline guidance (command timeouts, output piping, noninteractive scripts)
-  command: grep -q 'timeout commands >60s' tools/goal.mjs && grep -q 'pipe verbose output through tail -50' tools/goal.mjs && grep -q 'one noninteractive bash script' tools/goal.mjs
-- label: goal worker gets budget-derived timeout (remaining - 120s) when deadline is set
-  command: grep -q 'iterTimeout.*deadline.*budget.*120' tools/goal.mjs
+- label: goal worker prompt includes bash discipline guidance (command timeouts, output piping, small write-and-test steps instead of one long script) and a PERSIST ON PASS rule (best candidate goes to the declared artifacts at once); the old 'prefer one noninteractive bash script' push is gone
+  command: grep -q 'timeout commands >60s' tools/goal.mjs && grep -q 'pipe verbose output through tail -50' tools/goal.mjs && grep -q 'small write-and-test steps' tools/goal.mjs && grep -q 'PERSIST ON PASS: the moment you have a candidate result' tools/goal.mjs && ! grep -q 'one noninteractive bash script' tools/goal.mjs
+- label: goal worker gets a budget-derived pass timeout when a deadline is set (half of remaining minus the judge window, or the rest on the last pass)
+  command: grep -qF 'const iterTimeout = deadline ? Math.min(timeout ?? Infinity, 1000 * Math.round(lastPass ? Math.max(rem * 0.5, rem - (missingAll() ? minPass : 5)) : half)) : timeout;' tools/goal.mjs
 - skill tool without name lists all available skills; with name returns SKILL.md body
 - label: skill frontmatter parsed via regex (^name: and ^description: with multiline flag)
   command: grep -q '/m' tools/skill.mjs
@@ -89,8 +89,8 @@
   command: test $(grep -c 'STRICTLY READ-ONLY' tools/goal.mjs) -eq 2 && grep -q 'commit/merge/cherry-pick/rebase/checkout/reset/branch/clean/stash/apply' tools/goal.mjs && grep -q 'so the WORKER performs the repair' tools/goal.mjs
 - label: goal worker restart-before-ACK guidance carves out VMs/emulators/long-boot systems — never restart those
   command: grep -q 'VM/emulator/long-boot system — never restart those' tools/goal.mjs
-- label: goal planner emits ARTIFACTS: line; draft gate prefixes every worker (from iteration 1) with a draft-first directive while declared artifacts are missing, without producing NACKs or feeding blockerSigs
-  command: grep -q 'ARTIFACTS:' tools/goal.mjs && grep -q 'draftGate' tools/goal.mjs && grep -qF "deadline && artifacts.length ? artifacts.filter" tools/goal.mjs && grep -q 'DRAFT FIRST' tools/goal.mjs && grep -q "emit('draft_gate'" tools/goal.mjs
+- label: goal planner emits ARTIFACTS: line; draft gate prefixes every worker (from iteration 1) with a draft-first directive while a declared artifact is missing OR not modified since the run started (mtime < t0; mailman's pre-existing config never tripped an existence-only gate), without producing NACKs or feeding blockerSigs
+  command: grep -q 'ARTIFACTS:' tools/goal.mjs && grep -q 'draftGate' tools/goal.mjs && grep -qF "deadline && artifacts.length ? artifacts.filter" tools/goal.mjs && grep -q 'DRAFT FIRST' tools/goal.mjs && grep -q "emit('draft_gate'" tools/goal.mjs && grep -qF 'artifacts.filter(stale)' tools/goal.mjs && grep -qF 'statSync(p).mtimeMs < t0' tools/goal.mjs
 - label: MI_JUDGE_MODEL and MI_JUDGE_PARAMS optionally override model/params for judge and skeptical recheck delegates only
   command: grep -q 'MI_JUDGE_MODEL' tools/goal.mjs && grep -q 'MI_JUDGE_PARAMS' tools/goal.mjs && test $(grep -c 'env: jenv' tools/goal.mjs) -eq 2
 - label: goal loop shares one bg-jobs registry per session (MI_SESSION_ID) and polls live jobs without LLM calls — MI_JOB_POLL_MS interval, stall guard, cumulative 50%-of-budget cap
@@ -103,14 +103,14 @@
 - label: goal verdict scans the full judge message and takes the last ACK/NACK-bearing line — a front-loaded ACK with long trailing rationale parses as ACK
   command: grep -q 'findLast' tools/goal.mjs
   tags: [implemented]
-- label: goal judge and skeptical recheck delegates get a wall-clamped timeout (45-180s scaled from budget); recheck is skipped entirely when budget < 180s, banking the ACK
-  command: grep -q 'wallT' tools/goal.mjs && grep -q 'recheck_skipped' tools/goal.mjs
+- label: goal judge and skeptical recheck delegates get a wall of max(min(judgeWin, left), left/2), at most 600s and never past the deadline; a judge is not started with < 60s left (mechanical NACK, judge_skipped reason deadline) and a timed-out judge call is not retried; recheck is skipped entirely when budget < 180s, banking the ACK
+  command: grep -q 'wallT' tools/goal.mjs && grep -q 'recheck_skipped' tools/goal.mjs && grep -qF 'Math.max(Math.min(judgeWin, budget()), budget() * 0.5)' tools/goal.mjs && grep -qF "reason: 'deadline'" tools/goal.mjs && grep -qF '[timeout after' tools/goal.mjs
   tags: [implemented]
-- label: goal salvage/urgent phases trigger adaptively from an EMA of iteration duration (SALVAGE at max(60, 1.3*EMA); URGENT at max(2.5*EMA, 20% total)), EMA contribution clamped to 25% of total budget
-  command: grep -q '1.3 \* e' tools/goal.mjs && grep -q '2.5 \* e' tools/goal.mjs
+- label: goal salvage/urgent phases trigger adaptively from an EMA of iteration duration (SALVAGE at max(60, min(1.3*EMA, minPass)) so a normal last pass runs while minPass is left; URGENT at max(2.5*EMA, 20% total)), EMA contribution clamped to 25% of total budget
+  command: grep -qF 'Math.max(60, Math.min(1.3 * e, minPass))' tools/goal.mjs && grep -q '2.5 \* e' tools/goal.mjs
   tags: [implemented]
-- label: goal per-iteration verification-cost cap — EXPLORE iterations (including iteration 1) get the full usable remaining budget, but COMMIT/URGENT iterations are bounded to 50% of remaining (matching the judge wallT cap) so a runaway refine/verify sweep on a working-enough artifact is cut off with budget left for SALVAGE
-  command: grep -qF "iterFrac = phase === 'EXPLORE' ? 1 : 0.5" tools/goal.mjs && grep -qF "* 1000 * iterFrac" tools/goal.mjs
+- label: goal pass cap under a deadline — every pass, iteration 1 included, gets (remaining − judgeWin)/2 while a judge window plus minPass would remain after it (judgeWin = min(240s, max(180s, 15% of total)) capped at 30% of total, minPass = max(60s, 10%)); the last pass takes the rest minus 5s, or minus minPass for salvage while no declared artifact exists; no floors. Evidence: 54 of 57 corefix trials ran one worker iteration
+  command: grep -qF 'judgeWin = deadline ? Math.min(240, Math.max(180, totalS * 0.15), totalS * 0.3)' tools/goal.mjs && grep -qF 'lastPass = !!deadline && half - judgeWin < minPass' tools/goal.mjs && grep -qF "emit('pass'" tools/goal.mjs
   tags: [implemented]
 - label: goal draft-gate escalates one-shot past 40% elapsed budget with no live jobs: worker prompt becomes an artifacts-first salvage-style directive whose NACK is exempt from strategy/blockerSig accounting
   command: grep -q 'ARTIFACT ESCALATION' tools/goal.mjs && grep -q 'escalated' tools/goal.mjs && grep -qF '> 0.4' tools/goal.mjs
@@ -255,11 +255,11 @@
 - label: SSE parser prints '[provider] Name (model)' to stderr once per distinct provider value per process when chunks carry a top-level provider field (OpenRouter); no-op when absent
   command: grep -q 'seenProviders' index.mjs && grep -q '\[provider\]' index.mjs
   tags: [implemented]
-- label: under a deadline with more than half the budget left, the goal loop skips the pre-work LLM judge and every EXPLORE iteration (including iteration 1) gets the full usable remaining budget
-  command: grep -q "deadline && budget() > totalS \* 0.5" tools/goal.mjs && grep -qF "const iterFrac = phase === 'EXPLORE' ? 1 : 0.5;" tools/goal.mjs
+- label: under a deadline with more than half the budget left, the goal loop skips the pre-work LLM judge; worker passes are split so judge feedback can reach a second pass (see the pass-cap fact)
+  command: grep -q "deadline && budget() > totalS \* 0.5" tools/goal.mjs && ! grep -q 'iterFrac' tools/goal.mjs
   tags: [implemented]
-- label: under a deadline, worker iterations leave max(120s, 20%) for salvage only while no declared artifact exists (otherwise max(60s, 5%)); salvage keeps no 90s judge bank when nothing exists yet; judge wall clamp can grow to 600s
-  command: grep -qF "missingAll() ? Math.max(120, totalS * 0.2) : Math.max(60, totalS * 0.05)" tools/goal.mjs && grep -qF "(budget() - (missingAll() ? 20 : 90)) * 1000" tools/goal.mjs && grep -qF "Math.min(600000, Math.max(45000, (budget() - 60) * 500))" tools/goal.mjs
+- label: under a deadline the goal loop ends inside it — nothing starts with < 15s left (deadline_reached; a past deadline starts no planner), salvage is capped at min(300s, left − 5s) with no floor and no judge bank, and the planner timeout is bounded by the time left
+  command: grep -qF "emit('deadline_reached'" tools/goal.mjs && grep -qF 'Math.min(300000, (budget() - 5) * 1000)' tools/goal.mjs && grep -qF 'totalS * 150), budget() * 1000)' tools/goal.mjs && ! grep -qF 'Math.max(30000, (budget()' tools/goal.mjs && ! grep -qF 'Math.max(45000' tools/goal.mjs
   tags: [implemented]
 - label: every API request has a wall timeout (MI_REQUEST_TIMEOUT, default 600s); timeouts and empty completions (no text, no tool calls) are retried instead of ending the turn
   command: grep -qF "AbortSignal.timeout(1000 * (+process.env.MI_REQUEST_TIMEOUT || 600))" index.mjs && grep -qF "code: 'empty'" index.mjs && grep -qF "e.name === 'TimeoutError'" index.mjs
@@ -269,4 +269,7 @@
   tags: [implemented]
 - label: harbor adapter passes the workspace snapshot through SYSTEM_PROMPT and writes nothing into the task directory
   command: grep -qF 'export SYSTEM_PROMPT="$SYSTEM_PROMPT' bench/mi_agent.py && ! grep -q '} > AGENTS.md' bench/mi_agent.py
+  tags: [implemented]
+- label: harbor adapter copies the goal progress/event logs (/tmp/mi-goal-*) into /logs/agent every 20s during the run and again on EXIT, because Harbor's timeout kill skips the EXIT trap (7 of 64 corefix trials lost their event logs)
+  command: grep -qF '( while sleep 20; do synclogs; done ) < /dev/null > /dev/null 2>&1 &' bench/mi_agent.py && grep -qF 'kill $SYNC 2>/dev/null; synclogs' bench/mi_agent.py
   tags: [implemented]

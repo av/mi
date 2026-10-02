@@ -149,8 +149,13 @@ SECONDS=0
 # Process substitutions, not a pipeline: services mi leaves running for the
 # verifier may keep the log pipes open, and the wrapper must not wait for them.
 export MI_GOAL_FILE="$1"
-# the goal loop's own progress and event logs live in /tmp; keep them with the trial for trajectory analysis
-trap 'cp /tmp/mi-goal-*.md /tmp/mi-goal-*.jsonl "$LOG/" 2>/dev/null' EXIT
+# the goal loop's own progress and event logs live in /tmp; keep them with the trial for trajectory analysis.
+# Copied every 20 s while mi runs, not only on EXIT: Harbor kills the wrapper at its timeout without running
+# the trap (7 of 64 corefix trials lost their event logs). The copier's stdio is detached so it holds no log pipe.
+synclogs() { cp /tmp/mi-goal-*.md /tmp/mi-goal-*.jsonl "$LOG/" 2>/dev/null; }
+( while sleep 20; do synclogs; done ) < /dev/null > /dev/null 2>&1 &
+SYNC=$!
+trap 'kill $SYNC 2>/dev/null; synclogs' EXIT
 "$NODE" /opt/mi/launch.mjs < /dev/null \
   > >(exec > "$LOG/mi-output.txt" 2>/dev/null; stamp) 2> >(exec > "$LOG/mi-stderr.txt" 2>/dev/null; stamp)
 CODE=$?
