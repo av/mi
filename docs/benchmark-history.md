@@ -624,3 +624,241 @@ Per-task rerun table:
 | portfolio-optimization | guard | — | ✓ | ✓ | ✓ | pass | pass | regression guard |
 | regex-log | guard | — | ✓ | ✓ | ✓ | pass | pass | regression guard |
 | sparql-university | guard | — | ✓ | ✓ | ✓ | pass | pass | regression guard |
+
+## 2026-10-02: trajectory analysis of the current code
+
+Data: the 64 mi trials of the current code (`d475038`+`03d876e`, staged as
+`1.12.0+1525675`) in `jobs/tb21-mi-corefix-r1-20261001/` and
+`jobs/tb21-mi-corefix-r2-20261001/`: 32 tasks × 2 rounds, 40 passes, 24
+failures. Terminus 2 on the same tasks, same model and settings, comes from
+`jobs/tb21-h2h-mi-vs-terminus2-20260929/` and `jobs/tb21-deepseek-v4-20260927/`.
+No mi code was changed and no benchmark was run for this section. **(O)** marks
+observed facts and **(I)** marks inferences.
+
+### What the loop actually does (all 64 trials)
+
+- **(O) It is single-shot.**
+  - 7 trials have no event log. Harbor killed the wrapper before its EXIT trap
+    copied `/tmp/mi-goal-*`.
+  - Of the other 57, 54 ran exactly **one** worker iteration (60 iterations in
+    total).
+  - The worker was killed at its cap in 28 of the 60 iterations.
+  - Judge feedback reached a second worker in only 3 trials (regex-chess r1,
+    build-pov-ray r2, winning-avg-corewars r2).
+- **(O) The iteration judge returned no verdict in 27 of 57 calls.**
+  - The 30 calls that did return one took a median of 163 s; only 4 took
+    under 54 s.
+  - 12 of the 27 no-verdict calls took exactly 107–117 s. That is two clamps
+    of about 54 s: when the worker has used its cap, `wallT = (remaining − 60
+    s) × 0.5` leaves the judge (169 − 60)/2 ≈ 54 s, so a verdict is
+    structurally impossible.
+  - Judge precision is fine when a verdict exists: 23 loops ended in ACK and
+    22 of them passed. Of the 34 that ended in NACK, 14 passed.
+- **(O) The run reliably overruns its own deadline.** 26 of 64 trials ended
+  in `AgentTimeoutError`; 13 of those still passed. On 900 s tasks the timing
+  is fixed:
+
+  | Step | Time |
+  |---|---|
+  | Deadline (adapter: start + timeout − 60 s) | 840 s |
+  | Planner | 90 s |
+  | Worker cap (749 − max(120, 0.2 × 840)) | 581 s, ends at t = 671 s |
+  | Judge, 2 × 54 s | ends at t = 779 s |
+  | SALVAGE pass (30 s floor) | |
+  | Salvage judge (2 × 45 s floor) | ends at t ≈ 899 s, then Harbor kills |
+
+  12 trials show exactly `w581/581 j108@779 salv:NACK@899`: chess,
+  count-dataset-tokens, regex-log, sparql, torch, write-compressor in r1;
+  chess, cobol, polyglot, regex-log, sparql, torch in r2. The floors (judge
+  45 s plus one retry, salvage 30 s, fast lane 30 s) apply after the
+  deadline, and the wrapper's 60 s margin is smaller than one judge with its
+  retry.
+- **(O) Long silent model turns.**
+  - Gaps of 300 s or more between mi tool calls hold 24% of all
+    inter-call time (4,211 gaps). Terminus 2 steps on the h2h run: 6%.
+  - Failed trials spent a median 20% of the task timeout in such gaps
+    (n = 24). Passed trials: 0% (n = 40).
+  - **(I)** The worker prompt asks it to "prefer one noninteractive bash
+    script" and gives a single iteration "explore freely". Both push toward
+    large one-shot generations. The gap difference could also partly reflect
+    task difficulty.
+- **(O) Correction to the 2026-10-01 section.** It says the 600 s request
+  timeout never fired. It did, in 5 trials: circuit-fibsqrt r1 and r2,
+  regex-chess r1 and r2, and feal-linear-cryptanalysis r2 (`⟡ retry 1 (23)`;
+  23 is the DOMException TimeoutError code).
+  - mi retries the identical request twice, losing up to 30 min per trial.
+  - In circuit-fibsqrt r2 and in both regex-chess trials, the worker process
+    then crashed (`DOMException [TimeoutError]` … `Node.js v22.11.0`).
+
+### Per-task causes (24 failing trials)
+
+Paths are under `jobs/tb21-mi-corefix-r{1,2}-20261001/<task>__*/`.
+
+| # | Cause (general) | Tasks | Failing trials | Evidence (O) |
+|---|---|---:|---:|---|
+| K1 | **Single long iteration, nothing better persisted.** The worker uses the whole budget in one iteration: long silent turns, blocking commands, or exploration with no state change. The best answer it has seen never reaches the artifact path before the cap kills it. | 9 | 13 | **count-dataset-tokens r1**: printed `A reasoning+solution 79586` at t = 273 s; the file still held the placeholder at the cap (t = 670 s); salvage wrote `13849`. **llm-inference-batching-scheduler r2**: "Both buckets now pass all thresholds" at t = 770 s, never written; the judge measured the stale draft (bucket 1 uses 24 shapes). **mailman r1, r2**: planner's artifact `/etc/mailman3/mailman.cfg` already existed, so the draft gate never fired; about 1,500 s of read-only commands, no list created, no service started. **cobol-modernization r2**: 311-byte draft at t = 109 s never replaced; r1 passed by writing `program.py` at t = 292 s. **write-compressor r1, r2** and **model-extraction-relu-logits r1, r2**: 400–600 s silent turns, 2–3 worker tool calls. **protein-assembly r2**: no draft at the cap; r1 passed only because salvage ran `cp work/gblock_draft.txt gblock.txt`. **fix-ocaml-gc r1**: `git log -S` on a `--filter=tree:0` clone blocked for about 1,930 s until the cap. **winning-avg-corewars r1**: `timeout 900 python3 eval.py` started at t = 2,543 s, killed at the cap; r2 copied the winner 59 s before its cap. **llm-inference r1**: 200–350 s thinking gaps, never improved on its draft. |
+| K2 | **Request timeout thrown away and retried identically.** A 600 s request aborts, the same prompt is resent, and three timeouts crash the worker. | 3 | 5 | circuit-fibsqrt r1, r2 (about 2,400 s of a 3,272 s cap lost; `gates.txt` still the example), regex-chess r1, r2 (`retry 1 (23)` at 691 s, `retry 2` at 1,293 s, crash at 1,897 s), feal-linear-cryptanalysis r2 (600 s lost at 99–699 s; r1 passed with turns of 337 s and 549 s, under the limit) |
+| K3 | **Destructive change outside the artifact, not checked.** Neither the worker nor the judge checks that the environment and inputs the verifier relies on survived. | 2 | 3 | sanitize-git-repo r1, r2 (`git gc --prune=now` deleted the original commits; verifier: `SHA d6987af… could not be resolved`; the r2 worker checked `d6987af: gone` and called it success), compile-compcert r1 (`dpkg -i --force-downgrade` broke apt; the verifier's `apt-get install curl` failed, so no test ran; judge and skeptical recheck had both ACKed) |
+| K4 | Perception or capability | 1 | 2 | chess-best-move r1, r2 (piece recognition by template matching, never a FEN; wrote `e2e4`, the verifier wants `e2e4`, `g2g4`). Terminus 2 decoded the board, passed once and failed once. |
+| K5 | Infrastructure | 1 | 1 | torch-tensor-parallelism r2: `VerifierTimeoutError` (test hung in a 4-rank gloo spawn) |
+
+**Present in nearly every failure but primary in none:**
+- **K6, judge without a verdict and the deadline overrun** (previous
+  subsection). In every K1 trial the judge or salvage got 0–108 s, so the
+  loop never produced the feedback that would have redirected the worker.
+- **K7, planner artifact-path parse bug.** Markdown leaks into paths
+  (`/app/answer.txt**`, `/app/my_warrior.red**`, `/app/dclm;`,
+  `/app/interp.py)`), so the declared artifact never "exists".
+  - In count-dataset-tokens r2 this accidentally helped: the judge was
+    skipped and salvage got 148 s, so it wrote `79586`.
+  - In sanitize-git-repo r2 it disabled the judge for the whole run.
+
+**The 8 flips between rounds** (O):
+- **6 are K1 timing**, decided by whether a good artifact reached the real
+  path before the single iteration ended: cobol, count-dataset-tokens,
+  fix-ocaml-gc, protein-assembly, winning-avg-corewars, and llm-inference in
+  part.
+- 1 is K2 (feal-linear).
+- 1 is K3 (compile-compcert).
+- torch-tensor-parallelism r2 is K5. Its r1 pass came after the worker found
+  the reference solution on GitHub (`evolvent-ai/RSIBench-Data`, t = 572 s).
+  This is contamination, so the task is a poor signal.
+- **(I)** None of the flips depended on a judge verdict.
+
+**Terminus 2 on the same tasks** (O):
+- It finished early on most of mi's both-fail tasks: write-compressor 520 s
+  (12 steps, longest turn about 3 min), sanitize-git-repo 279 s (`sed -i` on
+  the three files, no history rewrite), llm-inference 489 s (wrote both plans
+  as soon as feasible), model-extraction 868 s (25 short probes).
+- It wrote the deliverable within the first quarter of the run and then
+  edited it: torch at step 3, write-compressor and count-dataset-tokens at
+  about 6.5 min.
+- Turns of 6–9 min also occur in Terminus (regex-chess) but were never
+  aborted.
+
+### Ranked general fixes (for the next iteration)
+
+1. **Restructure the worker iteration (K1 and K6; 9 tasks, 13 trials).**
+   - Cap every worker iteration, including the first, at about 50% of the
+     remaining budget. Reserve a real judge window, at least
+     min(240 s, 15% of total), instead of a 54 s clamp, so there are at least
+     two worker passes with feedback in between.
+   - Add a worker-prompt rule: write the best candidate to the artifact path
+     as soon as one exists or a self-check passes ("persist on pass"). Drop
+     "prefer one noninteractive bash script" in favour of small write-and-test
+     steps.
+   - Base the draft and pivot gates on artifacts *modified since start*, not
+     on existence (mailman).
+   - **(I)** Expected to flip count-dataset-tokens, llm-inference,
+     cobol-modernization and protein-assembly most often.
+2. **End inside the deadline (K6; 26 AgentTimeoutErrors, 7 lost logs).**
+   - No delegate may start with less than its floor left. After the deadline,
+     skip the judge (record a mechanical NACK) rather than run 45 s × 2.
+   - Bound salvage to the time actually left.
+   - The adapter should copy `/tmp/mi-goal-*` while running, or from a
+     background loop, rather than only in an EXIT trap.
+3. **Make request timeouts recoverable (K2; 3 tasks, 5 trials).**
+   - On a request timeout, resend with a short user nudge ("write the code to
+     a file in small parts now") instead of the identical prompt.
+   - Bound `MI_REQUEST_TIMEOUT` by the time left in the iteration.
+   - Never let retry exhaustion crash the worker: return what was done.
+4. **Preservation checks (K3; 2 tasks, 3 trials).**
+   - Worker rule: no irreversible environment changes (history rewrite or
+     gc/prune, `dpkg --force-*`, deleting metadata) unless the goal asks for
+     them.
+   - Judge rule: measure that the package manager and pre-existing
+     repository objects still work before ACK.
+5. **Sanitize planner artifact paths (K7).** Strip trailing markdown and
+   punctuation, and drop paths that fail a path regex.
+
+### Discriminating task set for the next run
+
+Config: `bench/configs/tb21-mi-v4.1-discriminating.yaml`.
+
+**Rule.** Pass rates use every DeepSeek V4.1 Flash trial in `jobs/`: mi
+older code (`tb21-deepseek-v4-20260927`, `tb21-mi-fix-r1/r2`, `tb21-h2h`,
+`pilot-v4`), mi current code (corefix r1, r2) and Terminus 2 (`tb21-h2h`,
+`tb21-deepseek-v4-20260927`, `pilot-v4`).
+
+- **Excluded:**
+  - 30 tasks mi passed in every trial.
+  - 13 tasks no harness ever passed.
+  - Tasks whose failure is not harness-shaped: chess-best-move (K4) and
+    torch-tensor-parallelism (verifier flake, contamination).
+  - The 3600 s tasks (circuit-fibsqrt, regex-chess, fix-ocaml-gc,
+    winning-avg-corewars). Four trials of one of them use 4 trial-hours,
+    about 1 h of the 6 h window. They are left for a later, K2-specific
+    check.
+- **Kept:**
+  - 10 core tasks with a current-code mi rate of at most 50% where Terminus
+    2 passed at least once and the cause is K1, K2 or K3.
+  - 4 guards that currently pass but end through the code being changed
+    (the overrun from K6): regex-log, sparql-university, polyglot-c-py,
+    overfull-hbox.
+
+| task | timeout | mi older | mi current | Terminus 2 | role / cause |
+|---|---:|---:|---:|---:|---|
+| count-dataset-tokens | 900 | 2/3 | 1/2 | 3/3 | core, K1 |
+| cobol-modernization | 900 | 1/4 | 1/2 | 1/2 | core, K1 |
+| model-extraction-relu-logits | 900 | 0/4 | 0/2 | 2/2 | core, K1 |
+| write-compressor | 900 | 0/4 | 0/2 | 1/2 | core, K1 |
+| sanitize-git-repo | 900 | 1/2 | 0/2 | 2/2 | core, K3 |
+| llm-inference-batching-scheduler | 1800 | 0/2 | 0/2 | 2/2 | core, K1 |
+| mailman | 1800 | 0/4 | 0/2 | 1/2 | core, K1 |
+| protein-assembly | 1800 | 0/4 | 1/2 | 2/2 | core, K1 |
+| feal-linear-cryptanalysis | 1800 | 0/4 | 1/2 | 1/2 | core, K2 |
+| compile-compcert | 2400 | 1/3 | 1/2 | 2/2 | core, K3 |
+| regex-log | 900 | 2/3 | 2/2 | 2/2 | guard (overrun ending) |
+| sparql-university | 900 | 1/4 | 2/2 | 2/2 | guard (overrun ending) |
+| polyglot-c-py | 900 | 1/3 | 2/2 | 2/2 | guard (overrun ending) |
+| overfull-hbox | 750 | 1/3 | 2/2 | 1/2 | guard (overrun ending) |
+
+The current code passed 5/20 on the core tasks and 8/8 on the guards.
+
+### Run design: same-job A/B
+
+**Arms and size.**
+- In one Harbor job, `n_attempts: 1`, agents `[baseline × 1, fixed × 3]`.
+- 14 tasks × 4 = **56 trials**: per task, 3 fixed and 1 baseline.
+- The baseline arm pools the in-job trial with the two existing rounds of
+  the same code, so it has 3 trials per task. The in-job trial also checks
+  for provider or day drift against those rounds.
+- Harbor's `n_attempts` applies to the whole job, so the 1:3 ratio comes from
+  listing the fixed agent three times. That is not verified on Harbor 0.23:
+  smoke-test one task first. Fallback: `n_attempts: 2` with one entry each,
+  i.e. 2 + 2 per task, with the baseline pooled to 4.
+
+**Baseline agent setup.**
+1. Make a git worktree of the baseline commit:
+   `git worktree add ../mi-baseline 4a1f56a`.
+2. Add a loader module outside the repo, e.g. `/tmp/mi-ab/mi_baseline.py`. It
+   imports `../mi-baseline/bench/mi_agent.py` with
+   `importlib.util.spec_from_file_location("mi_agent_baseline", …)` and
+   subclasses `MiAgent` with `name()` returning `"mi-baseline"`.
+   - The adapter's `REPO` comes from that file's `__file__`, so it stages the
+     baseline checkout.
+   - `_stage` is per class, so the two stages stay separate.
+3. Put `/tmp/mi-ab` on `PYTHONPATH` (`bench/harbor.sh` prepends the repo) and
+   use `import_path: mi_baseline:MiBaselineAgent`.
+4. Compare with `bench/compare.py --a <job>@mi-baseline --b <job>@mi`.
+
+**Budget.**
+- Sum of timeouts: 17,450 s per trial set; × 4 = 69,800 trial-seconds.
+- That is **at most 4.9 h at concurrency 4**, plus about 15 min of
+  setup/verifier time, assuming every trial uses its full limit.
+- Cost: $0.054–0.071 per trial in the corefix rounds (about $0.032 per
+  1,000 s of timeout), so about **$2.3–4.0**. Run the guard with
+  `--cap 5.5`.
+
+**Decision rule, set before the run.** Fixed arm against the pooled
+baseline on the 10 core tasks, 30 vs 30 trials, expected baseline about
+7/30.
+
+| Result | Verdict |
+|---|---|
+| Fixed ≥ 15/30 (one-sided Fisher p ≈ 0.03 against 7/30; recompute with the actual baseline) and guards ≥ 11/12 | improvement |
+| Fixed ≤ baseline + 2 | no improvement |
+| In between | inconclusive; extend k on the same tasks |
+
+Also report AgentTimeoutError counts and judge verdict rates per arm, since
+fix 2 should move them deterministically.

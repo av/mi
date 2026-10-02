@@ -1,0 +1,64 @@
+# Discriminating set for the next harness change (2026-10-02; analysis in docs/benchmark-history.md,
+# "2026-10-02: trajectory analysis of the current code").
+#
+# Selection rule. Historical pass rates come from every DeepSeek V4.1 Flash trial in jobs/:
+#   mi older code: tb21-deepseek-v4-20260927, tb21-mi-fix-r1/r2, tb21-h2h, pilot-v4
+#   mi current code: tb21-mi-corefix-r1/r2
+#   Terminus 2: tb21-h2h, tb21-deepseek-v4-20260927, pilot-v4
+# Excluded:
+#   - the 30 tasks mi passed in every trial
+#   - the 13 tasks no harness ever passed
+#   - chess-best-move (piece recognition, not the harness)
+#   - torch-tensor-parallelism (verifier flake; its r1 pass found the reference solution online)
+#   - the 3600 s tasks, which are too long for a 6 h window at k=4: circuit-fibsqrt, regex-chess,
+#     fix-ocaml-gc, winning-avg-corewars
+# Kept:
+#   - core: current-code mi rate <= 50%, Terminus 2 passed at least once, and the failure cause in
+#     the trajectories is harness-shaped (K1 single long iteration, K2 request timeout,
+#     K3 unchecked destructive change)
+#   - guard: tasks that pass now but end through the deadline overrun that the next fix changes
+#
+#   task                              timeout  mi-older mi-current terminus  role
+#   count-dataset-tokens                  900    2/3      1/2       3/3     core K1
+#   cobol-modernization                   900    1/4      1/2       1/2     core K1
+#   model-extraction-relu-logits          900    0/4      0/2       2/2     core K1
+#   write-compressor                      900    0/4      0/2       1/2     core K1
+#   sanitize-git-repo                     900    1/2      0/2       2/2     core K3
+#   llm-inference-batching-scheduler     1800    0/2      0/2       2/2     core K1
+#   mailman                              1800    0/4      0/2       1/2     core K1
+#   protein-assembly                     1800    0/4      1/2       2/2     core K1
+#   feal-linear-cryptanalysis            1800    0/4      1/2       1/2     core K2
+#   compile-compcert                     2400    1/3      1/2       2/2     core K3
+#   regex-log                             900    2/3      2/2       2/2     guard
+#   sparql-university                     900    1/4      2/2       2/2     guard
+#   polyglot-c-py                         900    1/3      2/2       2/2     guard
+#   overfull-hbox                         750    1/3      2/2       1/2     guard
+#
+# Planned run: one job, n_attempts 1, agents [baseline mi x1, fixed mi x3]
+#   = 56 trials, <= 69,800 trial-seconds (<= 4.9 h at -n 4), about $2.3-4.0.
+# The baseline is pooled with corefix r1/r2 (same code) to 3 trials per task.
+# Fixed-arm only:
+#   bench/harbor.sh run -y -c bench/configs/tb21-mi-v4.1-discriminating.yaml \
+#     -c bench/configs/agent-mi-deepseek-v4.1-flash.yaml -n 4 --job-name <J>
+jobs_dir: jobs
+n_attempts: 1
+n_concurrent_trials: 4
+datasets:
+  - name: terminal-bench/terminal-bench-2-1
+    task_names:
+      # core (10)
+      - terminal-bench/count-dataset-tokens
+      - terminal-bench/cobol-modernization
+      - terminal-bench/model-extraction-relu-logits
+      - terminal-bench/write-compressor
+      - terminal-bench/sanitize-git-repo
+      - terminal-bench/llm-inference-batching-scheduler
+      - terminal-bench/mailman
+      - terminal-bench/protein-assembly
+      - terminal-bench/feal-linear-cryptanalysis
+      - terminal-bench/compile-compcert
+      # guard (4)
+      - terminal-bench/regex-log
+      - terminal-bench/sparql-university
+      - terminal-bench/polyglot-c-py
+      - terminal-bench/overfull-hbox
