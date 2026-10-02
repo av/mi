@@ -132,6 +132,11 @@ bench/compare.py --a jobs/$J@mi-baseline --b jobs/$J@mi
 git worktree remove ~/code/mi-baseline-4a1f56a                  # afterwards
 ```
 
+Launched on 2026-10-02 at 16:07 CEST with exactly these commands, as job
+`tb21-mi-ab-4a1f56a-vs-fixed-20261002`: 14 tasks × 4 trials = 56 trials. The fixed arm reports
+version `1.12.0+07bff7c`; its mi code is identical to 7ea0dbb. The decision rule is in
+`docs/benchmark-history.md`, section "2026-10-02".
+
 `agent-mi-ab-baseline-4a1f56a-deepseek-v4.1-flash.yaml` lists the baseline once
 and the current checkout three times. For another A/B, edit `checkout` and the
 counts. Every agent entry needs its full `model_name` and `kwargs`: an entry
