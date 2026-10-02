@@ -196,12 +196,16 @@ class MiOptions(InstalledAgentOptions):
         default=None, description="Seconds for the goal budget (default: the trial's real agent timeout)."
     )
     system_prompt: str | None = Field(default=None, description="Replaces the eval system prompt.")
+    checkout: str | None = Field(
+        default=None,
+        description="Package this mi checkout instead of the one holding this adapter (A/B of mi code under one adapter).",
+    )
 
 
 class MiAgent(BaseInstalledAgent):
     options_model = MiOptions
     MODEL_CONNECTION = ModelConnectionSpec()
-    _stage: Path | None = None
+    _stages: dict[Path, Path] = {}
 
     @staticmethod
     def name() -> str:
@@ -210,23 +214,29 @@ class MiAgent(BaseInstalledAgent):
     def get_version_command(self) -> str | None:
         return "cat /opt/mi/VERSION"
 
+    def _repo(self) -> Path:
+        repo = Path(self.options.checkout).expanduser().resolve() if self.options.checkout else REPO
+        if not (repo / "index.mjs").is_file():
+            raise RuntimeError(f"mi: checkout {repo} has no index.mjs")
+        return repo
+
     @classmethod
-    def _staged_checkout(cls) -> Path:
-        """Copy of the checkout's runtime files, built once per Harbor process."""
-        if cls._stage is None:
+    def _staged_checkout(cls, repo: Path = REPO) -> Path:
+        """Copy of a checkout's runtime files, built once per checkout per Harbor process."""
+        if repo not in cls._stages:
             stage = Path(tempfile.mkdtemp(prefix="mi-bench-"))
             atexit.register(shutil.rmtree, stage, True)
             for name in PACKAGE_PATHS:
-                src = REPO / name
+                src = repo / name
                 (shutil.copytree if src.is_dir() else shutil.copy2)(src, stage / name)
-            version = json.loads((REPO / "package.json").read_text())["version"]
-            git = lambda *a: subprocess.run(["git", "-C", str(REPO), *a], capture_output=True, text=True).stdout.strip()
+            version = json.loads((repo / "package.json").read_text())["version"]
+            git = lambda *a: subprocess.run(["git", "-C", str(repo), *a], capture_output=True, text=True).stdout.strip()
             sha, dirty = git("rev-parse", "--short", "HEAD"), git("status", "--porcelain", "--", *PACKAGE_PATHS)
             (stage / "VERSION").write_text(f"{version}+{sha or 'nogit'}{'-dirty' if dirty else ''}\n")
             (stage / "bench-run.sh").write_text(WRAPPER)
             (stage / "launch.mjs").write_text(LAUNCH)
-            cls._stage = stage
-        return cls._stage
+            cls._stages[repo] = stage
+        return cls._stages[repo]
 
     @staticmethod
     def _node_tarball(arch: str) -> Path | None:
@@ -243,7 +253,7 @@ class MiAgent(BaseInstalledAgent):
         return path
 
     async def install(self, environment: BaseEnvironment) -> None:
-        await environment.upload_dir(self._staged_checkout(), "/opt/mi")
+        await environment.upload_dir(self._staged_checkout(self._repo()), "/opt/mi")
         arch = (await environment.exec(command="uname -m", user="root")).stdout or ""
         if tarball := self._node_tarball(arch.strip()):
             await environment.upload_file(tarball, "/tmp/mi-node.tar.gz")
@@ -317,3 +327,13 @@ class MiAgent(BaseInstalledAgent):
         logs = [self.logs_dir / n for n in ("mi-output.txt", "mi-stderr.txt")]
         meta["providers"] = sorted({m for f in logs if f.exists() for m in PROVIDER_RE.findall(f.read_text(errors="replace"))})
         context.metadata = {**(context.metadata or {}), "mi": meta}
+
+
+class MiBaselineAgent(MiAgent):
+    """The same adapter under another name, so one job can run two mi versions side by side:
+    point `kwargs.checkout` at the baseline checkout (e.g. a `git worktree`); compare with
+    `bench/compare.py --a JOB@mi-baseline --b JOB@mi`."""
+
+    @staticmethod
+    def name() -> str:
+        return "mi-baseline"

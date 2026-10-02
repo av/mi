@@ -219,7 +219,7 @@
 - label: tasks are pulled from the Harbor registry (terminal-bench/terminal-bench-2-1), never vendored
   command: grep -q 'name: terminal-bench/terminal-bench-2-1' bench/configs/full.yaml && ! test -d bench/terminal-bench-2.1
 - label: harbor adapter uploads the local checkout to /opt/mi and runs mi in goal mode (goal read from a file by launch.mjs so no process argv carries task text) with TERMINAL_BENCH_CHECK and the eval system prompt
-  command: grep -q 'upload_dir(self._staged_checkout(), "/opt/mi")' bench/mi_agent.py && grep -q 'MI_GOAL_FILE' bench/mi_agent.py && grep -q '/opt/mi/launch.mjs' bench/mi_agent.py && grep -q 'EVAL_SYSTEM_PROMPT' bench/mi_agent.py
+  command: grep -q 'upload_dir(self._staged_checkout(self._repo()), "/opt/mi")' bench/mi_agent.py && grep -q 'MI_GOAL_FILE' bench/mi_agent.py && grep -q '/opt/mi/launch.mjs' bench/mi_agent.py && grep -q 'EVAL_SYSTEM_PROMPT' bench/mi_agent.py
 - label: harbor adapter recomputes the trial's agent timeout from config.json + task.toml and sets MI_TASK_TIMEOUT, MI_DEADLINE (60s verifier buffer) and MI_GOAL_MAX (4-12)
   command: grep -q 'TrialConfig.model_validate_json' bench/mi_agent.py && grep -q 'MI_TASK_TIMEOUT - 60' bench/mi_agent.py && grep -q 'MI_GOAL_MAX' tools/goal.mjs
 - label: harbor TERMINAL_BENCH_CHECK treats /tests/ results as ground truth for what they cover, requires every goal-stated path/threshold with measured values, never NACKs for margin, and warns about the hidden external verifier
@@ -278,4 +278,7 @@
   tags: [implemented]
 - label: harbor adapter copies the goal progress/event logs (/tmp/mi-goal-*) into /logs/agent every 20s during the run and again on EXIT, because Harbor's timeout kill skips the EXIT trap (7 of 64 corefix trials lost their event logs)
   command: grep -qF '( while sleep 20; do synclogs; done ) < /dev/null > /dev/null 2>&1 &' bench/mi_agent.py && grep -qF 'kill $SYNC 2>/dev/null; synclogs' bench/mi_agent.py
+  tags: [implemented]
+- label: harbor adapter can package another mi checkout (kwargs.checkout) and exposes it as bench.mi_agent:MiBaselineAgent named mi-baseline, so one job A/Bs two mi versions under the same adapter
+  command: grep -q 'class MiBaselineAgent(MiAgent)' bench/mi_agent.py && grep -q 'return "mi-baseline"' bench/mi_agent.py && grep -q 'checkout: str | None' bench/mi_agent.py
   tags: [implemented]

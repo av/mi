@@ -1,0 +1,29 @@
+# Same-job A/B of mi code (2026-10-02): baseline mi @4a1f56a (the code of corefix r1/r2) x1
+# vs the current checkout ("fixed", 7ea0dbb or later) x3 per task, on DeepSeek V4.1 Flash with the
+# settings of agent-mi-deepseek-v4.1-flash.yaml. Both arms use THIS checkout's adapter
+# (bench/mi_agent.py); only the packaged mi code differs (agent_info.version 1.12.0+<sha>).
+# Needs the baseline worktree:  git worktree add --detach ~/code/mi-baseline-4a1f56a 4a1f56a
+# Harbor 0.23 expands tasks x agents, so a repeated agent entry gives repeated trials.
+# Compare: bench/compare.py --a jobs/<J>@mi-baseline --b jobs/<J>@mi
+agents:
+  - import_path: bench.mi_agent:MiBaselineAgent
+    model_name: openrouter/deepseek/deepseek-v4.1-flash
+    kwargs:
+      temperature: 0.6
+      seed: null
+      provider: deepinfra/fp8
+      api_params: '{"reasoning":{"effort":"max"}}'
+      checkout: ~/code/mi-baseline-4a1f56a
+  - import_path: bench.mi_agent:MiAgent
+    model_name: openrouter/deepseek/deepseek-v4.1-flash
+    kwargs: &mi_fixed
+      temperature: 0.6
+      seed: null
+      provider: deepinfra/fp8
+      api_params: '{"reasoning":{"effort":"max"}}'
+  - import_path: bench.mi_agent:MiAgent
+    model_name: openrouter/deepseek/deepseek-v4.1-flash
+    kwargs: *mi_fixed
+  - import_path: bench.mi_agent:MiAgent
+    model_name: openrouter/deepseek/deepseek-v4.1-flash
+    kwargs: *mi_fixed

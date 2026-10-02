@@ -9,7 +9,7 @@ earlier approach taught: `docs/benchmark-history.md`.
 
 | Path | What |
 |---|---|
-| `bench/mi_agent.py` | Harbor installed agent `bench.mi_agent:MiAgent`: uploads this checkout to `/opt/mi`, runs `mi -g <task> -c <check>`, sets the goal budget from the trial's real timeout |
+| `bench/mi_agent.py` | Harbor installed agent `bench.mi_agent:MiAgent` (and `MiBaselineAgent`, the same adapter named `mi-baseline` for same-job A/Bs of another checkout): uploads this checkout (or `kwargs.checkout`) to `/opt/mi`, runs `mi -g <task> -c <check>`, sets the goal budget from the trial's real timeout |
 | `bench/configs/mi.yaml` | base Harbor JobConfig: agent, model, determinism kwargs, concurrency |
 | `bench/configs/{smoke,subset,full}.yaml` | task selection, stacked on `mi.yaml` |
 | `bench/harbor.sh` | runs `harbor` pinned to 0.23.0 (`HARBOR_VERSION` to change) with `bench.mi_agent` importable |
@@ -99,6 +99,47 @@ bench/guard.py jobs/tb21-mi-fix-$(date +%Y%m%d) --cap 5 &
 Each trial's `agent/mi-goal-*.md` holds the goal loop's planner, worker and
 judge log. Its "judge summary" shows whether an iteration ended at its cap or
 with the declared artifact still missing.
+
+## A/B of two mi versions in one job
+
+To compare mi code changes under identical host, provider and adapter
+conditions, run both versions in one Harbor job. `bench.mi_agent:MiBaselineAgent`
+is the same adapter class under the name `mi-baseline`. Its `checkout` kwarg
+points at another checkout, which it packages instead of the adapter's own. A
+`git worktree` outside the repo keeps the main checkout and its branch
+untouched. Both arms then use this checkout's adapter, wrapper, prompts and
+goal check, and only the packaged mi code (`index.mjs`, `tools/`, `skills/`)
+differs. `agent_info.version` in each `result.json` shows which code ran
+(`1.12.0+<sha>`).
+
+Harbor 0.23 expands trials as attempts × tasks × agents and does not
+deduplicate agents. A repeated agent entry therefore gives repeated trials of
+that arm, interleaved per task.
+
+Observed on 2026-10-02 with the regex-log task:
+- `--install-only` with 1 baseline and 3 fixed entries ran 4 trials, versioned `1.12.0+4a1f56a` and `1.12.0+7ea0dbb`.
+- A real run with one trial per arm passed in both arms. It cost $0.065 in total.
+
+```sh
+git worktree add --detach ~/code/mi-baseline-4a1f56a 4a1f56a     # baseline code, once
+export OPENROUTER_API_KEY=...
+J=tb21-mi-ab-4a1f56a-vs-fixed-$(date +%Y%m%d)
+setsid nohup bench/harbor.sh run -y -c bench/configs/tb21-mi-v4.1-discriminating.yaml \
+  -c bench/configs/agent-mi-ab-baseline-4a1f56a-deepseek-v4.1-flash.yaml \
+  -n 4 --job-name $J > /tmp/$J.log 2>&1 < /dev/null &
+setsid nohup python3 bench/guard.py jobs/$J --cap 5.5 > /tmp/$J-guard.log 2>&1 < /dev/null &
+bench/compare.py --a jobs/$J@mi-baseline --b jobs/$J@mi
+git worktree remove ~/code/mi-baseline-4a1f56a                  # afterwards
+```
+
+`agent-mi-ab-baseline-4a1f56a-deepseek-v4.1-flash.yaml` lists the baseline once
+and the current checkout three times. For another A/B, edit `checkout` and the
+counts. Every agent entry needs its full `model_name` and `kwargs`: an entry
+without them runs with no model and fails at once.
+
+Export `OPENROUTER_API_KEY` in the guard's own shell. In
+`export X && cmd &`, the whole chain goes to the background, so the export
+never reaches the commands after it.
 
 ## Parameters
 

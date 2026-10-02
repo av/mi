@@ -2940,6 +2940,8 @@ import { tmpdir } from 'node:os';
 test('Harbor adapter routes tasks through goal mode with the eval prompts', async () => {
   const adapter = readFileSync(join(__dirname, '../bench/mi_agent.py'), 'utf8');
   assert.match(adapter, /class MiAgent\(BaseInstalledAgent\)/);
+  // same-job A/B of two mi checkouts under one adapter: kwargs.checkout + a separately named class
+  assert.match(adapter, /class MiBaselineAgent\(MiAgent\):[\s\S]*return "mi-baseline"/);
   // goal comes from a file via launch.mjs: no process argv carries task text (kv-store-grpc self-kill, exit 143)
   assert.match(adapter, /readFileSync\(process\.env\.MI_GOAL_FILE, 'utf8'\), '-c', process\.env\.MI_GOAL_CHECK/);
   assert.match(adapter, /"\$NODE" \/opt\/mi\/launch\.mjs < \/dev\/null/);
@@ -2978,7 +2980,7 @@ test('Harbor adapter derives the goal budget from the trial agent timeout', asyn
 test('Harbor adapter ships the checkout and puts node on PATH only when it brings its own', async () => {
   const adapter = readFileSync(join(__dirname, '../bench/mi_agent.py'), 'utf8');
   assert.match(adapter, /PACKAGE_PATHS = \("index\.mjs", "package\.json", "README\.md", "tools", "skills"\)/);
-  assert.match(adapter, /upload_dir\(self\._staged_checkout\(\), "\/opt\/mi"\)/);
+  assert.match(adapter, /upload_dir\(self\._staged_checkout\(self\._repo\(\)\), "\/opt\/mi"\)/);
   assert.match(adapter, /\[ "\$NODE" = \/opt\/mi-node\/bin\/node \] && export PATH="\/opt\/mi-node\/bin:\$PATH"/);
 });
 
