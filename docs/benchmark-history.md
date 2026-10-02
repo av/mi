@@ -862,3 +862,78 @@ baseline on the 10 core tasks, 30 vs 30 trials, expected baseline about
 
 Also report AgentTimeoutError counts and judge verdict rates per arm, since
 fix 2 should move them deterministically.
+
+### In-flight check of the A/B (16:51 CEST, 12 of 56 trials)
+
+Job `tb21-mi-ab-4a1f56a-vs-fixed-20261002`. Fixed arm = 7ea0dbb (reports 07bff7c),
+baseline = 4a1f56a. Finished so far: write-compressor, model-extraction-relu-logits
+and regex-log, i.e. 9 fixed and 3 baseline trials. Guard spend $0.335. Logs were
+read from `agent/mi-goal-*.jsonl`, `mi-output.txt` and `result.json`. Scripts:
+`/tmp/mi-ana/inflight.py` and `abstat.py`.
+
+**Results (observed).** Three tasks are too few for any verdict.
+
+| task | fixed (A/B) | baseline (A/B) | corefix r1/r2 (same code as baseline) |
+|---|---|---|---|
+| write-compressor | 0/3 | 0/1 | 0/2 |
+| model-extraction-relu-logits | 1/3 | 0/1 | 0/2 |
+| regex-log | 3/3 | 1/1 | 2/2 |
+| AgentTimeoutError | **0/9** | 1/3 (regex-log, 900 s) | 4/6 |
+
+**Fix 2 works (observed).**
+- Every fixed trial ended cleanly with `complete`, at an agent time of 811–826 s
+  against the 840 s deadline.
+- No fatal events, no crashes, and `mi-stderr.txt` is empty everywhere.
+- Each trial ran 2–3 worker passes. The baseline ran 1 iteration.
+
+**New defect: every model call runs into its wall (observed).**
+- The `[request timeout: stopped early]` marker appears 5 times in 8 of the 9
+  fixed trials, and twice in the ninth (model-extraction `__bSsxght`).
+- Pass 1 ended at exactly 277 s of its 292 s cap in **9/9** trials, in the
+  middle of one silent request:
+  - each request started 75–80 s into the trial;
+  - none produced a tool call before the cut.
+- Retries never fire: the request wall is pass end − 15 s, and no retry starts
+  with less than 45 s left. So the nudge is never sent.
+- Pass 1 left a non-empty artifact in only 2/9 trials (regex-log `__FoRwvD6`
+  and `__RH9ExuB`). Example: `jobs/tb21-mi-ab-4a1f56a-vs-fixed-20261002/write-compressor__6PLCmX6/agent/mi-output.txt`
+  is silent from 78 s to 352 s.
+- The baseline shows the same single-request lengths, but those requests
+  finished:
+  - A/B baseline: 475 s (model-extraction), 329 s (write-compressor) and
+    261 s (regex-log) silent gaps;
+  - corefix rounds: 50 gaps of 250 s or more across 64 trials.
+- So the 292 s cap on 900 s tasks is shorter than one reasoning turn of
+  DeepSeek V4.1 Flash at effort max (inferred).
+- Pass 2 is the last pass. It also ended by request timeout in 8/9 trials,
+  not by finishing; how much work that cost is not measured.
+
+**Judge (observed).**
+- 6 LLM judge calls in total; the other judge steps were mechanical skips.
+- 5 of the 6 gave no verdict, all through request timeouts. The three after
+  pass 1 each ran 228 s of a 243.5 s wall.
+- The one verdict was a false ACK: model-extraction `__bSsxght`, where the
+  verifier failed `test_stolen_matrix_matches`.
+- **Judge feedback reached pass 2 in 0/9 trials.** Pass 2 got a mechanical
+  "artifact missing" NACK in 6 trials and a no-verdict tail in 3.
+- write-compressor `__NJd7Gmi`: the draft gate produced
+  `printf '' > /app/data.comp`. The existence-only mechanical skip let the judge
+  spend 228 s on an empty file.
+
+**Fix (commit f1f07b2, future runs only).** The running job staged 7ea0dbb
+once per Harbor process. Observed: the llm-inference-batching-scheduler
+trials, which started after the commit, have no `grace_ms` in their `pass`
+events.
+- **Turn grace.** A non-last pass stops at its cap only between model turns:
+  - delegate kills the child at `timeout + grace` and sets `MI_PASS_SOFT` at
+    the cap;
+  - after `MI_PASS_SOFT`, mi starts no new request and prints `[pass time up: …]`;
+  - a turn already running finishes and its tool calls run;
+  - grace = min(judge window, cap/2), which is 146 s on 900 s tasks;
+  - the last pass gets no grace.
+- **Empty artifacts.** A 0-byte declared artifact counts as missing for the
+  mechanical judge skip.
+- npm test 126/126, lines 29, .facts 0 failing.
+- Not fixed: the judge's own wall (180–243 s) is still shorter than many single
+  judge requests. That needs either a longer judge window on short tasks or a
+  lower judge reasoning effort (`MI_JUDGE_PARAMS`), which is a settings change.
