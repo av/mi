@@ -3214,7 +3214,9 @@ test('goal pass caps: non-last passes get half of (remaining − judge window), 
   assert.strictEqual(passes[0].last, false);
   assert.ok(Math.abs(passes[0].iter_timeout_ms - (passes[0].budget_remaining_s - judgeWin) * 500) <= 1000, `pass 1 cap ${passes[0].iter_timeout_ms}`);
   assert.ok(iters[0].judge_timeout_ms >= judgeWin * 1000, `iteration 1 judge wall ${iters[0].judge_timeout_ms} below the judge window`);
+  assert.strictEqual(passes[0].grace_ms, 1000 * Math.round(Math.min(judgeWin, (passes[0].budget_remaining_s - judgeWin) * 0.25)), 'non-last pass: turn grace');
   assert.strictEqual(passes[1].last, true);
+  assert.strictEqual(passes[1].grace_ms, 0, 'last pass: no grace past the deadline');
   assert.ok(Math.abs(passes[1].iter_timeout_ms - (passes[1].budget_remaining_s - 5) * 1000) <= 1000, `last pass cap ${passes[1].iter_timeout_ms}`);
   const w = prompts.filter(p => kind(p) === 'worker');
   assert.strictEqual(w.length, 2, prompts.map(kind).join(','));
@@ -3575,6 +3577,70 @@ test('delegate passes MI_PASS_END (earliest of the inherited end and its own tim
   assert.strictEqual(none, 'unset');
   assert.ok(own > 58 && own <= 61, `own timeout end ${own}`);
   assert.ok(nested > 19 && nested <= 20.5, `nested keeps the earlier end ${nested}`);
+});
+
+// ── turn grace (2026-10-02 A/B in-flight check): pass 1 of all 6 fixed-arm trials on write-compressor and model-extraction-relu-logits
+// ended at 277s of a 292s cap by "[request timeout: stopped early]" in the middle of one long reasoning request (silent 150-275s),
+// so everything that request produced was lost. A non-last pass now stops at its cap only between model turns. ──
+test('after MI_PASS_SOFT a running turn finishes and its tool calls run, then no new request starts', async () => {
+  let calls = 0;
+  requestHandler = (req, res) => { calls++; setTimeout(() => sse(res, { role: 'assistant', tool_calls: [{ id: 'c1', type: 'function', function: { name: 'bash', arguments: JSON.stringify({ command: 'echo soft-turn-ran' }) } }] }), 1500); };
+  const result = await runMi(['-p', 'long turn'], { MI_PASS_SOFT: String(Date.now() / 1000 + 0.5), MI_PASS_END: String(Date.now() / 1000 + 120) });
+  assert.strictEqual(result.status, 0, result.stderr);
+  assert.strictEqual(calls, 1, 'no request after the soft end');
+  assert.match(result.stdout, /soft-turn-ran/, 'the tool call of the turn that crossed the soft end still ran');
+  assert.match(result.stdout, /\[pass time up: stopped at a turn boundary, work so far is on disk\]/);
+});
+
+test('delegate grace: child killed at timeout + grace, MI_PASS_END at the kill time, MI_PASS_SOFT at the cap', async () => {
+  const probe = `/tmp/mi-test-passsoft-${process.pid}.mjs`;
+  writeFileSync(probe, 'console.log("END=" + (process.env.MI_PASS_END ?? "unset") + " SOFT=" + (process.env.MI_PASS_SOFT ?? "unset"));');
+  const saved = { path: process.env.MI_PATH, end: process.env.MI_PASS_END, soft: process.env.MI_PASS_SOFT };
+  global.spawn = spawn;
+  const delegate = (await import('../tools/delegate.mjs')).default;
+  let withGrace, noGrace, now;
+  try {
+    process.env.MI_PATH = probe; delete process.env.MI_PASS_END; delete process.env.MI_PASS_SOFT;
+    now = Date.now() / 1000;
+    withGrace = await delegate.handler({ prompt: 'x', timeout: 60000, grace: 30000 });
+    noGrace = await delegate.handler({ prompt: 'x', timeout: 60000 });
+  } finally {
+    process.env.MI_PATH = saved.path ?? '';
+    for (const [k, v] of [['MI_PASS_END', saved.end], ['MI_PASS_SOFT', saved.soft]]) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
+    rmSync(probe, { force: true });
+  }
+  const [, end, soft] = withGrace.match(/END=(\S+) SOFT=(\S+)/);
+  assert.ok(+end - now > 89 && +end - now <= 91, `hard end ${+end - now}`);
+  assert.ok(+soft - now > 59 && +soft - now <= 61, `soft end ${+soft - now}`);
+  assert.match(noGrace, /SOFT=unset/);
+  // the kill timer itself uses timeout + grace
+  const slow = `/tmp/mi-test-slow-${process.pid}.mjs`;
+  writeFileSync(slow, 'setTimeout(() => console.log("finished"), 1500);');
+  try { process.env.MI_PATH = slow; assert.match(await delegate.handler({ prompt: 'x', timeout: 500, grace: 3000 }), /finished/); assert.match(await delegate.handler({ prompt: 'x', timeout: 500 }), /\[timeout after 500ms\]/); }
+  finally { process.env.MI_PATH = saved.path ?? ''; rmSync(slow, { force: true }); }
+});
+
+test('goal: an empty (0-byte) declared artifact still counts as missing, so no LLM judge runs on it', async () => {
+  // write-compressor (A/B, fixed arm): the draft gate produced `printf '' > /app/data.comp`; the existence-only skip let a judge spend 228s on it
+  const art = `/tmp/mi-test-empty-artifact-${process.pid}.txt`, prompts = [], t0 = Date.now();
+  rmSync(art, { force: true });
+  requestHandler = (req, res, body) => {
+    const prompt = body.messages.at(-1).content;
+    prompts.push(prompt);
+    const k = kind(prompt);
+    if (k === 'planner') sse(res, { role: 'assistant', content: `EXIT_CRITERIA\n- done\nARTIFACTS: ${art}\nVERIFIER_SHAPE_CONTRACT\n- ok\nVERIFICATION_PLAN\n- inspect\nCURRENT_STATE\n- missing` });
+    else if (k === 'worker') { writeFileSync(art, /you are worker 1\//.test(prompt) ? '' : 'content'); sse(res, { role: 'assistant', content: WORK }); }
+    else sse(res, { role: 'assistant', content: 'file: measured=content expected=content [PASS]\nACK' });
+  };
+  try {
+    const result = await runMi(['-g', 'write the file', '-c', 'check it', '-d', String(Math.floor(Date.now() / 1000) + 900)]);
+    assert.strictEqual(result.status, 0);
+  } finally { rmSync(art, { force: true }); }
+  const ks = prompts.map(kind);
+  assert.deepStrictEqual(ks.slice(0, 3), ['planner', 'worker', 'worker'], ks.join(','));
+  assert.strictEqual(ks.filter(k => k === 'judge').length, 1, 'one judge, after the artifact has content');
+  const skips = latestEvents(t0).filter(e => e.type === 'judge_skipped' && e.reason === 'no declared artifact exists yet');
+  assert.strictEqual(skips.length, 2, 'precheck + iteration 1 (empty file) skipped');
 });
 
 // ── K3: preservation (sanitize-git-repo r1/r2 `git gc --prune=now` lost original commit d6987af; compile-compcert r1
