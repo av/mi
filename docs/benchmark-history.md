@@ -937,3 +937,68 @@ events.
 - Not fixed: the judge's own wall (180–243 s) is still shorter than many single
   judge requests. That needs either a longer judge window on short tasks or a
   lower judge reasoning effort (`MI_JUDGE_PARAMS`), which is a settings change.
+
+
+### Result of the A/B (2026-10-03): no clear improvement
+
+Job `jobs/tb21-mi-ab-4a1f56a-vs-a3106b2-20261003` (gitignored): the 14-task
+discriminating set, baseline mi `4a1f56a` ×1 against fixed mi `a3106b2` ×3
+(mi code = `f1f07b2`), interleaved per task, same adapter, model and
+settings. The before runs for pooling are `jobs/tb21-mi-corefix-r1-20261001`
+and `jobs/tb21-mi-corefix-r2-20261001`, which ran the same baseline code.
+The first attempt, `jobs/tb21-mi-ab-4a1f56a-vs-fixed-20261002`, was stopped
+at 16/56 trials because it measured the intermediate `7ea0dbb`, which had the
+pass-cap defect.
+
+| group | task | baseline in-job (4a1f56a) | baseline earlier (r1+r2) | baseline pooled | fixed (a3106b2) | Δ rate |
+|---|---|---:|---:|---:|---:|---:|
+| core | count-dataset-tokens | 0/1 | 1/2 | 1/3 | 2/3 | +0.33 |
+| core | cobol-modernization | 0/1 | 1/2 | 1/3 | 3/3 | +0.67 |
+| core | model-extraction-relu-logits | 1/1 | 0/2 | 1/3 | 1/3 | +0.00 |
+| core | write-compressor | 0/1 | 0/2 | 0/3 | 0/3 | +0.00 |
+| core | sanitize-git-repo | 0/1 | 0/2 | 0/3 | 2/3 | +0.67 |
+| core | llm-inference-batching-scheduler | 0/1 | 0/2 | 0/3 | 0/3 | +0.00 |
+| core | mailman | 0/1 | 0/2 | 0/3 | 0/3 | +0.00 |
+| core | protein-assembly | 0/1 | 1/2 | 1/3 | 0/3 | -0.33 |
+| core | feal-linear-cryptanalysis | 1/1 | 1/2 | 2/3 | 1/3 | -0.33 |
+| core | compile-compcert | 1/1 | 1/2 | 2/3 | 3/3 | +0.33 |
+| guard | regex-log | 1/1 | 2/2 | 3/3 | 3/3 | +0.00 |
+| guard | sparql-university | 1/1 | 2/2 | 3/3 | 3/3 | +0.00 |
+| guard | polyglot-c-py | 1/1 | 2/2 | 3/3 | 3/3 | +0.00 |
+| guard | overfull-hbox | 1/1 | 2/2 | 3/3 | 1/3 | -0.67 |
+
+| | Baseline pooled | Baseline in-job | Fixed |
+|---|---:|---:|---:|
+| Core (10 tasks) | 8/30 (27%) | 3/10 | 12/30 (40%) |
+| Guards (4 tasks) | 12/12 | 4/4 | 10/12 |
+| All 14 | 20/42 (48%) | 7/14 | 22/42 (52%) |
+| Harbor `AgentTimeoutError` | n/a | 7/14 | 0/42 |
+
+**Verdict by the rule set before the run: not an improvement** (observed).
+- Core 12/30 is above the no-improvement line (≤ 10) and below the
+  improvement line (≥ 15). Fisher p = 0.41 against the pooled baseline.
+- Guards 10/12 miss the required 11/12.
+- By task, 4 rates went up (cobol-modernization +0.67, sanitize-git-repo
+  +0.67, count-dataset-tokens +0.33, compile-compcert +0.33), 3 went down
+  (overfull-hbox −0.67, protein-assembly −0.33, feal-linear-cryptanalysis
+  −0.33) and 7 did not move. `compare.py` on the in-job pair gives NOISE
+  (p = 0.87).
+
+What the fixes did change (observed):
+- **Ends inside the deadline.** The fixed arm had 0/42 Harbor timeouts against
+  7/14 for the in-job baseline; 900 s tasks end at about 821 s.
+- **More passes.** Most fixed trials ran two worker passes, where the
+  baseline runs one.
+- **sanitize-git-repo** went 0/3 → 2/3. The two passes ran 0–1
+  history-pruning commands; the failure ran 4 and the baseline failure 2.
+  This is consistent with the PRESERVE rule (inferred).
+- **cobol-modernization** went 1/3 → 3/3.
+
+What did not move (observed): write-compressor, llm-inference-batching-scheduler,
+mailman and protein-assembly stayed at 0/3. The overfull-hbox regression: one
+trial left an overfull box and one edited the input file, each on a single
+pass; no specific fix is implicated (inferred: variance or the shorter first
+pass).
+
+Spend for the round was $3.58: analysis and fixes $0, smoke tests $0.09, the
+stopped first A/B $0.40, this A/B $3.09.
