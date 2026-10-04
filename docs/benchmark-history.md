@@ -1011,8 +1011,8 @@ Data: the 42 trials of the fixed arm (`agent_info.name == "mi"`, mi
 failed. Read from each trial's `agent/mi-goal-*.jsonl`, `agent/mi-goal-*.md`,
 `agent/mi-output.txt`, `verifier/ctrf.json` and `verifier/test-stdout.txt`.
 Terminus 2 comes from `jobs/tb21-h2h-mi-vs-terminus2-20260929/`. No Harbor job
-was run for this section. API spend: $0.16 for 34 single-request probes, about
-$0.03 for two local sanity runs. **(O)** marks observed facts, **(I)**
+was run for this section. API spend: $0.157 for 34 single-request probes, plus
+two small local sanity runs that were not metered. **(O)** marks observed facts, **(I)**
 inferences. Scripts: `/tmp/mi-r1/` (`sum.py`, `agg.py`, `gaps.py`,
 `reread.py`, `exp/exp.py`).
 
@@ -1027,7 +1027,7 @@ inferences. Scripts: `/tmp/mi-r1/` (`sum.py`, `agg.py`, `gaps.py`,
 - **(O) The judge almost never gave a verdict.** 40 LLM judge calls after a
   pass: 5 verdicts, 35 without one (30 trials), all 35 ending in a request
   timeout inside the judge window.
-  - The 35 took 9,382 s, a median 24% of the trial's budget each (165–585 s).
+  - The 35 took 9,382 s, a median 24% of the trial's budget each (49–585 s; 165–585 s for the ones after a first pass).
   - The 5 verdicts were all ACK. Two were wrong:
     model-extraction-relu-logits `zUpxqaC` (the skeptical recheck also said
     ACK; verifier: `Failed to match rows: [3, 10, 11, 13, 19, 22]`) and
@@ -1078,9 +1078,11 @@ subsections).
 ### The overfull-hbox regression (3/3 → 1/3)
 
 - **(O) Same structure in both arms.** A 750 s task is one worker pass in
-  both: old mi 544 s (ends at about 630 s, then judge and salvage until Harbor
-  kills it at 750 s+), fixed mi 594 s (ends at 669 s). No judge verdict in any
-  of the six trials. So the shorter first pass and the judge are not involved.
+  both: old mi 544 s in `WMsgDcd` (ends at about 630 s, then judge and salvage
+  until Harbor kills it after 750 s; the two corefix trials have no event log
+  but show the same shape in `mi-output.txt`), fixed mi 594 s (ends at
+  669 s). No judge verdict in the four trials that have an event log. So the
+  shorter first pass and the judge are not involved.
 - **(O) The passes reached zero overfull boxes earlier.** Old mi: 415 s
   (`WMsgDcd`), 567 s (`hVBWoHm`), about 500 s (`tcFTyxr`). Fixed mi: 597 s
   (`jRGttL4`, passed), 606 s (`eCz5Ykk`), and 528 s in a scratch copy
@@ -1099,11 +1101,11 @@ subsections).
   artifact gate told the worker to "write a best-effort draft" of
   `/app/main.tex` and `/app/synonyms.txt`, which the task forbids editing
   (`eCz5Ykk`, `jRGttL4`). Neither file was changed in any trial.
-- **(O) Base rate.** Before this run the task stood at 4/7 for mi (older code
-  1/3, corefix 2/2, in-job baseline 1/1, h2h 0/1) and 2/3 for Terminus 2.
+- **(O) Base rate.** Before this arm the task stood at 4/6 for mi (older code
+  1/3, corefix 2/2, in-job baseline 1/1) and 1/2 for Terminus 2.
 - **Verdict (I): mostly model variance, with a possible small contribution
-  from the DRAFT FIRST text.** At a true pass rate near 0.6, one pass in three
-  has probability 0.29. The blanket 144-word draft in `eCz5Ykk` follows the
+  from the DRAFT FIRST text.** At a true pass rate of 0.6–0.67, at most one
+  pass in three has probability 0.26–0.35. The blanket 144-word draft in `eCz5Ykk` follows the
   DRAFT FIRST directive in spirit, and the old passing trials searched from
   the original text instead, but one of them (`WMsgDcd`) also made 122
   replacements and passed. Confidence that no harness change is needed beyond
@@ -1144,8 +1146,10 @@ temperature 0.6, DeepInfra FP8).
   | + budget line ("you can be stopped at any moment…") | one line, bash only | 0.05k, 0.05k | 2 s, 3 s |
   | + draft and verify lines | one line, bash only | 0.1k, 1.1k | 5 s, 17 s |
   | Terminus 2's opening as the user message | eval prompt, 4 tools | 1.3k, 13.4k | 14 s, 152 s |
-  | Terminus 2's opening + all mi notes, guidance and the planner transcript | either | 6.9k–10.5k (n = 3) | 77–119 s |
+  | short mi-style brief without its budget line | one line, bash only | 8.4k, 17.0k | 116 s, 206 s |
+  | Terminus 2's opening + all mi notes, guidance and the planner transcript | one of each | 9.8k, 10.5k | 96 s, 119 s |
   | the same with "you are worker 1/6 of a goal loop" first | eval prompt, 4 tools | 8.1k, 28.1k, 37.3k | 87 s, 349 s, 445 s |
+  | the same with "you are worker 1/6 of a goal loop" first | one line, bash only | 6.9k | 77 s |
   | Terminus 2's opening + gate, budget, rules (no guidance, no plan) | one line, bash only | 0.07k | 3 s |
   | + guidance block | one line, bash only | 0.3k, 1.5k | 6 s, 20 s |
   | + planner transcript and checkpoint | one line, bash only | 2.0k, 4.0k | 25 s, 50 s |
@@ -1181,7 +1185,7 @@ temperature 0.6, DeepInfra FP8).
      sparql-university and polyglot-c-py were all still working when pass 1
      was cut, so they continue instead of restarting. cobol-modernization and
      compile-compcert passed with a second pass that re-read the files first
-     (4–8 read-only commands). Not verified: whether a fresh second look ever
+     (3–8 read-only commands). Not verified: whether a fresh second look ever
      helped, and how a 2,300 s compile-compcert session behaves near the
      context limit.
 2. **Task-first worker brief** (`tools/goal.mjs`). Targets the long requests
