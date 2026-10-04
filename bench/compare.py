@@ -70,7 +70,7 @@ def selected(r, sel):
 def harbor_summary(jobs):
     for path, r, agent in jobs:
         for key, s in (r["stats"].get("evals") or {}).items():
-            name, _, model = agent.partition("/")
+            name, _, model = (agent or "").partition("/")
             if agent and not (key.startswith(f"{name}__") and model in key.split("__")[1]):
                 continue
             metrics = ", ".join(f"{k}={v:.3f}" for m in s.get("metrics", []) for k, v in m.items())

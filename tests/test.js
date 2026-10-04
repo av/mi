@@ -3809,3 +3809,40 @@ test('a second context overflow in the same run is compacted again after a succe
   assert.strictEqual(compactions, 2);
   assert.match(result.stdout, /finished after two compactions/);
 });
+
+// ── Round 1 (2026-10-04): providers drop earlier reasoning from the history, so a tool-calling turn keeps the end of it as notes ──
+test('reasoning of a tool-calling turn is kept in the history as notes; a final answer is left as it is', async () => {
+  const bodies = [];
+  requestHandler = (req, res, body) => {
+    bodies.push(body);
+    res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+    const d = delta => res.write(`data: ${JSON.stringify({ choices: [{ delta }] })}\n\n`);
+    d({ reasoning: 'the format is LZ77; ' }); d({ reasoning: 'next: count the bytes' });
+    if (bodies.length === 1) d({ tool_calls: [{ index: 0, id: 'c1', type: 'function', function: { name: 'bash', arguments: JSON.stringify({ command: 'echo hi' }) } }] });
+    else d({ content: 'done' });
+    res.end('data: [DONE]\n\n');
+  };
+  const r = await runMi(['-p', 'go']);
+  assert.strictEqual(r.status, 0, r.stderr);
+  assert.strictEqual(bodies.length, 2);
+  const turn = bodies[1].messages.find(m => m.role === 'assistant');
+  assert.match(turn.content, /^\[my notes before these calls\] the format is LZ77; next: count the bytes$/);
+  assert.ok(!r.stdout.includes('my notes'), 'notes are not printed');
+  assert.match(r.stdout, /done/);
+});
+
+test('a request cut off by the time limit leaves the end of its reasoning in the history for the retry', async () => {
+  const bodies = [];
+  requestHandler = (req, res, body) => {
+    bodies.push(body);
+    res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+    if (bodies.length === 1) return void res.write(`data: ${JSON.stringify({ choices: [{ delta: { reasoning: 'half-built encoder: tokens parsed, range coder next' } }] })}\n\n`); // never finishes
+    res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: 'done' } }] })}\n\n`); res.end('data: [DONE]\n\n');
+  };
+  const r = await runMi(['-p', 'go'], { MI_REQUEST_TIMEOUT: '1' });
+  assert.strictEqual(r.status, 0, r.stderr);
+  assert.strictEqual(bodies.length, 2);
+  const users = bodies[1].messages.filter(m => m.role === 'user').map(m => m.content);
+  assert.ok(users.some(c => /cut off by the request time limit[\s\S]*half-built encoder: tokens parsed, range coder next/.test(c)), users.join(' | '));
+  assert.match(r.stdout, /done/);
+});

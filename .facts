@@ -300,3 +300,9 @@
 - label: harbor adapter can package another mi checkout (kwargs.checkout) and exposes it as bench.mi_agent:MiBaselineAgent named mi-baseline, so one job A/Bs two mi versions under the same adapter
   command: grep -q 'class MiBaselineAgent(MiAgent)' bench/mi_agent.py && grep -q 'return "mi-baseline"' bench/mi_agent.py && grep -q 'checkout: str | None' bench/mi_agent.py
   tags: [implemented]
+- label: a tool-calling turn keeps the last 3000 chars of its streamed reasoning in the history as '[my notes before these calls]' (providers drop earlier reasoning, so without it every turn re-derives the plan)
+  command: grep -q 'my notes before these calls' index.mjs
+  tags: [implemented]
+- label: a request cut off by the request time limit leaves the last 3000 chars of its streamed reasoning in the history as a harness note, so the retry or the next pass continues from it
+  command: grep -q 'cut off by the request time limit' index.mjs
+  tags: [implemented]
