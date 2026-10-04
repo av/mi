@@ -365,9 +365,11 @@ test('goal workers do work instead of receiving judge criteria', async () => {
       sse(res, { role: 'assistant', content: 'missing files [FAIL]\nNACK' });
     } else if (prompts.length === 3) {
       assert.match(prompt, /you are worker 1\/128/);
-      assert.match(prompt, /complete the goal now/);
+      assert.match(prompt, /solve the task by running shell commands with the bash tool, a few at a time/);
+      assert.match(prompt, /Task Description:\ncreate files\n/);
       assert.match(prompt, /progress file:/);
-      assert.match(prompt, /verifier contract and plan:/);
+      assert.match(prompt, /Refined Exit Criteria And Verification Plan" section holds a planner's notes \(verifier contract and plan: a hypothesis, not a spec\)/);
+      assert.doesNotMatch(prompt, /exact files exist/, 'the planner transcript is referenced, not pasted into the brief');
       assert.match(prompt, /judge feedback and checkpoint:\n[\s\S]*missing files/);
       assert.match(prompt, /guidance:/);
       assert.match(prompt, /PERSIST ON PASS: the moment you have a candidate result/);
@@ -2947,7 +2949,7 @@ test('Harbor adapter routes tasks through goal mode with the eval prompts', asyn
   assert.match(adapter, /"\$NODE" \/opt\/mi\/launch\.mjs < \/dev\/null/);
   assert.match(adapter, /bench-run\.sh \/opt\/mi\/task\.md"/);
   assert.doesNotMatch(adapter, /bench-run\.sh \{shlex/);
-  assert.match(adapter, /cp \/tmp\/mi-goal-\*\.md \/tmp\/mi-goal-\*\.jsonl "\$LOG\/"/);
+  assert.match(adapter, /cp \/tmp\/mi-goal-\*\.md \/tmp\/mi-goal-\*\.jsonl \/tmp\/mi-goal-\*\.session\.json "\$LOG\/"/); // logs + the worker's conversation
   // goal logs are copied periodically during the run (Harbor kills skip the EXIT trap: 7 of 64 trials lost them), and on EXIT
   assert.match(adapter, /\( while sleep 20; do synclogs; done \) < \/dev\/null > \/dev\/null 2>&1 &\nSYNC=\$!/);
   assert.match(adapter, /trap 'kill \$SYNC 2>\/dev\/null; synclogs' EXIT/);
@@ -3152,7 +3154,8 @@ test('goal worker 1 states its time cap and gets DRAFT FIRST for missing artifac
   const w1 = prompts.find(p => /you are worker 1\//.test(p));
   assert.ok(w1, 'worker 1 prompt seen');
   assert.match(w1, /DRAFT FIRST: required artifact\(s\) not yet written in this run \(missing, or unchanged since it started\): \/tmp\/mi-test-never-written-artifact\.txt/);
-  assert.match(w1, /this pass is capped at ~\d+min and is followed by a judge review and another pass with its feedback/);
+  assert.match(w1, /this pass runs until you finish or the time is used \(~\d+min\); you can be stopped at any moment, and what the artifact path\(s\) hold then is what gets graded/);
+  assert.match(w1, /never a placeholder or an empty file/);
   assert.match(w1, /declared artifacts: \/tmp\/mi-test-never-written-artifact\.txt/);
   assert.match(w1, /PERSIST ON PASS/);
   assert.doesNotMatch(w1, /explore freely|one noninteractive bash script/);
@@ -3187,18 +3190,16 @@ test('goal draft gate fires for a declared artifact that exists but was not writ
   assert.deepStrictEqual(gates.map(g => g.iteration), [1]);
 });
 
-test('goal pass caps: non-last passes get half of (remaining − judge window), the last pass takes the rest', async () => {
-  // K1/K6 (2026-10-02 analysis): 54 of 57 logged trials ran one worker iteration and judge feedback reached a second worker
-  // in only 3, because iteration 1 kept the whole budget. Now each pass gets (remaining − judgeWin)/2 while a judge window
-  // plus minPass would remain after it; judgeWin = min(240, max(180, 15% total)) ≥ the 163s median verdict.
-  const prompts = [], lb = lowBudget(), t0 = Date.now();
+test('goal under a deadline: one worker session — a pass takes the whole remaining budget, the judge runs when the worker stops, the next pass continues the conversation', async () => {
+  // Round 1 (2026-10-04, A/B of a3106b2, 42 trials): 36 of 39 capped passes were cut while the worker was still working, 35 of the 40 LLM
+  // judge calls that followed gave no verdict (median 24% of the budget each), and each later pass was a new process that re-read the same files.
+  const bodies = [], lb = lowBudget(), t0 = Date.now();
   let judges = 0;
   requestHandler = (req, res, body) => {
-    const prompt = body.messages.at(-1).content;
-    prompts.push(prompt);
-    const k = kind(prompt);
+    bodies.push(body);
+    const k = kind(body.messages.at(-1).content);
     if (k === 'planner') sse(res, { role: 'assistant', content: PLAN_NONE });
-    // 270s left after judge 1 (two FAILs: no fast lane): the inflated EMA would have made this a no-debug SALVAGE pass under the old 1.3×EMA trigger
+    // 270s left after judge 1 (two FAILs: no fast lane): still a normal pass, not a no-debug SALVAGE
     else if (k === 'judge') { if (++judges === 1) lb.jump(270); sse(res, { role: 'assistant', content: judges === 1 ? 'a: measured=1 expected=2 [FAIL]\nb: measured=1 expected=2 [FAIL]\nNACK' : 'all good [PASS]\nACK' }); }
     else if (k === 'worker') sse(res, { role: 'assistant', content: WORK });
     else sse(res, { role: 'assistant', content: 'confirmed [PASS]\nACK' });
@@ -3207,23 +3208,50 @@ test('goal pass caps: non-last passes get half of (remaining − judge window), 
     const result = await runMi(['-g', 'long task', '-c', 'check it', '-d', String(lb.dl)], lb.env);
     assert.strictEqual(result.status, 0);
   } finally { lb.done(); }
+  const prompts = bodies.map(b => b.messages.at(-1).content);
   assert.ok(!prompts.slice(0, 2).some(p => kind(p) === 'judge'), 'no pre-work judge on a fresh deadline budget');
   const ev = latestEvents(t0), passes = ev.filter(e => e.type === 'pass'), iters = ev.filter(e => e.type === 'iteration');
   assert.strictEqual(passes.length, 2);
-  const judgeWin = 180; // totalS ≈ 1000: min(240, max(180, 150), 300)
-  assert.strictEqual(passes[0].last, false);
-  assert.ok(Math.abs(passes[0].iter_timeout_ms - (passes[0].budget_remaining_s - judgeWin) * 500) <= 1000, `pass 1 cap ${passes[0].iter_timeout_ms}`);
-  assert.ok(iters[0].judge_timeout_ms >= judgeWin * 1000, `iteration 1 judge wall ${iters[0].judge_timeout_ms} below the judge window`);
-  assert.strictEqual(passes[0].grace_ms, 1000 * Math.round(Math.min(judgeWin, (passes[0].budget_remaining_s - judgeWin) * 0.25)), 'non-last pass: turn grace');
-  assert.strictEqual(passes[1].last, true);
-  assert.strictEqual(passes[1].grace_ms, 0, 'last pass: no grace past the deadline');
-  assert.ok(Math.abs(passes[1].iter_timeout_ms - (passes[1].budget_remaining_s - 5) * 1000) <= 1000, `last pass cap ${passes[1].iter_timeout_ms}`);
-  const w = prompts.filter(p => kind(p) === 'worker');
+  for (const p of passes) assert.ok(Math.abs(p.iter_timeout_ms - (p.budget_remaining_s - 5) * 1000) <= 1000, `pass ${p.iteration} cap ${p.iter_timeout_ms} of ${p.budget_remaining_s}s left`);
+  assert.deepStrictEqual(passes.map(p => p.resumed), [false, true]);
+  assert.ok(iters[0].judge_timeout_ms >= 180 * 1000, `iteration 1 judge wall ${iters[0].judge_timeout_ms} below the judge window`); // totalS ≈ 1000: min(240, max(180, 150), 300)
+  assert.strictEqual(iters[0].judge_verdict, true);
+  const w = bodies.filter(b => kind(b.messages.at(-1).content) === 'worker');
   assert.strictEqual(w.length, 2, prompts.map(kind).join(','));
-  assert.match(w[0], /followed by a judge review and another pass/);
-  assert.match(w[1], /is the LAST one/);
-  assert.match(w[1], /a: measured=1 expected=2 \[FAIL\]/, 'judge feedback reaches the second pass');
+  assert.deepStrictEqual(w[0].messages.map(m => m.role), ['system', 'user']);
+  // pass 2 is the same conversation: the first brief, the worker's own reply, then the feedback
+  assert.deepStrictEqual(w[1].messages.map(m => m.role), ['system', 'user', 'assistant', 'user']);
+  assert.strictEqual(w[1].messages[1].content, w[0].messages[1].content);
+  assert.strictEqual(w[1].messages[2].content, WORK);
+  const cont = w[1].messages[3].content;
+  assert.match(cont, /you are worker 2\/\d+ of a goal loop — the same worker as before: this conversation continues/);
+  assert.match(cont, /a: measured=1 expected=2 \[FAIL\]/, 'judge feedback reaches the second pass');
+  assert.doesNotMatch(cont, /Task Description:/, 'the brief is not repeated');
   assert.ok(!prompts.some(p => kind(p) === 'salvage'), 'no salvage while ≥ minPass is left');
+});
+
+test('goal under a deadline: a review without a verdict is followed by one worker re-check, then the loop stops', async () => {
+  // 35 of 40 LLM judge calls in the a3106b2 arm ended in a request timeout; the next pass then got the tail of an unfinished transcript as "feedback"
+  const bodies = [], t0 = Date.now();
+  requestHandler = (req, res, body) => {
+    bodies.push(body);
+    const k = kind(body.messages.at(-1).content);
+    if (k === 'planner') sse(res, { role: 'assistant', content: PLAN_NONE });
+    else if (k === 'judge') sse(res, { role: 'assistant', content: 'looking at the files\n[request timeout: stopped early, work so far is on disk]' });
+    else sse(res, { role: 'assistant', content: WORK });
+  };
+  const result = await runMi(['-g', 'long task', '-c', 'check it', '-d', String(Math.floor(Date.now() / 1000) + 900)]);
+  assert.strictEqual(result.status, 0);
+  const kinds = bodies.map(b => kind(b.messages.at(-1).content));
+  assert.deepStrictEqual(kinds, ['planner', 'worker', 'judge', 'worker'], kinds.join(','));
+  const cont = bodies[3].messages.at(-1).content;
+  assert.match(cont, /the independent review ended without a verdict/);
+  assert.doesNotMatch(cont, /looking at the files/, 'no unfinished judge transcript in the feedback');
+  assert.doesNotMatch(cont, /failed strategies|PIVOT MANDATE/, 'a verdict-less review is not a failed strategy');
+  const ev = latestEvents(t0);
+  assert.deepStrictEqual(ev.filter(e => e.type === 'iteration').map(e => e.judge_verdict), [false, false]);
+  assert.ok(ev.some(e => e.type === 'self_checked'));
+  assert.deepStrictEqual([ev.at(-1).type, ev.at(-1).status], ['complete', 'NACK']);
 });
 
 test('goal ends inside the deadline: no judge after a pass that leaves too little time, no salvage under 15s', async () => {
@@ -3674,4 +3702,110 @@ test('goal: preservation rule in worker, environment check in judge, ORIGINAL_HE
   const ev = latestEvents(t0);
   assert.ok(!ev.some(e => e.type === 'judge_skipped' && e.reason !== 'deadline'), 'cleaned paths exist, so the judge is not mechanically skipped');
   assert.ok(judge, 'judge ran');
+});
+
+// ── Round 1 (2026-10-04): one worker session. MI_SESSION keeps a piped mi's conversation in a file and continues it on the next call ──
+test('MI_SESSION: a piped run saves its conversation and the next piped run continues it', async () => {
+  const file = `/tmp/mi-test-session-${process.pid}.json`, bodies = [];
+  rmSync(file, { force: true });
+  requestHandler = (req, res, body) => {
+    bodies.push(body);
+    if (bodies.length === 1) sse(res, { role: 'assistant', tool_calls: [{ id: 'c1', type: 'function', function: { name: 'bash', arguments: JSON.stringify({ command: 'echo from-first-run' }) } }] });
+    else sse(res, { role: 'assistant', content: bodies.length === 2 ? 'first done' : 'second done' });
+  };
+  let saved;
+  try {
+    const first = await runMi([], { MI_SESSION: file }, 'first task');
+    assert.strictEqual(first.status, 0, first.stderr);
+    saved = JSON.parse(readFileSync(file, 'utf8'));
+    const second = await runMi([], { MI_SESSION: file }, 'now the feedback');
+    assert.strictEqual(second.status, 0, second.stderr);
+  } finally { rmSync(file, { force: true }); }
+  assert.deepStrictEqual(saved.map(m => m.role), ['system', 'user', 'assistant', 'tool', 'assistant']);
+  assert.strictEqual(saved.at(-1).content, 'first done');
+  assert.strictEqual(bodies.length, 3);
+  const resumed = bodies[2].messages;
+  assert.deepStrictEqual(resumed.map(m => m.role), ['system', 'user', 'assistant', 'tool', 'assistant', 'user']);
+  assert.strictEqual(resumed[1].content, 'first task');
+  assert.match(resumed[3].content, /from-first-run/);
+  assert.strictEqual(resumed.at(-1).content, 'now the feedback');
+});
+
+test('MI_SESSION: an unreadable session file starts a fresh conversation; without MI_SESSION nothing is written', async () => {
+  const file = `/tmp/mi-test-session-bad-${process.pid}.json`, bodies = [];
+  writeFileSync(file, '[{"role":"system","content":"cut off mid-wri');
+  requestHandler = (req, res, body) => { bodies.push(body); sse(res, { role: 'assistant', content: 'ok' }); };
+  let after;
+  try {
+    const r = await runMi([], { MI_SESSION: file }, 'task');
+    assert.strictEqual(r.status, 0, r.stderr);
+    after = JSON.parse(readFileSync(file, 'utf8'));
+    rmSync(file, { force: true });
+    const plain = await runMi([], {}, 'task');
+    assert.strictEqual(plain.status, 0);
+  } finally { /* removed below */ }
+  assert.deepStrictEqual(bodies[0].messages.map(m => m.role), ['system', 'user']);
+  assert.deepStrictEqual(after.map(m => m.role), ['system', 'user', 'assistant']);
+  assert.ok(!existsSync(file), 'no session file without MI_SESSION');
+});
+
+test('delegate: MI_SESSION is not inherited by a child, only passed when the caller names it', async () => {
+  const probe = `/tmp/mi-test-sessenv-${process.pid}.mjs`;
+  writeFileSync(probe, 'console.log("SESSION=[" + (process.env.MI_SESSION ?? "unset") + "]");');
+  const saved = { path: process.env.MI_PATH, sess: process.env.MI_SESSION };
+  global.spawn = spawn;
+  const delegate = (await import('../tools/delegate.mjs')).default;
+  let inherited, named;
+  try {
+    process.env.MI_PATH = probe; process.env.MI_SESSION = '/tmp/parent-session.json';
+    inherited = await delegate.handler({ prompt: 'x' });
+    named = await delegate.handler({ prompt: 'x', env: { MI_SESSION: '/tmp/child-session.json' } });
+  } finally {
+    process.env.MI_PATH = saved.path ?? '';
+    if (saved.sess === undefined) delete process.env.MI_SESSION; else process.env.MI_SESSION = saved.sess;
+    rmSync(probe, { force: true });
+  }
+  assert.match(inherited, /SESSION=\[\]/, 'a nested delegate must not load or overwrite its parent\'s conversation');
+  assert.match(named, /SESSION=\[\/tmp\/child-session\.json\]/);
+});
+
+test('goal: the salvage pass continues the worker conversation instead of starting from nothing', async () => {
+  // a3106b2 arm: every salvage/short last pass (35–80s, a fresh process) ended in a request timeout with nothing written
+  const art = `/tmp/mi-test-salvage-art-${process.pid}.txt`, bodies = [], lb = lowBudget(), t0 = Date.now();
+  rmSync(art, { force: true });
+  requestHandler = (req, res, body) => {
+    bodies.push(body);
+    const k = kind(body.messages.at(-1).content);
+    if (k === 'planner') sse(res, { role: 'assistant', content: `EXIT_CRITERIA\n- done\nARTIFACTS: ${art}\nVERIFIER_SHAPE_CONTRACT\n- ok\nVERIFICATION_PLAN\n- inspect\nCURRENT_STATE\n- missing` });
+    else if (k === 'worker') { lb.jump(50); sse(res, { role: 'assistant', content: 'found the answer 42, not written yet' }); }
+    else sse(res, { role: 'assistant', content: 'wrote it' });
+  };
+  try {
+    const result = await runMi(['-g', 'long task', '-c', 'check it', '-d', String(lb.dl)], lb.env);
+    assert.strictEqual(result.status, 0);
+  } finally { lb.done(); rmSync(art, { force: true }); }
+  const kinds = bodies.map(b => kind(b.messages.at(-1).content));
+  assert.deepStrictEqual(kinds, ['planner', 'worker', 'salvage'], kinds.join(','));
+  const pass = latestEvents(t0).find(e => e.type === 'pass');
+  assert.ok(Math.abs(pass.iter_timeout_ms - (pass.budget_remaining_s - 100) * 1000) <= 1000, `no artifact yet: the pass keeps minPass (10% of ~1000s) back for salvage, cap ${pass.iter_timeout_ms} of ${pass.budget_remaining_s}s`);
+  const sal = bodies[2].messages;
+  assert.deepStrictEqual(sal.map(m => m.role), ['system', 'user', 'assistant', 'user']);
+  assert.strictEqual(sal[2].content, 'found the answer 42, not written yet');
+});
+
+test('a second context overflow in the same run is compacted again after a successful request in between', async () => {
+  // one worker session now lasts the whole budget, so it can outgrow the context more than once
+  let streams = 0, compactions = 0;
+  const overflow = res => { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: { code: 'context_length_exceeded', message: 'maximum context length is 8192 tokens' } })); };
+  requestHandler = (req, res, body) => {
+    if (!body.stream) { compactions++; res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ choices: [{ message: { content: 'GOAL: test\nDONE: some\nSTATE: clean\nNEXT: go on\nCONSTRAINTS: none' } }] })); }
+    streams++;
+    if (streams === 1 || streams === 3) return overflow(res);
+    if (streams === 2) return sse(res, { role: 'assistant', tool_calls: [{ id: 'c1', type: 'function', function: { name: 'bash', arguments: JSON.stringify({ command: 'echo step' }) } }] });
+    sse(res, { role: 'assistant', content: 'finished after two compactions' });
+  };
+  const result = await runMi(['-p', 'long job']);
+  assert.strictEqual(result.status, 0, result.stderr);
+  assert.strictEqual(compactions, 2);
+  assert.match(result.stdout, /finished after two compactions/);
 });
