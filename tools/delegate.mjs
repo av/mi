@@ -5,9 +5,10 @@ handler: ({prompt, timeout, env, grace = 0}) => new Promise(resolve => {
   // grace (ms): the child is killed at timeout + grace; MI_PASS_SOFT (unix s) = now + timeout. after the soft end the child starts no new model
   // request but a turn already running may finish and its tool calls run (2026-10-02 A/B: pass 1 of all 6 fixed-arm trials on two 900s tasks
   // was cut at its 292s cap in the middle of one long reasoning request, and everything that request had produced was lost)
+  // MI_SESSION (a file) makes a piped child keep its conversation there and continue it on the next call; it is never inherited — only a caller that names it in env gets it
   const now = Date.now() / 1000, kill = timeout ? timeout + grace : 0;
   const passEnd = timeout ? Math.min(+process.env.MI_PASS_END || Infinity, now + kill / 1000) : null, soft = timeout && grace ? Math.min(+process.env.MI_PASS_SOFT || Infinity, now + timeout / 1000) : null;
-  const child = spawn('node', [process.env.MI_PATH], { stdio: ['pipe', 'pipe', 'pipe'], detached: true, env: { ...process.env, ...env, ...(passEnd && { MI_PASS_END: String(passEnd) }), ...(soft && { MI_PASS_SOFT: String(soft) }) } });
+  const child = spawn('node', [process.env.MI_PATH], { stdio: ['pipe', 'pipe', 'pipe'], detached: true, env: { ...process.env, MI_SESSION: '', ...env, ...(passEnd && { MI_PASS_END: String(passEnd) }), ...(soft && { MI_PASS_SOFT: String(soft) }) } });
   child.on('error', e => resolve(`[spawn error: ${e.message}]`));
   child.stdin.end(prompt); let out = '', done = false;
   for (const s of [child.stdout, child.stderr]) s.on('data', d => { if (!done) { process.stdout.write(d); out += d; } });
