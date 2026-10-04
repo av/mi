@@ -1223,3 +1223,52 @@ Not fixed:
 - **The judge prompt** (about 2,500 words). It now runs only in time the
   worker did not need.
 - **overfull-hbox**: no change beyond the draft wording.
+
+### Round 1 result (2026-10-05): bar cleared — core 22/30, controls 12/12
+
+Run `tb21-mi-iter-r1-27da25f-20261004`: the 14-task discriminating set, 3 attempts, mi at `27da25f`
+(one worker session, task-first brief, reasoning notes kept between turns and across request timeouts),
+DeepSeek V4.1 Flash with the usual settings, `-n 4`. 42/42 trials finished in 3 h 28 min. Bar set before
+the previous run: core >= 15/30 and controls >= 11/12.
+
+| task | old mi 4a1f56a | previous round (f1f07b2) | round 1 (27da25f) |
+|---|---|---|---|
+| cobol-modernization | 1/3 | 3/3 | 3/3 |
+| compile-compcert | 2/3 | 3/3 | 3/3 |
+| count-dataset-tokens | 1/3 | 2/3 | 2/3 |
+| feal-linear-cryptanalysis | 2/3 | 1/3 | 3/3 |
+| llm-inference-batching-scheduler | 0/3 | 0/3 | 3/3 |
+| mailman | 0/3 | 0/3 | 2/3 |
+| model-extraction-relu-logits | 1/3 | 1/3 | 1/3 |
+| protein-assembly | 1/3 | 0/3 | 1/3 |
+| sanitize-git-repo | 0/3 | 2/3 | 3/3 |
+| write-compressor | 0/3 | 0/3 | 1/3 |
+| **core** | **8/30** | **12/30** | **22/30** |
+| regex-log | 3/3 | 3/3 | 3/3 |
+| sparql-university | 3/3 | 3/3 | 3/3 |
+| polyglot-c-py | 3/3 | 3/3 | 3/3 |
+| overfull-hbox | 3/3 | 1/3 | 3/3 |
+| **controls** | **12/12** | **10/12** | **12/12** |
+
+All counts observed. Core 22/30 vs 8/30 for old mi: Fisher exact p = 0.0006; vs 12/30 last round: p = 0.019
+(computed from these counts; the old-mi column pools three runs of the same code).
+
+Loop behaviour in this run (observed, from the event logs): 53 worker passes over 42 trials, 11 of them
+continuing the saved conversation; 37 LLM reviews, 15 with a verdict (14 ACK, 1 NACK) and 22 without.
+
+Remaining failures (8 trials; classes are coarse, from event logs and verifier output):
+
+| class | n | trials |
+|---|---:|---|
+| time used up before a working artifact: few, very long requests (8-27 tool calls in ~700 s, 3-4 request timeouts) | 4 | write-compressor `6PiHpg2`, `BcJKXrm` (verifier then timed out on what was left); model-extraction `SfWXSYD`, `r63jj3x` (verifier timed out) |
+| worked the whole budget, delivered a wrong result | 3 | protein-assembly `k6QgFPA`, `yu8cLPh` (`test_gblock`); count-dataset-tokens `EsEfBsV` (`test_command_output_content_example`) |
+| ran to the deadline with the service not working | 1 | mailman `7NRnAra` (`test_simple_local_delivery`, `test_join_announce_leave_flow`) |
+
+Inferred, not measured separately: which of the three changes (single session, shorter brief, reasoning
+notes) carries the gain. The two smoke runs before it (`mi-smoke-96f6111-20261004` without the notes,
+`mi-smoke-notes-20261004` with them, 4 trials each) are too small to split it. Tasks outside this set
+were not rerun; the effect on the full 89-task score is unknown.
+
+Cost: $2.87 for the round (key usage 203.18 -> 206.05: analysis probes, two smoke runs $0.26, the run
+about $2.43, about $0.058 per trial). The spend guard's log stops four minutes into the run (the guard
+process did not survive); the run completed without it.
