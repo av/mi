@@ -1002,3 +1002,220 @@ pass).
 
 Spend for the round was $3.58: analysis and fixes $0, smoke tests $0.09, the
 stopped first A/B $0.40, this A/B $3.09.
+
+
+## Round 1 (2026-10-04): trajectory analysis and fixes
+
+Data: the 42 trials of the fixed arm (`agent_info.name == "mi"`, mi
+`a3106b2`) in `jobs/tb21-mi-ab-4a1f56a-vs-a3106b2-20261003/`: 22 passed, 20
+failed. Read from each trial's `agent/mi-goal-*.jsonl`, `agent/mi-goal-*.md`,
+`agent/mi-output.txt`, `verifier/ctrf.json` and `verifier/test-stdout.txt`.
+Terminus 2 comes from `jobs/tb21-h2h-mi-vs-terminus2-20260929/`. No Harbor job
+was run for this section. API spend: $0.16 for 34 single-request probes, about
+$0.03 for two local sanity runs. **(O)** marks observed facts, **(I)**
+inferences. Scripts: `/tmp/mi-r1/` (`sum.py`, `agg.py`, `gaps.py`,
+`reread.py`, `exp/exp.py`).
+
+### What the loop did in the 42 trials
+
+- **(O) Where the time went.** 47,895 s of agent wall in total: worker passes
+  71%, iteration judges 21%, planner 7%.
+- **(O) The planner never finished.** 42 of 42 planner calls ended in
+  `[request timeout: stopped early…]` at 75 s (its 90 s wall minus the 15 s
+  request margin). The worker and judge received whatever the transcript held
+  at that point.
+- **(O) The judge almost never gave a verdict.** 40 LLM judge calls after a
+  pass: 5 verdicts, 35 without one (30 trials), all 35 ending in a request
+  timeout inside the judge window.
+  - The 35 took 9,382 s, a median 24% of the trial's budget each (165–585 s).
+  - The 5 verdicts were all ACK. Two were wrong:
+    model-extraction-relu-logits `zUpxqaC` (the skeptical recheck also said
+    ACK; verifier: `Failed to match rows: [3, 10, 11, 13, 19, 22]`) and
+    mailman `HVWEt5E` (the skeptical recheck then said NACK).
+  - No judge NACK with findings exists in the 42 trials. A later pass got a
+    real finding once (the skeptical NACK in mailman `HVWEt5E`); otherwise it
+    got "artifact missing" or the last 800 characters of an unfinished judge
+    transcript.
+- **(O) Passes ended by the clock, not by the worker.** 36 of 39 capped
+  (non-last) passes ended at `[pass time up…]` with the worker still working;
+  1 finished by itself. 40 of 46 last passes ended in a request timeout, so
+  the request in flight was discarded.
+- **(O) Each later pass started over.** A pass is a new process that gets the
+  planner transcript and a checkpoint, not the earlier conversation.
+  - Of the 36 trials with a second pass, the second pass wrote no file at all
+    in 12 (approximate: write commands found by regex).
+  - Where it did write, the first write came a median 65 s in, after a median
+    4 read-only commands; 325–458 s in for feal-linear-cryptanalysis
+    `MQhEgSQ` and `gqKu7Xa`, llm-inference-batching-scheduler `Nfj2czg` and
+    protein-assembly `xKoesFe`.
+  - mailman `L3ZW3N4`: pass 1 read Mailman's sources for 800 s and wrote the
+    config at 876 s. The judge (881–1,294 s, no verdict) read the same source
+    files again. Pass 2 (1,299–1,719 s) read them a third time and never
+    created the list or started a service.
+  - llm-inference-batching-scheduler `Nfj2czg`: bucket-1 cost 3.013e11 against
+    a 3.0e11 bar. Pass 2 re-read the cost model, re-derived the statistics and
+    wrote its optimizer script at 1,714 s, 5 s before the cut.
+- **(O) Placeholder drafts.** The DRAFT FIRST directive produced files with no
+  content of value, and three of them were what the verifier graded (class R2
+  below). A placeholder also makes the declared artifact "exist", which
+  switches the mechanical judge skip off.
+
+### Failure classes (20 failed trials, one primary class each)
+
+| # | Class | Trials | Trial ids | Evidence (O) |
+|---|---|---:|---|---|
+| R1 | **Out of working time, spread over 2–3 separate contexts.** Pass 1 cut at its cap while still working; a judge without a verdict (or a mechanical skip) in between; pass 2 starts over and is cut by a request timeout. The artifact was never correct. | 13 | write-compressor `CYitJYb` `FuM7yRb` `hXoAgTk`; model-extraction-relu-logits `k5RRaFC`; feal-linear-cryptanalysis `MQhEgSQ` `gqKu7Xa`; llm-inference-batching-scheduler `Nfj2czg` `cnYHPtf` `kHvKVPM`; mailman `HVWEt5E` `JyRMoXL` `L3ZW3N4`; protein-assembly `xKoesFe` | Events: `pass` → `[pass time up]` → `judge_invalid` or `judge_skipped` → `pass` → `[request timeout]`. 11–18 tool calls in 820 s on write-compressor and model-extraction `k5RRaFC`, with single requests of 374 s, 392 s and 397 s. 78–95% of the wall in gaps ≥ 45 s on feal, llm-inference and write-compressor. mailman: `ConnectionRefusedError` and "Mailing list does not exist" in all three. Closest: llm-inference `Nfj2czg` (0.4% over the bar). |
+| R2 | **A placeholder draft was graded.** | 3 | count-dataset-tokens `Lzsje7V`; protein-assembly `grpHGjD` `axDFoMy` | `printf '1000000' > /app/answer.txt` at 752 s (expected 79586); `open('/app/gblock.txt','w').write('')` under the comment "DRAFT artifact write first" (verifier: 0 lines); `printf 'ATGGCTAGC' > gblock.txt` at 1,610 s. All three had run two passes without an artifact first, so they are also R1 by timing. write-compressor `hXoAgTk` left a 4,868-byte copy of the input as `data.comp`. |
+| R3 | **False ACK ended the run early.** | 1 | model-extraction-relu-logits `zUpxqaC` | Judge ACK after 89 s, skeptical ACK after 65 s, run over at 541 s of 840 s; 6 rows unmatched. |
+| R4 | **Destructive git clean-up despite the PRESERVE rule.** | 1 | sanitize-git-repo `mVNRPhn` | Verifier: `SHA d6987af… could not be resolved`. 5 history-pruning command mentions in the transcript against 1 in each passing trial. |
+| R5 | overfull-hbox (control), see below | 2 | overfull-hbox `MCcxeCt` `eCz5Ykk` | One pass each, cut at 669 s. |
+
+The four 0/3 tasks are R1 (10 of 12 trials) and R2 (2). **(I)** R1 has two
+causes that add up: the model needs more uninterrupted working time than a
+pass gives it, and it spends long requests on trivial steps (next two
+subsections).
+
+### The overfull-hbox regression (3/3 → 1/3)
+
+- **(O) Same structure in both arms.** A 750 s task is one worker pass in
+  both: old mi 544 s (ends at about 630 s, then judge and salvage until Harbor
+  kills it at 750 s+), fixed mi 594 s (ends at 669 s). No judge verdict in any
+  of the six trials. So the shorter first pass and the judge are not involved.
+- **(O) The passes reached zero overfull boxes earlier.** Old mi: 415 s
+  (`WMsgDcd`), 567 s (`hVBWoHm`), about 500 s (`tcFTyxr`). Fixed mi: 597 s
+  (`jRGttL4`, passed), 606 s (`eCz5Ykk`), and 528 s in a scratch copy
+  (`MCcxeCt`).
+- **(O) `MCcxeCt` (overfull box left).** A shortest-synonym replacement gave 0
+  overfull boxes at 528 s but changed words that are not the first word of a
+  synonym line. The worker dropped it because the planner's DECISION said only
+  first words may be replaced, got 3 overfull boxes with first words only at
+  595 s, and was cut at 668 s while starting a search.
+- **(O) `eCz5Ykk` (`test_input_file_matches`).** The input file was not
+  damaged; one substitution was illegal. A blanket draft at 477 s replaced 144
+  words, among them `Middle` → `Hub`, and the later search kept it. `middle`
+  is not the first word of its line; `MCcxeCt`'s own check lists it among the
+  tokens that are "family members but NOT heads".
+- **(O) A harness hazard that did not cause either failure.** The new stale
+  artifact gate told the worker to "write a best-effort draft" of
+  `/app/main.tex` and `/app/synonyms.txt`, which the task forbids editing
+  (`eCz5Ykk`, `jRGttL4`). Neither file was changed in any trial.
+- **(O) Base rate.** Before this run the task stood at 4/7 for mi (older code
+  1/3, corefix 2/2, in-job baseline 1/1, h2h 0/1) and 2/3 for Terminus 2.
+- **Verdict (I): mostly model variance, with a possible small contribution
+  from the DRAFT FIRST text.** At a true pass rate near 0.6, one pass in three
+  has probability 0.29. The blanket 144-word draft in `eCz5Ykk` follows the
+  DRAFT FIRST directive in spirit, and the old passing trials searched from
+  the original text instead, but one of them (`WMsgDcd`) also made 122
+  replacements and passed. Confidence that no harness change is needed beyond
+  the draft wording: moderate, about 65%.
+
+### Terminus 2 on the same tasks
+
+Same model, provider and request settings (`reasoning: {effort: max}`,
+temperature 0.6, DeepInfra FP8).
+
+| task | result | turns | wall | turn latency median / max | completion tokens per turn median / max |
+|---|---|---:|---:|---:|---:|
+| write-compressor | pass | 11 | 521 s | 19 s / 185 s | 1,530 / 17,368 |
+| llm-inference-batching-scheduler | pass | 15 | 489 s | 31 s / 64 s | 3,233 / 6,883 |
+| mailman | pass | 36 | 1,800 s (timeout) | 36 s / 133 s | 2,816 / 13,264 |
+| protein-assembly | pass | 20 | 1,800 s (timeout) | 61 s / 274 s | 4,904 / 24,772 |
+| feal-linear-cryptanalysis | pass | 7 | 233 s | 10 s / 141 s | 1,022 / 11,298 |
+| model-extraction-relu-logits | pass | 24 | 869 s | 19 s / 140 s | 1,698 / 12,220 |
+
+- **(O) One conversation for the whole timeout.** No planner, no judge, no
+  restart. mailman and protein-assembly used all 1,800 s in one context; mi's
+  worker had about 730 s and 460 s in two.
+- **(O) Reasoning scales with the step.** Hard turns are long in Terminus 2
+  as well (133–274 s), and 60–85% of its wall is in turns of 45 s or more. But
+  a trivial turn costs 127–550 completion tokens (2–10 s).
+- **(O) Same state, different prompt, tenfold reasoning.** 34 single requests
+  on one write-compressor state (the source of `decomp.c` has just been read;
+  the next sensible step is to look at `data.txt`):
+
+  | prompt | system prompt, tools | reasoning tokens | time |
+  |---|---|---|---|
+  | Terminus 2's own (JSON reply, no tools) | none | 1.8k, 2.3k | 27 s, 33 s |
+  | mi worker brief as run (a3106b2) | eval prompt, 4 tools | 18.2k, 31.9k | 194 s, 358 s |
+  | short mi-style brief ("you are the worker of a goal loop. complete the goal", 5 rules) | eval prompt, 4 tools | 16.7k, 24.2k | 184 s, 256 s |
+  | the same | one line, bash only | 27.2k, 35.0k | 324 s, 411 s |
+  | the same, JSON reply instead of tool calls | one line, none | 11.1k, 24.8k | 156 s, 348 s |
+  | Terminus 2's opening, native tool calls | one line, bash only | 1.4k, 1.6k | 17 s, 20 s |
+  | + budget line ("you can be stopped at any moment…") | one line, bash only | 0.05k, 0.05k | 2 s, 3 s |
+  | + draft and verify lines | one line, bash only | 0.1k, 1.1k | 5 s, 17 s |
+  | Terminus 2's opening as the user message | eval prompt, 4 tools | 1.3k, 13.4k | 14 s, 152 s |
+  | Terminus 2's opening + all mi notes, guidance and the planner transcript | either | 6.9k–10.5k (n = 3) | 77–119 s |
+  | the same with "you are worker 1/6 of a goal loop" first | eval prompt, 4 tools | 8.1k, 28.1k, 37.3k | 87 s, 349 s, 445 s |
+  | Terminus 2's opening + gate, budget, rules (no guidance, no plan) | one line, bash only | 0.07k | 3 s |
+  | + guidance block | one line, bash only | 0.3k, 1.5k | 6 s, 20 s |
+  | + planner transcript and checkpoint | one line, bash only | 2.0k, 4.0k | 25 s, 50 s |
+  | **new worker brief (shipped)** | eval prompt, 4 tools | 0.8k, 1.4k, 7.9k | 10 s, 15 s, 72 s |
+
+  The action that came back was the same kind in every row (`wc`, `head`,
+  `xxd` on `data.txt`). The old brief twice also wrote a junk draft
+  (`printf 'draft' > data.comp`, `: > data.comp`).
+- **(I)** Tool calling, JSON output, the budget line and the draft rule do not
+  drive the reasoning length. The opening does (a task to solve by running
+  commands a few at a time, against a goal to complete), and so does the
+  amount of instruction text after it. One state of one task, 1–3 samples per
+  row: the direction is clear, the sizes are not.
+
+### Fixes (commits `4930c72`, `96f6111`)
+
+1. **One worker session for the whole budget** (`tools/goal.mjs`,
+   `index.mjs`, `tools/delegate.mjs`). Targets R1 (13 trials) and the timing
+   half of R2.
+   - A pass is no longer capped at half the budget. It runs until the worker
+     stops by itself or the budget is used, minus 5 s, or minus the salvage
+     reserve while no declared artifact exists.
+   - The judge runs only when the worker stops with at least 60 s left.
+   - `MI_SESSION=<file>`: a piped `mi` saves its conversation before every
+     request and at the end, and continues it on the next call. Later passes
+     and the salvage pass send the judge's findings as the next message of the
+     same conversation. `delegate` does not pass `MI_SESSION` on to nested
+     children.
+   - Compaction can run again after a successful request.
+   - On a 900 s task the worker now has about 760 s in one context; before it
+     had about 300 s and 230 s in two, with a 200 s judge call in between.
+   - **(I) Risk to passing tasks.** The 9 passing trials of regex-log,
+     sparql-university and polyglot-c-py were all still working when pass 1
+     was cut, so they continue instead of restarting. cobol-modernization and
+     compile-compcert passed with a second pass that re-read the files first
+     (4–8 read-only commands). Not verified: whether a fresh second look ever
+     helped, and how a 2,300 s compile-compcert session behaves near the
+     context limit.
+2. **Task-first worker brief** (`tools/goal.mjs`). Targets the long requests
+   on trivial steps in R1.
+   - The brief opens with Terminus 2's framing and the task description. The
+     harness notes follow. The planner transcript is no longer pasted in: the
+     brief points to its section in the progress file, and the planner's
+     DECISION lines stay inline. The guidance and rules text is unchanged.
+   - Measured only on the probe above (0.8k–7.9k reasoning tokens against
+     18k–32k). **(I)** That it carries over to other tasks and later turns.
+3. **A review without a verdict is not feedback** (`tools/goal.mjs`). Targets
+   the 35 verdict-less judge calls.
+   - The worker gets a plain re-check request instead of the tail of the
+     unfinished transcript.
+   - It is not counted as a failed strategy, a blocker signature or a
+     fast-lane criterion. Two such tails in a row could arm the pivot mandate.
+   - Under a deadline the loop stops after that one re-check.
+4. **DRAFT FIRST asks for a real candidate** (`tools/goal.mjs`). Targets R2
+   (3 trials) and the overfull-hbox hazard: "never a placeholder or an empty
+   file", and "a listed path that already exists may be a given input".
+5. **The adapter copies `mi-goal-*.session.json`** (`bench/mi_agent.py`), the
+   worker's conversation with full tool output, for the next analysis.
+
+Checks: `npm test` 132/132, `npm run lines` 29, `.facts` 109 passed, 0 failed.
+A local goal run on a small file task with the benchmark's model settings
+ended in ACK after 145 s (planner 45 s, worker 21 s, judge 54 s, recheck
+24 s), and a two-call `MI_SESSION` run recalled the first call's command.
+
+Not fixed:
+- **R3, false ACK** (1 trial, 2 of 5 verdicts). Stricter judging costs time
+  the judge already does not have.
+- **R4** (1 trial): the worker broke a rule it had been given.
+- **The planner** (75 s, always cut). It still supplies the artifact list and
+  the DECISION lines; its transcript no longer weighs on the worker brief.
+- **The judge prompt** (about 2,500 words). It now runs only in time the
+  worker did not need.
+- **overfull-hbox**: no change beyond the draft wording.
