@@ -3952,3 +3952,35 @@ test('review 3: a resumed session runs under the current system message (cwd, po
   assert.deepStrictEqual(saved.filter(m => m.role === 'user').map(m => m.content), ['first task', 'second task', 'one-shot question'], '-p did not erase it');
   assert.deepStrictEqual(saved.at(-1), { role: 'assistant', content: 'reply 3' });
 });
+
+test('review 4: a legitimately empty artifact reaches the judge — at once when the goal asks for an empty file, otherwise after one pass', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'mi-test-rev4-'));
+  let art = join(dir, 'blank.txt');
+  const script = (p, o, k) => k === 'planner' ? `ARTIFACTS: ${art}\nAMBIGUITIES: none` : k === 'worker' ? (writeFileSync(art, ''), WORK) : 'file: measured=0 bytes expected=0 bytes [PASS]\nACK';
+  let asked, unasked, kinds;
+  try {
+    asked = await withDelegate(script, goal => goal.handler({ goal: `Create an empty file ${art}, exactly 0 bytes.`, check: 'ACK if this file exists and is empty.', max: 1 }));
+    art = join(dir, 'failing.txt');
+    unasked = await withDelegate(script, async (goal, calls) => { const r = await goal.handler({ goal: `Write the names of the failing checks to ${art}.`, check: 'ACK if the file lists exactly the failing checks.', max: 2 }); kinds = calls.map(c => c.kind); return r; });
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+  assert.match(asked, /^goal achieved in 1 iteration/);
+  assert.doesNotMatch(asked, /still missing/);
+  assert.match(unasked, /^goal achieved in 2 iterations/, unasked.slice(0, 200));
+  assert.deepStrictEqual(kinds.filter(k => k !== 'recheck'), ['planner', 'worker', 'worker', 'judge'], 'held back once, then reviewed as it is');
+});
+
+test('review 4: an artifact name ending in _ or . is kept as written; a sentence period after a real name still resolves to the file', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'mi-test-rev4b-')), under = join(dir, 'result_'), dotted = join(dir, 'notes.'), plainFile = join(dir, 'out.txt');
+  const seen = [];
+  const script = arts => (p, o, k) => { if (k === 'worker') seen.push(p.match(/declared artifacts: ([^\n]*)/)?.[1]); return k === 'planner' ? `ARTIFACTS: ${arts}\nAMBIGUITIES: none` : k === 'worker' ? WORK : 'file: measured=ok expected=ok [PASS]\nACK'; };
+  let r1, r2;
+  try {
+    writeFileSync(under, 'x'); writeFileSync(dotted, 'x'); writeFileSync(plainFile, 'x');
+    r1 = await withDelegate(script(`\`${under}\`, ${dotted}`), goal => goal.handler({ goal: 'write both', check: 'check', max: 1 }));
+    r2 = await withDelegate(script(`**${plainFile}**.`), goal => goal.handler({ goal: 'write it', check: 'check', max: 1 }));
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+  assert.match(r1, /^goal already met/, r1.slice(0, 200));
+  assert.match(r2, /^goal already met/, r2.slice(0, 200));
+  const names = await withDelegate((p, o, k) => k === 'planner' ? `ARTIFACTS: ${under}, ${dotted}\nAMBIGUITIES: none` : WORK, async (goal, calls) => { await goal.handler({ goal: 'write both', check: 'check', max: 1 }); return calls.find(c => c.kind === 'worker').prompt.match(/declared artifacts: ([^\n]*)/)[1]; });
+  assert.strictEqual(names, `${under}, ${dotted}`);
+});
