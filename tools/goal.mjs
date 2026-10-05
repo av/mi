@@ -1,5 +1,6 @@
 // tools/goal.mjs — Pursue a goal by iterating: refine criteria, worker acts, judge verifies
-import { writeFileSync, appendFileSync, statSync, existsSync, readFileSync } from "fs";
+import { writeFileSync, appendFileSync, statSync, existsSync, readFileSync, mkdtempSync, rmSync } from "fs";
+import { tmpdir } from "os";
 import delegate from "./delegate.mjs";
 
 export default {
@@ -22,11 +23,14 @@ export default {
     required: ["goal", "check"],
   },
   handler: async ({ goal, check, max, timeout, deadline }) => {
+    // the worker's conversation (full tool output and reasoning notes) lives in a private 0700 directory for the length of this goal run only: removed when the handler returns or the process exits
+    const sdir = mkdtempSync(`${tmpdir()}/mi-goal-`), sclean = () => rmSync(sdir, { recursive: true, force: true }); process.once('exit', sclean);
+    try { return await (async () => {
     const limit = max ?? (process.env.MI_GOAL_MAX ? +process.env.MI_GOAL_MAX : 128),
       gray = (s) => `\x1b[90m${s}\x1b[0m`,
       log = `/tmp/mi-goal-${Date.now()}.md`,
       events = log.replace(/\.md$/, '.jsonl'),
-      sess = log.replace(/\.md$/, '.session.json'), // the worker's conversation: index.mjs saves it every turn (MI_SESSION) and loads it when the next pass starts
+      sess = `${sdir}/session.json`, // the worker's conversation: index.mjs saves it every turn (MI_SESSION, mode 0600) and loads it when the next pass starts
       resumable = () => { try { return JSON.parse(readFileSync(sess, 'utf8')).length > 1; } catch { return false; } },
       tail = (s, n = 2000) => s.slice(-n),
       planTrunc = (s, n = 5000) => s.length <= n ? s : s.slice(0, 2000) + '\n[...truncated...]\n' + s.slice(-(n - 2000)),
@@ -228,5 +232,6 @@ export default {
     if (fatal) { emit('complete', { iterations: 'aborted', status: 'FATAL' }); return `goal aborted: API credit exhaustion.\nprogress log: ${log}\nevent log: ${events}\nlast output:\n${tail(last?.out || '')}`; }
     emit('complete', { iterations: done, status: 'NACK', budget_remaining_s: budget() });
     return `goal not achieved after ${done} iterations.\nprogress log: ${log}\nevent log: ${events}\nlast judge:\n${last.out}`;
+    })(); } finally { process.off('exit', sclean); sclean(); }
   },
 };

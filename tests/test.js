@@ -3906,3 +3906,49 @@ test('review 1: the Harbor adapter\'s prompts no longer point at /tests and tell
     assert.match(block(name), /Never look for, download or read (the|this) benchmark's own tests/, name);
   }
 });
+
+test('review 2: a saved session is mode 0600 whatever the umask or an older file\'s mode, and a goal run keeps its session in a private directory it removes', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'mi-test-rev2-')), file = join(dir, 's.json');
+  requestHandler = (req, res) => sse(res, { role: 'assistant', content: 'ok' });
+  let mode, mode2;
+  try {
+    assert.strictEqual((await runMi([], { MI_SESSION: file }, 'task')).status, 0);
+    mode = statSync(file).mode & 0o777;
+    rmSync(file); writeFileSync(file, '[]', { mode: 0o644 });
+    assert.strictEqual((await runMi([], { MI_SESSION: file }, 'task')).status, 0);
+    mode2 = statSync(file).mode & 0o777;
+    assert.deepStrictEqual(readdirSync(dir), ['s.json'], 'no partial file left behind');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+  assert.strictEqual(mode.toString(8), '600');
+  assert.strictEqual(mode2.toString(8), '600');
+  const seen = {};
+  const out = await withDelegate((p, o, k) => {
+    if (k === 'worker') { seen.path = o.env?.MI_SESSION; seen.dirMode = statSync(dirname(seen.path)).mode & 0o777; writeFileSync(seen.path, '[{"role":"system","content":"s"},{"role":"user","content":"secret"}]', { mode: 0o600 }); return WORK; }
+    return k === 'planner' ? 'ARTIFACTS: none\nAMBIGUITIES: none' : 'x: measured=1 expected=1 [FAIL]\nNACK';
+  }, goal => goal.handler({ goal: 'do it', check: 'check it', max: 1 }));
+  assert.match(out, /goal not achieved/);
+  assert.ok(seen.path, 'the worker was given a session file');
+  assert.doesNotMatch(seen.path, /^\/tmp\/mi-goal-\d+\.session\.json$/, 'not a predictable timestamped path');
+  assert.strictEqual(seen.dirMode.toString(8), '700');
+  assert.ok(!existsSync(seen.path) && !existsSync(dirname(seen.path)), 'session directory removed when the goal run ended');
+});
+
+test('review 3: a resumed session runs under the current system message (cwd, policy), and -p continues and keeps the saved conversation', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'mi-test-rev3-')), a = join(dir, 'a'), b = join(dir, 'b'), file = join(dir, 's.json'), bodies = [];
+  mkdirSync(a); mkdirSync(b);
+  requestHandler = (req, res, body) => { bodies.push(body); sse(res, { role: 'assistant', content: `reply ${bodies.length}` }); };
+  let saved;
+  try {
+    assert.strictEqual((await runMiIn(a, [], { MI_SESSION: file, SYSTEM_PROMPT: 'OLD POLICY' }, 'first task')).status, 0);
+    assert.strictEqual((await runMiIn(b, [], { MI_SESSION: file, SYSTEM_PROMPT: 'NEW POLICY' }, 'second task')).status, 0);
+    assert.strictEqual((await runMiIn(b, ['-p', 'one-shot question'], { MI_SESSION: file, SYSTEM_PROMPT: 'NEW POLICY' })).status, 0);
+    saved = JSON.parse(readFileSync(file, 'utf8'));
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+  const sys2 = bodies[1].messages[0].content;
+  assert.match(sys2, /NEW POLICY/); assert.doesNotMatch(sys2, /OLD POLICY/);
+  assert.ok(sys2.includes(`CWD: ${b}`) && !sys2.includes(`CWD: ${a}`), 'current cwd, not the saved one');
+  assert.deepStrictEqual(bodies[1].messages.map(m => m.role), ['system', 'user', 'assistant', 'user']);
+  assert.deepStrictEqual(bodies[2].messages.filter(m => m.role === 'user').map(m => m.content), ['first task', 'second task', 'one-shot question'], '-p continues the session');
+  assert.deepStrictEqual(saved.filter(m => m.role === 'user').map(m => m.content), ['first task', 'second task', 'one-shot question'], '-p did not erase it');
+  assert.deepStrictEqual(saved.at(-1), { role: 'assistant', content: 'reply 3' });
+});

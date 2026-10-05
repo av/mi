@@ -163,7 +163,8 @@ export MI_GOAL_FILE="$1"
 # the goal loop's own progress and event logs live in /tmp; keep them with the trial for trajectory analysis.
 # Copied every 20 s while mi runs, not only on EXIT: Harbor kills the wrapper at its timeout without running
 # the trap (7 of 64 corefix trials lost their event logs). The copier's stdio is detached so it holds no log pipe.
-# mi-goal-*.session.json is the worker's whole conversation (full tool output, which mi-output.txt truncates to 200 chars)
+# mi-goal-*.session.json matches nothing since 2026-10-06: the worker's conversation now lives in a private directory that the
+# goal run removes when it ends, and is deliberately not copied out (mi-output.txt keeps every tool call with its full arguments)
 synclogs() { cp /tmp/mi-goal-*.md /tmp/mi-goal-*.jsonl /tmp/mi-goal-*.session.json "$LOG/" 2>/dev/null; }
 ( while sleep 20; do synclogs; done ) < /dev/null > /dev/null 2>&1 &
 SYNC=$!
