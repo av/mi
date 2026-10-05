@@ -36,11 +36,10 @@ PROVIDER_RE = re.compile(r"\[provider\] ([^(\x1b\n]+?) \(")
 
 TERMINAL_BENCH_CHECK = (
     "Inspect the actual task state in the working directory (run pwd first). "
-    "A hidden external verifier runs after you finish — predict its checks from the goal text "
-    "and any visible tests; visible /tests/ may not cover every requirement. "
-    "FIRST: if /tests/ exists, run `cd / && python3 -m pytest tests/ --tb=short 2>&1 | tail -80` — "
-    "test results are GROUND TRUTH for what they cover. If any test fails, NACK immediately. "
-    "If no /tests/: run any visible test suite (pytest, npm test, make test, etc.). "
+    "A hidden external verifier runs after you finish — predict its checks from the goal text only. "
+    "Never look for, download or read the benchmark's own tests, solutions or verifier files, on disk or online. "
+    "FIRST: if the project in the working directory ships its own test suite (pytest, npm test, make test, etc.), "
+    "run it — its results are GROUND TRUTH for what they cover. If any test fails, NACK immediately. "
     "Then verify EVERY goal-stated output path, threshold, format, and preservation constraint — "
     "check exact paths exist and are non-empty; parseable artifacts must parse/compile/import. "
     "For numeric thresholds, measure the actual value and compare to the required value — "
@@ -56,8 +55,11 @@ EVAL_SYSTEM_PROMPT = (
     "You are an autonomous coding agent in a Linux terminal inside a Docker container. "
     "Your tools are bash and file editing.\n\n"
     "Act, don't speculate. Read the task description, the workspace snapshot below, and any README. "
-    "A hidden verifier grades your work after you finish — the goal text defines success; "
-    "visible /tests/ may be incomplete. Write required output files early as drafts, then refine. "
+    "A hidden verifier grades your work after you finish — the goal text defines success. "
+    "Never look for, download or read this benchmark's own tests, reference solutions or verifier files, "
+    "on disk or online (its repositories, dataset mirrors, /tests, /solution, /logs/verifier): solve the task "
+    "from the task text and the environment only; such calls are blocked. "
+    "Write required output files early as drafts, then refine. "
     "Explore briefly, then solve. One step at a time, verify each requirement with measured values.\n\n"
     "If something fails, read the error, form a diagnosis, change approach. "
     "Don't repeat failed strategies. Do not stop on partial progress or plausible-looking output.\n\n"
@@ -67,6 +69,15 @@ EVAL_SYSTEM_PROMPT = (
     "Minimize context: head -20 for file starts, tail -20 for ends, grep -n to locate, "
     "sed -n for ranges. Reserve cat for short files. Edit with sed -i or heredocs.\n\n"
     "Do not fake tool output."
+)
+
+# Tool calls that name the benchmark's own sources or Harbor's test/solution/verifier mounts are refused by mi
+# (MI_DENY, a case-insensitive regex over each tool call's arguments). 2026-10-06 review: two passing round 1
+# trials had cloned laude-institute/terminal-bench-2 and read the task's tests/test_outputs.py and solution/solve.sh.
+# Root-level /tests, /solution and /logs/verifier only; a project's own ./tests or /app/tests is not matched.
+BENCH_DENY = (
+    r"terminal[-_ ]?bench|laude-institute|harbor-framework|tbench\.ai"
+    r"|(?<![\w.~-])/(tests|solution|logs/verifier)(?![\w.-])"
 )
 
 # Node for mi: the task's own node if >= 18, else a private copy in
@@ -304,6 +315,7 @@ class MiAgent(BaseInstalledAgent):
             "MI_JUDGE_PARAMS": self.options.judge_params or params,
             "SYSTEM_PROMPT": self.options.system_prompt or EVAL_SYSTEM_PROMPT,
             "MI_GOAL_CHECK": TERMINAL_BENCH_CHECK,
+            "MI_DENY": BENCH_DENY,
             "PAGER": "cat", "GIT_PAGER": "cat", "GIT_EDITOR": "true", "VISUAL": "true", "EDITOR": "true", "TERM": "dumb",
             **self.resolve_env_vars(),
         }

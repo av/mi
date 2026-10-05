@@ -3846,3 +3846,63 @@ test('a request cut off by the time limit leaves the end of its reasoning in the
   assert.ok(users.some(c => /cut off by the request time limit[\s\S]*half-built encoder: tokens parsed, range coder next/.test(c)), users.join(' | '));
   assert.match(r.stdout, /done/);
 });
+
+// ── Review 2026-10-06 (adversarial review of bench/tb2-reference at 160a177): one block of tests per finding ──
+const runMiIn = (cwd, args, env = {}, input = '') => new Promise(resolve => {
+  const child = spawn('node', [INDEX_PATH, ...args], { cwd, env: { ...process.env, OPENAI_BASE_URL: serverUrl, OPENAI_API_KEY: 'test-key', MI_HOME: '/tmp/.mi-test-no-home', http_proxy: '', https_proxy: '', HTTP_PROXY: '', HTTPS_PROXY: '', ...env } });
+  let stdout = '', stderr = ''; child.stdout.on('data', d => stdout += d); child.stderr.on('data', d => stderr += d);
+  child.on('close', status => resolve({ status, stdout, stderr })); child.stdin.end(input);
+});
+// goal.handler with delegate.handler replaced by a script: fn(prompt, opts, kind) -> transcript
+const withDelegate = async (fn, body) => {
+  const delegate = (await import('../tools/delegate.mjs')).default, goal = (await import('../tools/goal.mjs')).default, saved = delegate.handler, calls = [];
+  delegate.handler = async opts => { const k = kind(opts.prompt); calls.push({ kind: k, prompt: opts.prompt, env: opts.env }); return fn(opts.prompt, opts, k, calls); };
+  try { return await body(goal, calls); } finally { delegate.handler = saved; }
+};
+
+test('review 1: no goal-loop prompt tells the agent to look for verifier files, and each forbids fetching a grader\'s tests or solutions', async () => {
+  const prompts = await withDelegate((p, o, k) => k === 'planner' ? 'ARTIFACTS: none\nAMBIGUITIES: none' : k === 'worker' ? WORK : 'x: measured=1 expected=1 [PASS]\nACK',
+    async (goal, calls) => { await goal.handler({ goal: 'make it work', check: 'ACK if it works', max: 1, deadline: Math.floor(Date.now() / 1000) + 900 }); return calls; });
+  const byKind = k => prompts.filter(c => c.kind === k).map(c => c.prompt);
+  for (const k of ['planner', 'worker', 'judge', 'recheck']) {
+    assert.ok(byKind(k).length, `${k} ran`);
+    for (const p of byKind(k)) {
+      assert.doesNotMatch(p, /verify\*\.py|grade\*\.py|ls \/tests|find \/ |cd \/ && python3 -m pytest tests|test\/verifier files/, `${k} prompt seeks verifier files`);
+      assert.match(p, /never search for, download or read a grader's own files/, `${k} prompt carries the rule`);
+    }
+  }
+  assert.doesNotMatch(byKind('planner')[0], /exact values, grading criteria/);
+});
+
+test('review 1: MI_DENY refuses a tool call that names a denied path or source and leaves other calls alone', async () => {
+  const src = readFileSync(join(__dirname, '../bench/mi_agent.py'), 'utf8');
+  const deny = [...src.match(/BENCH_DENY = \(([\s\S]*?)\n\)/)[1].matchAll(/r"([^"]*)"/g)].map(m => m[1]).join('');
+  assert.match(src, /"MI_DENY": BENCH_DENY/);
+  const marker = `/tmp/mi-test-deny-${process.pid}`, cmds = [
+    `cat /tests/test_outputs.py; touch ${marker}.a`, `git clone https://github.com/laude-institute/terminal-bench-2.git /tmp/tb2; touch ${marker}.b`,
+    `echo x\ncat /solution/solve.sh; touch ${marker}.c`, `curl -s https://raw.githubusercontent.com/harbor-framework/terminal-bench-2-1/main/x; touch ${marker}.d`,
+    `ls /logs/verifier; touch ${marker}.e`, `ls ./tests /app/tests /app/test_outputs.py 2>/dev/null; touch ${marker}.ok`];
+  const bodies = [];
+  requestHandler = (req, res, body) => {
+    bodies.push(body);
+    if (bodies.length === 1) sse(res, { role: 'assistant', tool_calls: cmds.map((command, i) => ({ id: `c${i}`, type: 'function', function: { name: 'bash', arguments: JSON.stringify({ command }) } })) });
+    else sse(res, { role: 'assistant', content: 'done' });
+  };
+  let made;
+  try { const r = await runMi(['-p', 'go'], { MI_DENY: deny }); assert.strictEqual(r.status, 0, r.stderr); made = ['a', 'b', 'c', 'd', 'e', 'ok'].filter(x => existsSync(`${marker}.${x}`)); }
+  finally { for (const x of ['a', 'b', 'c', 'd', 'e', 'ok']) rmSync(`${marker}.${x}`, { force: true }); }
+  assert.deepStrictEqual(made, ['ok'], 'only the call that names no denied path ran');
+  const results = bodies[1].messages.filter(m => m.role === 'tool').map(m => m.content);
+  assert.strictEqual(results.length, 6);
+  for (const r of results.slice(0, 5)) assert.match(r, /blocked by policy \(MI_DENY\)/);
+  assert.doesNotMatch(results[5], /blocked by policy/);
+});
+
+test('review 1: the Harbor adapter\'s prompts no longer point at /tests and tell the agent not to fetch the benchmark\'s files', () => {
+  const src = readFileSync(join(__dirname, '../bench/mi_agent.py'), 'utf8');
+  const block = name => src.match(new RegExp(`${name} = \\(([\\s\\S]*?)\\n\\)`))[1];
+  for (const name of ['TERMINAL_BENCH_CHECK', 'EVAL_SYSTEM_PROMPT']) {
+    assert.doesNotMatch(block(name), /if \/tests\/ exists|visible \/tests\/|pytest tests\//, name);
+    assert.match(block(name), /Never look for, download or read (the|this) benchmark's own tests/, name);
+  }
+});
