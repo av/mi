@@ -4046,3 +4046,17 @@ test('review2 1: the egress overlay gives the task container no way around the s
   assert.match(adapter, /elif self\.options\.egress:\s+raise RuntimeError/);
   assert.match(adapter, /finally:\s+self\._egress_finish\(environment\)/);
 });
+
+test('review2 2: a FAIL row in a markdown table blocks ACK — verdicts use the same failure parser as worker feedback; passing project tests alone are no reason to ACK', async () => {
+  const pre = judgeOut => withDelegate((p, o, k) => k === 'planner' ? 'ARTIFACTS: none\nEXIT_CRITERIA: required constraint passes' : k === 'worker' ? WORK : judgeOut, async (goal, calls) => ({ out: await goal.handler({ goal: 'synthetic constraint must equal 1', check: 'all measured criteria pass', max: 0 }), calls }));
+  const table = 'criterion: file present measured=1 expected=1 [PASS]\n| criterion | measured | expected | status |\n| constraint | 0 | 1 | FAIL |\nACK';
+  const bad = await pre(table);
+  assert.doesNotMatch(bad.out, /^goal already met/);
+  for (const t of ['| check | result |\n|---|---|\n| size | ❌ FAIL |\nmeasured=1\nACK', 'a: measured=1 expected=1 [PASS]\n| a | 1 | 1 | **FAIL** |\n**ACK**'])
+    assert.doesNotMatch((await pre(t)).out, /^goal already met/, t);
+  const good = await pre('| criterion | measured | expected | status |\n|---|---|---|---|\n| constraint | 1 | 1 | PASS |\nfile: measured=1 expected=1 [PASS]\nACK');
+  assert.match(good.out, /^goal already met/);
+  const judge = bad.calls.find(c => c.kind === 'judge').prompt;
+  assert.doesNotMatch(judge, /if all tests pass, ACK/);
+  assert.match(judge, /never a reason to ACK by themselves/);
+});
