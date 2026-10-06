@@ -249,15 +249,22 @@ python3 bench/audit.py jobs/<J>
 ```
 
 - `bench/egress/compose.yaml` puts the task container in the network namespace of the `mi-egress` sidecar, without
-  `NET_ADMIN` or `NET_RAW`. All its outbound TCP is redirected into `shim.py`.
-- Names in the watched families (GitHub, Hugging Face, known mirrors) are handed to a filtering proxy
-  (`filter.py`), which sees the URL after TLS and answers 403 to anything naming a benchmark source. A watched
-  source's address under another name, port or without a name is refused. Everything else is relayed untouched.
-- The adapter installs the proxy's CA in the container, keeps `agent/egress-shim.log` and `agent/egress-proxy.log`
-  with each trial, and switches the shim to plain relaying when the agent phase ends, so the verifier's downloads
-  are not intercepted.
+  `NET_ADMIN` or `NET_RAW`. All its outbound TCP is redirected into `shim.py`; IPv6 and UDP other than DNS are rejected.
+- During the agent phase there is no direct path out. Every connection that speaks HTTP or TLS, to any host and
+  port, is handed to a filtering proxy (`filter.py`) that terminates TLS and sees the real request. Anything else
+  (raw TCP, ssh, tunnels) is refused, and so is a watched source's address under another name.
+- The proxy refuses by kind of route: a request that names a benchmark source; a request that carries such a
+  target for a relay, reader or cache to fetch (URL in the path, query, body, percent- or base64-encoded); GitHub
+  API routes that do not carry a repository name (`/repositories/<id>`, `/user/<id>`, `/organizations/<id>`,
+  `/graphql`, gists — whatever the id); GitHub API replies and redirects that name a benchmark source; tunnels.
+- The adapter installs the proxy's CA in the container (system store, certifi lists, Java, and the environment
+  variables common clients read), keeps `agent/egress-shim.log` and `agent/egress-proxy.log` with each trial, and
+  switches the shim to plain relaying when the agent phase ends, so the verifier's downloads are not intercepted.
 - Probe: `bench/harbor.sh run -y -c bench/configs/egress-probe.yaml -c bench/configs/egress.yaml --job-name <J>`
   (no model; synthetic fixture). Without `egress.yaml` the same job is the control and scores 0.
 
-Limits: only the listed name families are filtered; a mirror under an unlisted host name that does not carry a
-benchmark name in its URL is not caught. Processes the agent leaves running are not filtered during verification.
+Limits: a client that neither uses the installed CA nor one of the environment variables cannot make TLS
+connections during the agent phase; non-HTTP protocols do not leave the container (`MI_EGRESS_ALLOW_RAW` lists
+exceptions, none by default). A relay that is given its target in a form the proxy cannot read (an encoding other
+than percent/base64, a pre-made short link) is not caught, nor is a mirror under an unrelated name. DNS is not
+inspected. Processes the agent leaves running are not filtered during verification.
