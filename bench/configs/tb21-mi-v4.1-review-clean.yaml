@@ -1,0 +1,34 @@
+# Clean rerun after the 2026-10-06 adversarial review: the 14-task discriminating set
+# (tb21-mi-v4.1-discriminating.yaml) plus the reviewer's 6 held-out tasks, 3 attempts each, mi only.
+#   bench/harbor.sh run -y -c bench/configs/tb21-mi-v4.1-review-clean.yaml \
+#     -c bench/configs/agent-mi-deepseek-v4.1-flash.yaml -n 4 --job-name <J>
+#   python3 bench/audit.py jobs/<J>      # contamination audit of the trajectories
+jobs_dir: jobs
+n_attempts: 3
+n_concurrent_trials: 4
+datasets:
+  - name: terminal-bench/terminal-bench-2-1
+    task_names:
+      # core (10)
+      - terminal-bench/count-dataset-tokens
+      - terminal-bench/cobol-modernization
+      - terminal-bench/model-extraction-relu-logits
+      - terminal-bench/write-compressor
+      - terminal-bench/sanitize-git-repo
+      - terminal-bench/llm-inference-batching-scheduler
+      - terminal-bench/mailman
+      - terminal-bench/protein-assembly
+      - terminal-bench/feal-linear-cryptanalysis
+      - terminal-bench/compile-compcert
+      # controls (4)
+      - terminal-bench/regex-log
+      - terminal-bench/sparql-university
+      - terminal-bench/polyglot-c-py
+      - terminal-bench/overfull-hbox
+      # held out by the reviewer (6)
+      - terminal-bench/password-recovery
+      - terminal-bench/configure-git-webserver
+      - terminal-bench/break-filter-js-from-html
+      - terminal-bench/financial-document-processor
+      - terminal-bench/cancel-async-tasks
+      - terminal-bench/mcmc-sampling-stan

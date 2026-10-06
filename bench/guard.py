@@ -30,7 +30,13 @@ FATAL = re.compile(r"requires more credits|insufficient_quota|No auth credential
 def usage():
     req = urllib.request.Request("https://openrouter.ai/api/v1/key",
                                  headers={"Authorization": f"Bearer {os.environ['OPENROUTER_API_KEY']}"})
-    return json.loads(urllib.request.urlopen(req, timeout=30).read())["data"]["usage"]
+    for attempt in range(5):  # a network error here must not end the guard (the 2026-10-04 round 1 guard stopped logging 4 minutes in)
+        try:
+            return json.loads(urllib.request.urlopen(req, timeout=30).read())["data"]["usage"]
+        except (OSError, ValueError, KeyError):
+            if attempt == 4:
+                raise
+            time.sleep(10)
 
 
 def harbor_pids(job):
