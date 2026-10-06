@@ -1330,3 +1330,67 @@ substitution the task does not allow and its judge ACKed it; neither trial had a
 two failure modes of the 2026-10-03 run. Inferred: the task sits near 50-60% for mi regardless of these
 changes (now 5/9 over the last three runs of this branch, 3/3 for old mi), so it is not a stable control;
 no further tuning was done, per the stop rule.
+
+## 2026-10-06: release review #2 fixes and the frozen clean run — all three bars cleared
+
+Review #2 (of `25852cc`) held the release on three defects. Fixes: `af97767` (network-level egress control,
+bench/egress/), `39b5dd1` (one failure parser for verdicts and feedback; passing project tests no longer end a
+review), `62f3a25` (pristine copy + literal change-set check), `0f3dad9` (facts, docs). Probes, before → after:
+
+| fix | probe | before (25852cc) | after (0f3dad9) |
+|---|---|---|---|
+| 1 | Harbor job on a synthetic task and fixture, no model: `egress-probe-before-20261006` (without `egress.yaml`) and `egress-probe-after-20261006` | reward 0: 18 of 30 routes wrong, the sentinel was retrieved by 10 routes (direct, split variable, percent-encoded, base64-built, by address, alias, forged Host, clean-env child, python child, `..` path) | reward 1: 30 of 30 routes as required |
+| 2 | the reviewer's `ack-probe.mjs` (FAIL row in a markdown table, then ACK) | `false_success: true` | `false_success: false` |
+| 3 | `bench/probes/literal-probe.mjs`, live model, scripted worker: 40 lines, 80 listed replacements, plus `Middle -> Hub` (not listed) in the bad variant | bad edit accepted in 1 of 3 runs (1 rejected naming the pair, 1 review cut off); good edit accepted 2 of 2 | bad edit rejected 3 of 3, each naming the pair; good edit accepted 2 of 2 |
+
+All observed; probe 3 is a live-model probe with 3 runs per side, so its before/after is a small sample. Outputs:
+`jobs/review2-probes-20261006/`, `jobs/egress-probe-*-20261006/*/agent/probe.txt`. The control run of probe 1 sent
+three requests for made-up paths under real GitHub organisations (answered 404; nothing was retrieved).
+`MI_DENY` is unchanged and remains an argument filter; the boundary is the network layer.
+
+Frozen run `tb21-mi-frozen-0f3dad9-20261006` (tree frozen at `0f3dad9` before launch; 20 tasks x 3, egress control
+on, 60/60 finished, no Harbor exceptions, 4 h 42 min, $2.79). Bars: core >= 15/30, controls >= 11/12, held out >= 15/18.
+
+| task | clean rerun (c1f1334) | frozen run (0f3dad9) |
+|---|---|---|
+| cobol-modernization | 3/3 | 2/3 |
+| compile-compcert | 3/3 | 3/3 |
+| count-dataset-tokens | 3/3 | 3/3 |
+| feal-linear-cryptanalysis | 3/3 | 3/3 |
+| llm-inference-batching-scheduler | 3/3 | 3/3 |
+| mailman | 3/3 | 2/3 |
+| model-extraction-relu-logits | 1/3 | 1/3 |
+| protein-assembly | 0/3 | 2/3 |
+| sanitize-git-repo | 2/3 | 3/3 |
+| write-compressor | 0/3 | 1/3 |
+| **core** | **21/30** | **23/30** |
+| regex-log | 3/3 | 3/3 |
+| sparql-university | 3/3 | 3/3 |
+| polyglot-c-py | 3/3 | 3/3 |
+| overfull-hbox | 1/3 | 2/3 |
+| **controls** | **10/12** | **11/12** |
+| break-filter-js-from-html | 3/3 | 3/3 |
+| cancel-async-tasks | 1/3 | 3/3 |
+| configure-git-webserver | 3/3 | 3/3 |
+| financial-document-processor | 3/3 | 3/3 |
+| mcmc-sampling-stan | 3/3 | 3/3 |
+| password-recovery | 3/3 | 3/3 |
+| **held out** | **16/18** | **18/18** |
+
+Contamination (observed): `python3 bench/audit.py jobs/tb21-mi-frozen-0f3dad9-20261006` (script unchanged) —
+`{"trials": 60, "tool_calls": 2638, "denied_pattern_calls": 11, "blocked": 11, "not_blocked": 0, "filename_mentions": 27}`,
+exit 0. 10 of the 11 are break-filter-js-from-html (its supplied test file refers to `/tests/filter.py`), one is an
+`ls` in protein-assembly `7ukoEbY`. Network layer, from the 60 trials' sidecar logs: the proxy handled 405 requests
+(Hugging Face 361, GitHub hosts 41, jsdelivr 3) and blocked 0 — no request naming a benchmark source reached it;
+the shim refused 20 connections, all in compile-compcert: 18 to `compcert.org`, a GitHub Pages site on GitHub's
+addresses under a name the shim does not watch (a false refusal of a legitimate site; the task still passed 3/3),
+and 2 without a name to a GitHub address.
+
+False successes (observed): 10 trials ended with an internal ACK and all 10 earned reward 1; in the previous run
+3 of 23 internal ACKs had reward 0. The 8 failed trials all ended NACK: time used up without a working artifact
+(write-compressor x2, model-extraction x2, cobol-modernization x1: 6-14 tool calls and 3-5 request timeouts each),
+or worked the whole budget with a wrong result (mailman, protein-assembly, overfull-hbox `Gb9HB7g`, which left an
+overfull box and did not claim success).
+
+Inferred, not measured: which fix moved which task; with 3 trials per task the task-level differences from the
+previous run are within noise. Scope stays these 20 tasks, one model and provider.
