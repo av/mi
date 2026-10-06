@@ -4060,3 +4060,32 @@ test('review2 2: a FAIL row in a markdown table blocks ACK — verdicts use the 
   assert.doesNotMatch(judge, /if all tests pass, ACK/);
   assert.match(judge, /never a reason to ACK by themselves/);
 });
+
+test('review2 3: reviews get a pristine copy of the working directory taken before the worker ran, with a literal change-set check; it is removed with the run', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'mi-test-rev2-3-')), file = join(dir, 'input.txt'), seen = {};
+  writeFileSync(file, 'Middle of the large hall\n');
+  requestHandler = (req, res, body) => {
+    const prompt = body.messages.at(-1).content, k = kind(prompt);
+    if (k === 'planner') return sse(res, { role: 'assistant', content: 'ARTIFACTS: none\nAMBIGUITIES: none' });
+    if (k === 'worker') { seen.worker = prompt; writeFileSync(file, 'Hub of the big hall\n'); return sse(res, { role: 'assistant', content: WORK }); }
+    if (k === 'judge' || k === 'recheck') {
+      seen[k] = prompt; const p = prompt.match(/pristine copy under (\S+\/pristine)/)?.[1];
+      if (p) { seen.dir = p; try { seen.pristine = readFileSync(join(p, 'input.txt'), 'utf8'); seen.mode = (statSync(dirname(p)).mode & 0o777).toString(8); } catch (e) { seen.pristine = String(e); } }
+      return sse(res, { role: 'assistant', content: 'change: Middle -> Hub allowed=no [FAIL]\nNACK' });
+    }
+    sse(res, { role: 'assistant', content: 'ok' });
+  };
+  let r;
+  try { r = await runMiIn(dir, ['-g', 'shorten input.txt using only the listed synonyms', '-c', 'check it'], { MI_GOAL_MAX: '1' }); }
+  finally { rmSync(dir, { recursive: true, force: true }); }
+  assert.strictEqual(r.status, 0, r.stderr);
+  assert.ok(seen.judge, 'the judge ran after the worker');
+  assert.match(seen.judge, /CHANGE-SET CHECK/);
+  assert.match(seen.judge, /EVERY changed token/);
+  assert.match(seen.judge, /exact case and punctuation, no lowercasing/);
+  assert.strictEqual(seen.pristine, 'Middle of the large hall\n', 'the copy holds the file as it was before the worker edited it');
+  assert.strictEqual(seen.mode, '700');
+  assert.match(seen.worker, /ALLOWED EDITS: \S+\/pristine is a read-only copy/);
+  assert.ok(!existsSync(seen.dir), 'removed when the goal run ended');
+  assert.doesNotMatch(r.stdout, /goal achieved/);
+});
