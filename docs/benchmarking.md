@@ -235,3 +235,29 @@ files remain in git history on `master` and are copied to the archive under
 |---|---|---|
 | `judge-merged` | fully merged into `master`; checked out in `.claude/worktrees/agent-a4c21b306b6d18f67` | left for Ivan (`git worktree remove` + `git branch -d`) |
 | `worktree-agent-a4c21b306b6d18f67` | fully merged into `master` | left for Ivan (`git branch -d`) |
+
+## Egress control for evaluation runs
+
+`MI_DENY` only looks at tool-call arguments; a URL put together by the shell gets past it. Clean runs therefore
+add a network boundary that the task container cannot change:
+
+```sh
+bench/egress/build.sh        # once: builds mi-egress:1 and the run-local CA in bench/egress/ca/ (not committed)
+bench/harbor.sh run -y -c bench/configs/tb21-mi-v4.1-review-clean.yaml \
+  -c bench/configs/agent-mi-deepseek-v4.1-flash-egress.yaml -c bench/configs/egress.yaml -n 4 --job-name <J>
+python3 bench/audit.py jobs/<J>
+```
+
+- `bench/egress/compose.yaml` puts the task container in the network namespace of the `mi-egress` sidecar, without
+  `NET_ADMIN` or `NET_RAW`. All its outbound TCP is redirected into `shim.py`.
+- Names in the watched families (GitHub, Hugging Face, known mirrors) are handed to a filtering proxy
+  (`filter.py`), which sees the URL after TLS and answers 403 to anything naming a benchmark source. A watched
+  source's address under another name, port or without a name is refused. Everything else is relayed untouched.
+- The adapter installs the proxy's CA in the container, keeps `agent/egress-shim.log` and `agent/egress-proxy.log`
+  with each trial, and switches the shim to plain relaying when the agent phase ends, so the verifier's downloads
+  are not intercepted.
+- Probe: `bench/harbor.sh run -y -c bench/configs/egress-probe.yaml -c bench/configs/egress.yaml --job-name <J>`
+  (no model; synthetic fixture). Without `egress.yaml` the same job is the control and scores 0.
+
+Limits: only the listed name families are filtered; a mirror under an unlisted host name that does not carry a
+benchmark name in its URL is not caught. Processes the agent leaves running are not filtered during verification.
