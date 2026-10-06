@@ -4150,3 +4150,32 @@ print(json.dumps({
   const allowed = Object.keys(r).filter(k => r[k]).sort();
   assert.deepStrictEqual(allowed, ['api_named', 'api_search', 'fastbench_is_not_tbench', 'github_repo', 'model_conversation', 'pypi', 'relay_named_repo', 'relay_ordinary'].sort());
 });
+
+test('review3 2: a failed criterion blocks ACK in any table shape — headers are told from data by structure, and only the status cell decides', async () => {
+  const pre = judgeOut => withDelegate((p, o, k) => k === 'planner' ? 'ARTIFACTS: none\nEXIT_CRITERIA: required criterion passes' : k === 'worker' ? WORK : judgeOut, goal => goal.handler({ goal: 'The criterion must equal 1. All criteria must pass.', check: 'Every measured criterion passes.', max: 0 }));
+  const ok = 'criterion: file present measured=1 expected=1 [PASS]\n';
+  const failing = {
+    'first cell is the word criterion': '| name | measured | expected | status |\n| criterion | 0 | 1 | FAIL |',
+    'expected PASS, status FAIL': '| name | measured | expected | status |\n| semantic validation | ERROR | PASS | FAIL |',
+    'measured PASS, status FAIL': '| name | measured | expected | status |\n| token | PASS | accepted | FAIL |',
+    'separator row, check in first cell': '| item | got | want | result |\n|---|---|---|---|\n| check | 0 | 1 | FAIL |',
+    'status column first': '| status | name | note |\n|:--|:--|:--|\n| FAIL | metric | PASS expected |',
+    'status column in the middle': '| name | status | expected | measured |\n| name | FAIL | PASS | PASS-ish |',
+    'no header at all': '| criterion | 0 | 1 | FAIL |',
+    'two columns, bold': '| check | result |\n|---|---|\n| size | **FAILED** |',
+    'cross mark in the status column': '| name | status |\n|---|---|\n| size | ❌ |',
+    'FAIL cell with a PASS note after it': '| size | 3000 | FAIL | would PASS at 2500 |',
+    'second table after a passing one': '| name | status |\n|---|---|\n| a | PASS |\n\ntext\n\n| name | status |\n|---|---|\n| b | FAIL |',
+    'status field outside a table': 'size check — status: FAIL',
+    'line ending in FAIL': 'compression ratio: 3000 > 2500 → FAIL',
+  };
+  for (const [name, body] of Object.entries(failing)) assert.doesNotMatch(await pre(`${ok}${body}\nACK`), /^goal already met/, name);
+  const passing = {
+    'all rows pass': '| name | measured | expected | status |\n|---|---|---|---|\n| criterion | 1 | 1 | PASS |\n| check | 2 | 2 | PASS |',
+    'header only names FAIL as a label': '| name | PASS/FAIL |\n|---|---|\n| size | PASS |',
+    'template text': 'format: "element: measured=X required=Y [PASS/FAIL]"',
+    'FAIL only in an expected column': '| name | measured | expected | status |\n| negative test | FAIL | FAIL | PASS |',
+    'prose mention': 'none of the checks FAIL here, and nothing would fail later.',
+  };
+  for (const [name, body] of Object.entries(passing)) assert.match(await pre(`${ok}${body}\nACK`), /^goal already met/, name);
+});

@@ -77,8 +77,20 @@ export default {
       for (const line of (s || '').split('\n')) { const c = line.trim(); if (!/^\|.*\|$/.test(c)) continue; const cells = c.slice(1, -1).split('|').map(x => x.trim()); if (cells.length < 4 || cells.length > 5) continue; if (/^-+:?$/.test(cells[0].replace(/:/g, '-')) || cells.every(x => /^:?-+:?$/.test(x))) continue; if (/^(criterion|check|metric|name)$/i.test(cells[0])) continue; if (!/\bFAIL\b/i.test(cells.slice(-2).join(' ')) || /\bPASS\b/i.test(cells.slice(-2).join(' '))) continue; if (!cells[0] || !cells[1] || !cells[2]) continue; record(cells[0], cells[1], cells[2]); }
     };
     // slice-6 fast lane: count/extract failing criteria (canonical [FAIL] lines + markdown FAIL rows, reusing harvest's row shape)
-    const isFailRow = c => { if (!/^\|.*\|$/.test(c)) return false; const cells = c.slice(1, -1).split('|').map(x => x.trim()); return cells.length >= 2 && !/^(criterion|check|metric|name)$/i.test(cells[0]) && !cells.every(x => /^:?-+:?$/.test(x)) && /\bFAIL\b/i.test(cells.slice(-2).join(' ')) && !/\bPASS\b/i.test(cells.slice(-2).join(' ')); };
-    const failLines = s => (s || '').split('\n').filter(l => { const c = l.trim(); return isFailRow(c) || (!/^\|.*\|$/.test(c) && /\[FAIL\]/i.test(c)); });
+    // failed criteria in a review, one parser for worker feedback AND verdicts (2026-10-07 review #3: a data row whose first cell was the word "criterion" was taken for a header, and a PASS in the
+    // expected column cancelled the FAIL in the status column). tables are read by structure: a block of |rows|; its first row is a header when a separator row follows it or one of its cells is a
+    // status label; the status of a data row is the cell under that label, else a cell that is exactly FAIL, else the last cell. only the status cell decides — other cells never cancel it.
+    // outside tables: a canonical [FAIL], a status/result/verdict field set to FAIL, or a line that ends in FAIL after a separator. the "[PASS/FAIL]" template is never a failure.
+    const tableCells = c => c.slice(1, -1).split('|').map(x => x.replace(/[*_`~]/g, '').trim()), isTableRow = c => /^\|.*\|$/.test(c), isSepRow = cells => cells.length > 0 && cells.every(x => /^:?-{2,}:?$/.test(x));
+    const failWord = x => /\bFAIL(ED|URE|S)?\b/i.test(x) && !/PASS\s*\/\s*FAIL/i.test(x), statusLabel = x => /^(status|result|results|verdict|outcome|state|pass\s*\/\s*fail|pass\??|ok\??)$/i.test(x);
+    const failLines = s => { const lines = (s || '').split('\n'), out = []; let inTable = false, statusIdx = -1;
+      lines.forEach((line, i) => { const c = line.trim();
+        if (!isTableRow(c)) { inTable = false; statusIdx = -1; if (/PASS\s*\/\s*FAIL/i.test(c)) return; if (/\[FAIL\]/i.test(c) || /\b(status|result|verdict)\s*[:=]\s*\W{0,3}FAIL/i.test(c) || /(?:[:=→>—–-]|\bis)\s*\W{0,3}FAIL(ED)?\W{0,3}$/.test(c)) out.push(line); return; }
+        const cells = tableCells(c); if (isSepRow(cells)) return;
+        if (!inTable) { inTable = true; const next = (lines[i + 1] || '').trim(), label = cells.findIndex(statusLabel); if ((isTableRow(next) && isSepRow(tableCells(next))) || label >= 0) { statusIdx = label; return; } }
+        const status = statusIdx >= 0 && statusIdx < cells.length ? cells[statusIdx] : cells.find(x => /^\W*FAIL(ED)?\W*$/i.test(x)) ?? cells.at(-1);
+        if (failWord(status) || (statusIdx >= 0 && /[❌✗✘]/.test(status))) out.push(line); });
+      return out; };
     const withHist = s => s + Object.entries(ledger).filter(([, e]) => new Set(e.map(x => x.got)).size >= 2).map(([k, e]) => `\nPARAMETER HISTORY ${k}: tried→got: [${e.map(x => x.got).join(', ')}]; expected ${e.at(-1).want} — interpolate/bisect from this table; do NOT re-guess blindly.`).join('');
     let checkpoint = '', fatal = false, escalated = false, pivoted = false, fastLaneUsed = false;
     const isFatal = s => /requires more credits|HTTP 402\b/i.test(s?.slice?.(-2000) || ''); // API wording only: task output about balances/funds aborted cobol-modernization at planning
