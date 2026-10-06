@@ -37,8 +37,16 @@ export default {
       now = () => new Date().toISOString(),
       bullets = s => tail(s, 1200).replace(/\r/g, '').split('\n').map(x => x.trim()).filter(Boolean).slice(-8).map(x => `- ${x}`).join('\n') || '- no notable output captured',
       emit = (type, data = {}) => appendFileSync(events, `${JSON.stringify({ t: now(), type, ...data })}\n`),
-      verdict = (s) => { const m = (s.trimEnd().split('\n').findLast(l => /\b(N?ACK)\b/.test(l)) || '').match(/\b(N?ACK)\b/g); return m?.[m.length - 1] === "ACK"; }, // full-message scan, last token-bearing line wins — a front-loaded ACK + long rationale must not read as NACK
-      valid = (s) => /\b(N?ACK)\b/.test(s) && /measured=|PASS|FAIL/.test(s);
+      // verdicts (2026-10-06 review: the old "last line bearing an ACK token" rule turned a transcript with a measured FAIL, a NACK, a sentence ending in "…should be ACK" and a timeout marker into "goal already met").
+      // a verdict line STARTS with ACK or NACK (after markdown and an optional "verdict:" / "NEAR-COMPLETE" prefix). ACK needs: at least one verdict line, every verdict line ACK, no measured failure
+      // ([FAIL], or FAIL on a measured= line) outside tool-call echoes, and a review that was not cut off. NACK stays lenient (any last token), so its findings still reach the worker.
+      plain = s => s.replace(/\x1b\[[0-9;]*m/g, '').replace(/\r/g, ''),
+      vLines = s => plain(s).split('\n').map(l => l.trim().replace(/^[\s>*_`#–—-]+/, '').replace(/^(final\s+)?(verdict|decision|result)\s*[:=–—-]\s*[*_`]*/i, '').replace(/^NEAR-COMPLETE[\s:–—-]*/i, '').match(/^N?ACK\b/)?.[0]).filter(Boolean),
+      cutOff = s => /\[(timeout after \d+ms|request timeout:[^\]]*|pass time up:[^\]]*)\]\s*$/.test(plain(s).trimEnd()),
+      measuredFail = s => plain(s).split('\n').some(l => !l.trim().startsWith('⟡') && /\[FAIL\]|measured=.*(?<!PASS\/)\bFAIL\b/.test(l)),
+      looseNack = s => (plain(s).trimEnd().split('\n').findLast(l => /\b(N?ACK)\b/.test(l)) || '').match(/\b(N?ACK)\b/g)?.at(-1) === 'NACK',
+      verdict = (s) => { const v = vLines(s); return v.length > 0 && v.every(x => x === 'ACK') && !measuredFail(s) && !cutOff(s); },
+      valid = (s) => !cutOff(s) && (vLines(s).length > 0 || looseNack(s)) && /measured=|PASS|FAIL/.test(s);
     const totalS = deadline ? Math.max(1, Math.floor(deadline - Date.now() / 1000)) : null;
     const budget = () => deadline ? Math.max(0, Math.floor(deadline - Date.now() / 1000)) : null;
     let ema = 0; // EMA of full iteration duration (worker+judge, seconds) — adaptive salvage/urgent triggers; contribution clamped to 25% of total budget. SALVAGE fires only below minPass: with ≥ minPass left a normal last pass (with judge feedback) runs instead — on 840s budgets the old 1.3×EMA trigger (~273s) would turn the second pass into a no-debug salvage

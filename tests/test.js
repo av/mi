@@ -3984,3 +3984,18 @@ test('review 4: an artifact name ending in _ or . is kept as written; a sentence
   const names = await withDelegate((p, o, k) => k === 'planner' ? `ARTIFACTS: ${under}, ${dotted}\nAMBIGUITIES: none` : WORK, async (goal, calls) => { await goal.handler({ goal: 'write both', check: 'check', max: 1 }); return calls.find(c => c.kind === 'worker').prompt.match(/declared artifacts: ([^\n]*)/)[1]; });
   assert.strictEqual(names, `${under}, ${dotted}`);
 });
+
+test('review 5: an ACK is not accepted after a measured failure, a NACK, or from a review that was cut off', async () => {
+  const pre = judgeOut => withDelegate((p, o, k) => k === 'planner' ? 'ARTIFACTS: none\nAMBIGUITIES: none' : k === 'worker' ? WORK : judgeOut, goal => goal.handler({ goal: 'Review actual artifact.', check: 'ACK only if it is correct.', max: 0 }));
+  const reviewer = '\u001b[90m⟡ bash({"command":"printf \'criterion: measured=old expected=new [FAIL]\\\\nNACK\\\\n\'"})\u001b[0m\ncriterion: measured=old expected=new [FAIL]\nNACK\nIf remediation succeeds the later verdict should be ACK.\n[timeout after 180000ms]';
+  const cases = {
+    'reviewer transcript (FAIL, NACK, hypothetical ACK, timeout)': reviewer,
+    'measured FAIL then ACK': 'size: measured=3000 expected<=2500 [FAIL]\nACK',
+    'NACK line then ACK line': 'a: measured=1 expected=1 [PASS]\nNACK — b is wrong\nACK',
+    'ACK then cut off': 'a: measured=1 expected=1 [PASS]\nACK\n[request timeout: stopped early, work so far is on disk]',
+    'ACK only inside a sentence': 'a: measured=1 expected=1 [PASS]\nonce this is fixed the verdict will be ACK',
+  };
+  for (const [name, out] of Object.entries(cases)) assert.doesNotMatch(await pre(out), /^goal already met/, name);
+  for (const out of ['a: measured=1 expected=1 [PASS]\nACK', 'a: measured=1 expected=1 [PASS]\n**ACK** — every criterion measured', 'ACK\nall of: a measured=1 expected=1 PASS', 'a: measured=1 required=1 [PASS]\nFinal verdict: **ACK**'])
+    assert.match(await pre(out), /^goal already met/, out);
+});
