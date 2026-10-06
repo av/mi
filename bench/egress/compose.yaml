@@ -8,7 +8,9 @@ services:
     image: mi-egress:1
     command: ["proxy"]
     environment:
-      MI_EGRESS_DENY: 'terminal[-_. ]?bench|laude-institute|harbor-framework|tbench'
+      MI_EGRESS_DENY: 'terminal[-_. ]?bench|laude-institute|harbor-framework|(?<![a-z])tbench(?![a-z])'
+      # the model API: its request bodies hold the whole conversation, so only their URL is matched
+      MI_EGRESS_MODEL_HOSTS: '(^|\.)openrouter\.ai$$'
     healthcheck:
       test: ["CMD", "python3", "-c", "import socket; socket.create_connection(('127.0.0.1', 8080), 2)"]
       interval: 1s
@@ -21,7 +23,7 @@ services:
     cap_add: [NET_ADMIN]
     environment:
       MI_EGRESS_PROXY: mi-egress-proxy:8080
-      # name families whose requests go through the filtering proxy
+      # watched source families: their addresses may only be reached under these names
       MI_EGRESS_WATCH: '(^|\.)(github\.com|githubusercontent\.com|github\.io|githubassets\.com|huggingface\.co|jsdelivr\.net|githack\.com|statically\.io|sourcegraph\.com|archive\.org|gitlab\.com|bitbucket\.org|codeberg\.org|tbench\.ai|harborframework\.com|mi-fixture)$$'
       # addresses that may only be reached under a watched name (GitHub's published ranges + resolved names)
       MI_EGRESS_SOURCE_NETS: '140.82.112.0/20 143.55.64.0/20 185.199.108.0/22 192.30.252.0/22 2a0a:a440::/29 2606:50c0::/32'

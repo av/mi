@@ -82,9 +82,11 @@ BENCH_DENY = (
 
 # Network-level egress control (bench/egress/, 2026-10-06 review #2: MI_DENY alone is an argument filter and a
 # URL assembled by the shell gets past it). With bench/egress/compose.yaml added to the trial, the task container
-# shares a sidecar's network namespace: all its outbound TCP is redirected into a shim it cannot change, and
-# requests to GitHub, Hugging Face and known mirrors go through a filtering proxy that sees the real URL.
-# The proxy re-signs those hosts with a run-local CA; EGRESS_CA_SETUP makes the container trust it.
+# shares a sidecar's network namespace: all its outbound TCP is redirected into a shim it cannot change. During
+# the agent phase every HTTP(S) request, to any host, goes through a filtering proxy that sees the real request;
+# nothing else leaves (review #3: a relay on an unlisted host and numeric GitHub API routes got past the first
+# version, which filtered listed hosts only). The proxy re-signs TLS with a run-local CA; EGRESS_CA_SETUP makes
+# the container trust it.
 EGRESS_DIR = Path(__file__).resolve().parent / "egress"
 EGRESS_SERVICE, EGRESS_PROXY_SERVICE = "mi-egress", "mi-egress-proxy"
 EGRESS_CA_SETUP = r"""
@@ -102,6 +104,13 @@ done
 timeout 60 find / -xdev -name cacert.pem -path '*certifi*' 2>/dev/null | while read -r f; do
   grep -qF "$mark" "$f" || { echo; cat "$CA"; } >> "$f"
 done
+# Java keeps its own trust store
+command -v keytool >/dev/null 2>&1 && keytool -importcert -noprompt -trustcacerts -cacerts -storepass changeit \
+  -alias mi-egress -file "$CA" >/dev/null 2>&1
+# no system bundle in this image: clients that take one from the environment get the host's list plus the CA
+if [ -z "$SYS" ] && [ -f /opt/mi/host-ca-bundle.pem ]; then
+  SYS=/opt/mi/egress-bundle.pem; { cat /opt/mi/host-ca-bundle.pem; echo; cat "$CA"; } > "$SYS"; chmod a+r "$SYS"
+fi
 echo "$SYS" > /opt/mi/egress-bundle
 chmod a+r "$CA" /opt/mi/egress-bundle
 """
@@ -303,6 +312,10 @@ class MiAgent(BaseInstalledAgent):
         await self.exec_as_root(environment, command=INSTALL)
         if self._egress_container(environment, EGRESS_SERVICE):
             await environment.upload_file(EGRESS_DIR / "ca" / "mitmproxy-ca-cert.pem", "/opt/mi/egress-ca.pem")
+            for host_bundle in ("/etc/ssl/certs/ca-certificates.crt", "/etc/pki/tls/certs/ca-bundle.crt", "/etc/ssl/cert.pem"):
+                if Path(host_bundle).is_file():
+                    await environment.upload_file(Path(host_bundle), "/opt/mi/host-ca-bundle.pem")
+                    break
             await self.exec_as_root(environment, command=EGRESS_CA_SETUP)
         elif self.options.egress:
             raise RuntimeError("mi: egress control required (kwargs.egress) but the trial has no mi-egress sidecar; "
@@ -321,8 +334,8 @@ class MiAgent(BaseInstalledAgent):
         return out.stdout.split()[0] if out.stdout.split() else None
 
     async def _egress_env(self, environment: BaseEnvironment) -> dict[str, str]:
-        """CA variables for the agent's processes (empty without the sidecar). A full bundle is only named when the
-        image has a system one; otherwise clients keep their own lists, which EGRESS_CA_SETUP extended."""
+        """CA variables for the agent's processes (empty without the sidecar): the image's system bundle, or the
+        host's list when the image has none, each with the run-local CA added by EGRESS_CA_SETUP."""
         if not self._egress_container(environment, EGRESS_SERVICE):
             return {}
         env = {"NODE_EXTRA_CA_CERTS": "/opt/mi/egress-ca.pem", "MI_EGRESS_CA": "/opt/mi/egress-ca.pem"}

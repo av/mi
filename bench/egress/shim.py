@@ -2,18 +2,21 @@
 """Transparent egress shim for evaluation runs (runs in the sidecar whose network namespace the task container shares).
 
 Every outbound TCP connection of the task container is redirected here by nftables (the task container has no
-NET_ADMIN and cannot change that). For each connection the shim reads the original destination and the name the
-client asks for (TLS SNI, HTTP Host, or a CONNECT line) and decides:
+NET_ADMIN and cannot change that). While the agent phase runs there is NO direct path out: for each connection
+the shim reads the original destination and the first bytes, and decides:
 
-  via-proxy  the name is in a watched family (GitHub, Hugging Face, known mirrors, the probe fixture): the
-             connection is handed to the filtering proxy (filter.py), which sees the real URL after TLS and
-             refuses benchmark sources however the URL was put together
-  refused    the destination IP belongs to a watched source but the name does not (wrong or missing SNI,
-             ssh/git ports, a made-up alias for the address)
-  direct     everything else is relayed untouched
+  via-proxy  the connection speaks HTTP or TLS — to any host, any port. It is handed to the filtering proxy
+             (filter.py), which terminates TLS and applies the evaluation policy to the real request: its URL,
+             any target a relay or fetching service is asked for, and the reply. Nothing HTTP-shaped bypasses it.
+  refused    anything else (ssh, raw TCP, tunnels, server-speaks-first protocols): there is no way to inspect
+             it, so it does not leave. Also refused: a watched source's address under a name outside the watched
+             families (wrong or missing SNI, a made-up alias for the address).
+  direct     only connections to the proxy itself (a client using it explicitly), and hosts listed in
+             MI_EGRESS_ALLOW_RAW ("host:port ..."), which is empty by default.
 
-IPv6 egress is rejected outright (IPv4 only). /run/mi-egress/passthrough (created from the host when the agent phase is over) turns the shim into a plain
-relay, so the verifier's own downloads are not intercepted.
+IPv6, QUIC and every UDP port except DNS are rejected outright. /run/mi-egress/passthrough (created from the
+host when the agent phase is over) turns the shim into a plain relay, so the verifier's own downloads are not
+intercepted.
 """
 import asyncio
 import ipaddress
@@ -32,6 +35,8 @@ PROXY = os.environ.get("MI_EGRESS_PROXY", "mi-egress-proxy:8080").rsplit(":", 1)
 WATCH = re.compile(os.environ["MI_EGRESS_WATCH"], re.I)
 SOURCE_HOSTS = os.environ.get("MI_EGRESS_SOURCE_HOSTS", "").split()
 SOURCE_NETS = [ipaddress.ip_network(n) for n in os.environ.get("MI_EGRESS_SOURCE_NETS", "").split()]
+ALLOW_RAW = set(os.environ.get("MI_EGRESS_ALLOW_RAW", "").split())
+proxy_ips: set[str] = set()
 PASS_FLAG, READY = "/run/mi-egress/passthrough", "/run/mi-egress/ready"
 resolved: set[str] = set()
 
@@ -47,7 +52,8 @@ table inet mi_egress {{
   chain filter_out {{
     type filter hook output priority 0;
     meta mark {MARK} accept
-    udp dport 443 reject
+    ip daddr 127.0.0.0/8 accept
+    udp dport != 53 reject
     ip6 daddr != ::1 reject
   }}
 }}
@@ -60,6 +66,10 @@ def log(**kw):
 
 def refresh_sources():
     while True:
+        try:
+            proxy_ips.update(a[4][0] for a in socket.getaddrinfo(PROXY[0], None))
+        except OSError:
+            pass
         found = set()
         for h in SOURCE_HOSTS:
             try:
@@ -83,8 +93,9 @@ def original_dst(sock) -> tuple[str, int]:
     return socket.inet_ntoa(raw[4:8]), struct.unpack("!H", raw[2:4])[0]
 
 
-def sniff(data: bytes) -> str:
-    """The host name the client asks for: TLS SNI, HTTP Host header, or a CONNECT target ('' when none)."""
+def sniff(data: bytes) -> tuple[str, str]:
+    """(kind, name): kind is "tls", "http" or "" (neither); name is the TLS SNI, the HTTP Host header or the
+    CONNECT target ('' when the client sent none)."""
     if len(data) > 5 and data[0] == 0x16 and data[1] == 3:
         try:
             p = 5 + 4 + 2 + 32  # record header, handshake header, version, random
@@ -96,28 +107,32 @@ def sniff(data: bytes) -> str:
             while p + 4 <= min(end, len(data)):
                 typ, ln = struct.unpack("!HH", data[p:p + 4])
                 if typ == 0:
-                    return data[p + 9:p + 9 + struct.unpack("!H", data[p + 7:p + 9])[0]].decode("ascii", "replace").lower()
+                    return "tls", data[p + 9:p + 9 + struct.unpack("!H", data[p + 7:p + 9])[0]].decode("ascii", "replace").lower()
                 p += 4 + ln
         except (IndexError, struct.error):
             pass
-        return ""
+        return "tls", ""
     head = data.split(b"\r\n\r\n", 1)[0].decode("latin1")
     if m := re.match(r"CONNECT\s+\[?([^\s\]]+?)\]?:\d+\s", head, re.I):
-        return m.group(1).lower()
+        return "http", m.group(1).lower()
     if re.match(r"[A-Z]+ \S+ HTTP/1\.[01]\r?\n", head):
-        if m := re.search(r"^host:\s*\[?([^\s\]:]+)", head, re.I | re.M):
-            return m.group(1).lower()
-    return ""
+        m = re.search(r"^host:\s*\[?([^\s\]:]+)", head, re.I | re.M)
+        return "http", m.group(1).lower() if m else ""
+    return "", ""
 
 
-def decide(host: str, ip: str, passthrough: bool) -> str:
+def decide(kind: str, host: str, ip: str, port: int, passthrough: bool) -> str:
     if passthrough:
         return "direct"
-    if host and WATCH.search(host):
+    if ip in proxy_ips and port == int(PROXY[1]):
+        return "direct"  # the filtering proxy itself: whatever is sent to it is filtered there
+    if f"{ip}:{port}" in ALLOW_RAW or (host and f"{host}:{port}" in ALLOW_RAW):
+        return "direct"
+    if is_source(ip) and not (host and WATCH.search(host)):
+        return "refused"  # a watched source's address under another name, or under none
+    if kind in ("tls", "http"):
         return "via-proxy"
-    if is_source(ip):
-        return "refused"
-    return "direct"
+    return "refused"  # not inspectable: no direct fallback during the agent phase
 
 
 async def open_marked(host: str, port: int):
@@ -164,17 +179,17 @@ async def handle(reader, writer):
         first = await asyncio.wait_for(reader.read(8192), 3)
     except asyncio.TimeoutError:
         first = b""  # server-speaks-first protocol (ssh, smtp): no name to read
-    host = sniff(first)
-    action = decide(host, ip, os.path.exists(PASS_FLAG))
-    if action != "direct":
-        log(dst=ip, port=port, host=host, action=action)
+    kind, host = sniff(first)
+    action = decide(kind, host, ip, port, os.path.exists(PASS_FLAG))
+    if action == "refused":
+        log(dst=ip, port=port, host=host, kind=kind, action=action)
     try:
         if action == "refused":
             writer.close()
             return
         if action == "via-proxy":
             ur, uw = await open_marked(PROXY[0], int(PROXY[1]))
-            uw.write(f"CONNECT {host}:{port} HTTP/1.1\r\nHost: {host}:{port}\r\n\r\n".encode())
+            uw.write(f"CONNECT {ip}:{port} HTTP/1.1\r\nHost: {ip}:{port}\r\n\r\n".encode())
             await uw.drain()
             status = await asyncio.wait_for(ur.readuntil(b"\r\n\r\n"), 30)
             if b" 200 " not in status.split(b"\r\n", 1)[0]:

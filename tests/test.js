@@ -4006,30 +4006,38 @@ test('review2 1: the egress shim routes by the real destination and requested na
 import os, sys, json
 os.environ["MI_EGRESS_WATCH"] = r"(^|\\.)(github\\.com|githubusercontent\\.com|mi-fixture)$"
 os.environ["MI_EGRESS_SOURCE_NETS"] = "140.82.112.0/20 185.199.108.0/22"
+os.environ["MI_EGRESS_PROXY"] = "10.9.9.9:8080"
 sys.path.insert(0, "bench/egress")
 import shim, struct
+shim.proxy_ips.add("10.9.9.9")
 def hello(name):
     n = name.encode(); ext = struct.pack("!HH", 0, len(n) + 5) + struct.pack("!HBH", len(n) + 3, 0, len(n)) + n
     body = b"\\x03\\x03" + b"\\0" * 32 + b"\\0" + struct.pack("!H", 2) + b"\\x13\\x01" + b"\\x01\\0" + struct.pack("!H", len(ext)) + ext
     hs = b"\\x01" + struct.pack("!I", len(body))[1:] + body
     return b"\\x16\\x03\\x01" + struct.pack("!H", len(hs)) + hs
+d = lambda kind, host, ip, port=443, off=False: shim.decide(kind, host, ip, port, off)
 print(json.dumps({
   "sni": shim.sniff(hello("raw.githubusercontent.com")),
   "host": shim.sniff(b"GET /a HTTP/1.1\\r\\nHost: MI-Fixture:80\\r\\n\\r\\n"),
   "connect": shim.sniff(b"CONNECT github.com:443 HTTP/1.1\\r\\n\\r\\n"),
   "none": shim.sniff(b"SSH-2.0-x\\r\\n"),
-  "watched": shim.decide("api.github.com", "140.82.112.5", False),
-  "watched_any_ip": shim.decide("mi-fixture", "172.20.0.9", False),
-  "alias_on_source_ip": shim.decide("alias.example", "140.82.112.5", False),
-  "no_name_on_source_ip": shim.decide("", "185.199.108.133", False),
-  "lookalike": shim.decide("notgithub.com", "93.184.216.34", False),
-  "ordinary": shim.decide("pypi.org", "151.101.0.223", False),
-  "after_agent_phase": shim.decide("github.com", "140.82.112.5", True),
+  "watched": d("tls", "api.github.com", "140.82.112.5"),
+  "alias_on_source_ip": d("tls", "alias.example", "140.82.112.5"),
+  "no_name_on_source_ip": d("tls", "", "185.199.108.133"),
+  "ssh_to_source_ip": d("", "", "140.82.112.5", 22),
+  "unlisted_host_http": d("http", "some-relay.example", "93.184.216.34", 80),
+  "unlisted_host_tls": d("tls", "pypi.org", "151.101.0.223"),
+  "private_relay_http": d("http", "review-relay", "172.20.0.7", 80),
+  "raw_tcp_public": d("", "", "93.184.216.34", 9000),
+  "raw_tcp_private": d("", "", "172.20.0.7", 9000),
+  "the_proxy_itself": d("http", "x", "10.9.9.9", 8080),
+  "after_agent_phase": d("", "", "140.82.112.5", 22, True),
 }))`;
   const r = JSON.parse(execFileSync('python3', ['-c', py], { cwd: join(__dirname, '..'), encoding: 'utf8' }));
-  assert.deepStrictEqual(r, { sni: 'raw.githubusercontent.com', host: 'mi-fixture', connect: 'github.com', none: '',
-    watched: 'via-proxy', watched_any_ip: 'via-proxy', alias_on_source_ip: 'refused', no_name_on_source_ip: 'refused',
-    lookalike: 'direct', ordinary: 'direct', after_agent_phase: 'direct' });
+  assert.deepStrictEqual(r, { sni: ['tls', 'raw.githubusercontent.com'], host: ['http', 'mi-fixture'], connect: ['http', 'github.com'], none: ['', ''],
+    watched: 'via-proxy', alias_on_source_ip: 'refused', no_name_on_source_ip: 'refused', ssh_to_source_ip: 'refused',
+    unlisted_host_http: 'via-proxy', unlisted_host_tls: 'via-proxy', private_relay_http: 'via-proxy',
+    raw_tcp_public: 'refused', raw_tcp_private: 'refused', the_proxy_itself: 'direct', after_agent_phase: 'direct' });
 });
 
 test('review2 1: the egress overlay gives the task container no way around the shim, and the clean-run agent config requires it', () => {
@@ -4040,6 +4048,7 @@ test('review2 1: the egress overlay gives the task container no way around the s
   assert.doesNotMatch(main, /cap_add|privileged/);
   assert.match(read('bench/egress/shim.py'), /meta nfproto ipv4 meta l4proto tcp redirect to/);
   assert.match(read('bench/egress/filter.py'), /unquote/);
+  assert.match(read('bench/egress/shim.py'), /udp dport != 53 reject/);
   assert.match(read('bench/configs/agent-mi-deepseek-v4.1-flash-egress.yaml'), /egress: true/);
   assert.match(read('bench/configs/egress.yaml'), /bench\/egress\/compose\.yaml/);
   const adapter = read('bench/mi_agent.py');
@@ -4088,4 +4097,56 @@ test('review2 3: reviews get a pristine copy of the working directory taken befo
   assert.match(seen.worker, /ALLOWED EDITS: \S+\/pristine is a read-only copy/);
   assert.ok(!existsSync(seen.dir), 'removed when the goal run ended');
   assert.doesNotMatch(r.stdout, /goal achieved/);
+});
+
+// ── Review #3, 2026-10-07 (release review of bench/tb2-reference at 9046cd8): the two defects, fixed by kind ──
+test('review3 1: the egress policy judges routes by kind — names, carried targets (relays), and opaque repository identity', () => {
+  const py = `
+import os, sys, json, base64
+os.environ["MI_EGRESS_DENY"] = r"terminal[-_. ]?bench|laude-institute|harbor-framework|(?<![a-z])tbench(?![a-z])"
+os.environ["MI_EGRESS_MODEL_HOSTS"] = r"(^|\\.)openrouter\\.ai$"
+sys.path.insert(0, "bench/egress")
+import filter as f
+v = lambda host, path, body="", sni="", model=False: f.request_verdict(host, sni, path, body, model) is None
+b64 = base64.urlsafe_b64encode(b"http://mi-fixture/terminal-bench/sentinel").decode().rstrip("=")
+print(json.dumps({
+  # opaque identity on the GitHub API: refused as a class, whatever the id
+  "api_by_id": v("api.github.com", "/repositories/1063848495/readme"),
+  "api_by_other_id": v("api.github.com", "/repositories/7/contents/a"),
+  "api_user_id": v("api.github.com", "/user/9/repos"),
+  "api_org_id": v("api.github.com", "/organizations/9/repos"),
+  "api_numeric_owner": v("api.github.com", "/repos/12/34/readme"),
+  "api_graphql": v("api.github.com", "/graphql", '{"query":"{node(id:1){id}}"}'),
+  "api_dot_segments": v("api.github.com", "/repos/git/../repositories/8"),
+  "api_encoded": v("api.github.com", "/%72epositories/8"),
+  "api_double_slash": v("api.github.com", "//repositories/8"),
+  "api_unknown_route": v("api.github.com", "/anything/else"),
+  "api_by_sni": v("example.org", "/repositories/8", sni="api.github.com"),
+  "gist": v("gist.githubusercontent.com", "/u/abcdef0123456789/raw"),
+  "api_named": v("api.github.com", "/repos/git/git/contents/README.md?ref=master"),
+  "api_search": v("api.github.com", "/search/repositories?q=compcert"),
+  "api_named_denied": v("api.github.com", "/repos/harbor-framework/terminal-bench-2/readme"),
+  # relays: a carried target is judged like a direct one
+  "relay_path": v("review-relay", "/http://mi-fixture/terminal-bench/sentinel"),
+  "relay_query_encoded": v("r.example", "/?url=http%3A%2F%2Fmi-fixture%2F%74erminal-bench%2Fsentinel"),
+  "relay_double_encoded": v("r.example", "/?u=http%253A%252F%252Fx%252Fterminal%252Dbench"),
+  "relay_base64": v("r.example", "/b64/" + b64),
+  "relay_body": v("r.example", "/fetch", "target=https://api.github.com/repositories/5/zipball"),
+  "relay_numeric_id": v("r.jina.ai", "/https://api.github.com/repositories/1063848495/readme"),
+  "relay_schemeless": v("r.example", "/?u=api.github.com/repositories/5"),
+  "relay_gist": v("r.example", "/https://gist.githubusercontent.com/u/abc/raw"),
+  "relay_ordinary": v("r.jina.ai", "/https://www.rcsb.org/structure/1ABC"),
+  "relay_named_repo": v("r.example", "/https://api.github.com/repos/git/git"),
+  # ordinary traffic
+  "pypi": v("pypi.org", "/simple/six/"),
+  "github_repo": v("github.com", "/AbsInt/CompCert/archive/refs/tags/v3.13.tar.gz"),
+  "fastbench_is_not_tbench": v("example.org", "/fastbench/results"),
+  # the model API: the conversation may mention anything, but the provider may not browse for the model
+  "model_conversation": v("openrouter.ai", "/api/v1/chat/completions", '{"messages":[{"content":"git clone terminal-bench was blocked"}]}', model=True),
+  "model_web_plugin": v("openrouter.ai", "/api/v1/chat/completions", '{"model":"x","plugins":[{"id":"web"}]}', model=True),
+  "model_online": v("openrouter.ai", "/api/v1/chat/completions", '{"model":"deepseek/x:online"}', model=True),
+}))`;
+  const r = JSON.parse(execFileSync('python3', ['-c', py], { cwd: join(__dirname, '..'), encoding: 'utf8' }));
+  const allowed = Object.keys(r).filter(k => r[k]).sort();
+  assert.deepStrictEqual(allowed, ['api_named', 'api_search', 'fastbench_is_not_tbench', 'github_repo', 'model_conversation', 'pypi', 'relay_named_repo', 'relay_ordinary'].sort());
 });

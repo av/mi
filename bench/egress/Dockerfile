@@ -5,6 +5,6 @@ FROM python:3.12-slim
 RUN apt-get update && apt-get install -y --no-install-recommends nftables curl && rm -rf /var/lib/apt/lists/* \
     && pip install --no-cache-dir mitmproxy==11.0.2
 COPY ca/mitmproxy-ca.pem ca/mitmproxy-ca-cert.pem /ca/
-COPY shim.py filter.py /opt/mi-egress/
+COPY shim.py filter.py relay.py /opt/mi-egress/
 COPY --chmod=755 entrypoint.sh /opt/mi-egress/entrypoint.sh
 ENTRYPOINT ["/opt/mi-egress/entrypoint.sh"]
