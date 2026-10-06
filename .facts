@@ -90,7 +90,7 @@
 - label: goal worker restart-before-ACK guidance carves out VMs/emulators/long-boot systems — never restart those
   command: grep -q 'VM/emulator/long-boot system — never restart those' tools/goal.mjs
 - label: goal planner emits ARTIFACTS: line; draft gate prefixes every worker (from iteration 1) with a draft-first directive while a declared artifact is missing OR not modified since the run started (mtime < t0; mailman's pre-existing config never tripped an existence-only gate), without producing NACKs or feeding blockerSigs
-  command: grep -q 'ARTIFACTS:' tools/goal.mjs && grep -q 'draftGate' tools/goal.mjs && grep -qF "deadline && artifacts.length ? artifacts.filter" tools/goal.mjs && grep -q 'DRAFT FIRST' tools/goal.mjs && grep -q "emit('draft_gate'" tools/goal.mjs && grep -qF 'artifacts.filter(stale)' tools/goal.mjs && grep -qF 'statSync(p).mtimeMs < t0' tools/goal.mjs
+  command: grep -q 'ARTIFACTS:' tools/goal.mjs && grep -q 'draftGate' tools/goal.mjs && grep -qF "deadline && artifacts.length ? artifacts.filter" tools/goal.mjs && grep -q 'DRAFT FIRST' tools/goal.mjs && grep -q "emit('draft_gate'" tools/goal.mjs && grep -qF 'artifacts.filter(stale)' tools/goal.mjs && grep -qF 'statSync(real(p)).mtimeMs < t0' tools/goal.mjs
 - label: MI_JUDGE_MODEL and MI_JUDGE_PARAMS optionally override model/params for judge and skeptical recheck delegates only
   command: grep -q 'MI_JUDGE_MODEL' tools/goal.mjs && grep -q 'MI_JUDGE_PARAMS' tools/goal.mjs && test $(grep -c 'env: jenv' tools/goal.mjs) -eq 2
 - label: goal loop shares one bg-jobs registry per session (MI_SESSION_ID) and polls live jobs without LLM calls — MI_JOB_POLL_MS interval, stall guard, cumulative 50%-of-budget cap
@@ -222,8 +222,8 @@
   command: grep -q 'upload_dir(self._staged_checkout(self._repo()), "/opt/mi")' bench/mi_agent.py && grep -q 'MI_GOAL_FILE' bench/mi_agent.py && grep -q '/opt/mi/launch.mjs' bench/mi_agent.py && grep -q 'EVAL_SYSTEM_PROMPT' bench/mi_agent.py
 - label: harbor adapter recomputes the trial's agent timeout from config.json + task.toml and sets MI_TASK_TIMEOUT, MI_DEADLINE (60s verifier buffer) and MI_GOAL_MAX (4-12)
   command: grep -q 'TrialConfig.model_validate_json' bench/mi_agent.py && grep -q 'MI_TASK_TIMEOUT - 60' bench/mi_agent.py && grep -q 'MI_GOAL_MAX' tools/goal.mjs
-- label: harbor TERMINAL_BENCH_CHECK treats /tests/ results as ground truth for what they cover, requires every goal-stated path/threshold with measured values, never NACKs for margin, and warns about the hidden external verifier
-  command: grep -q 'test results are GROUND TRUTH' bench/mi_agent.py && grep -q 'hidden external verifier' bench/mi_agent.py && grep -q 'EVERY goal-stated output path' bench/mi_agent.py && grep -q 'never NACK for margin' bench/mi_agent.py
+- label: harbor TERMINAL_BENCH_CHECK treats the project's own test suite (never the benchmark's tests, which it forbids looking for) as ground truth for what it covers, requires every goal-stated path/threshold with measured values, never NACKs for margin, and warns about the hidden external verifier
+  command: grep -q 'its results are GROUND TRUTH' bench/mi_agent.py && grep -q 'hidden external verifier' bench/mi_agent.py && grep -q 'EVERY goal-stated output path' bench/mi_agent.py && grep -q 'never NACK for margin' bench/mi_agent.py
 - label: harbor adapter writes an AGENTS.md workspace snapshot in the detected workdir before the goal loop
   command: grep -q 'Workspace Snapshot' bench/mi_agent.py && grep -q 'detect_workdir' bench/mi_agent.py
 - label: eval determinism knobs are agent kwargs (temperature 0, seed 42, OpenRouter provider pin alibaba with allow_fallbacks false) merged into MI_API_PARAMS; the pin applies only to openrouter models
@@ -235,7 +235,7 @@
 
 # benchmark
 - label: goal loop skips LLM judge with a mechanical NACK while no declared artifact exists — mech NACKs are exempt from strategy/blockerSig accounting
-  command: grep -q 'missingAll' tools/goal.mjs && grep -q "emit('judge_skipped'" tools/goal.mjs && grep -q 'implementation does not exist yet; write the artifact first' tools/goal.mjs && grep -qF '!last.ok && !last.mech' tools/goal.mjs && grep -qF 'existsSync, readFileSync } from "fs"' tools/goal.mjs
+  command: grep -q 'missingAll' tools/goal.mjs && grep -q "emit('judge_skipped'" tools/goal.mjs && grep -q 'implementation does not exist yet; write the artifact first' tools/goal.mjs && grep -qF '!last.ok && !last.mech' tools/goal.mjs && grep -qF 'existsSync, readFileSync, mkdtempSync, rmSync } from "fs"' tools/goal.mjs
 - label: goal loop keeps a per-criterion measured/expected ledger from judge NACKs and injects a PARAMETER HISTORY table into the worker checkpoint when >=2 different measured values exist for the same criterion (capped at 5 entries)
   command: grep -q 'PARAMETER HISTORY' tools/goal.mjs && grep -q 'harvest' tools/goal.mjs && grep -q 'withHist' tools/goal.mjs && grep -qF 'e.length > 5' tools/goal.mjs && grep -q 'interpolate/bisect' tools/goal.mjs
 - label: goal loop single-blocker fast lane: when a real (non-mech) judge NACK has exactly one failing criterion (canonical [FAIL] lines or markdown FAIL rows) and remaining budget is under 30% of total, the next worker gets a surgical brief (single criterion verbatim + parameter history, fix-only-this directive) with strategy/exploration scaffolding dropped, preempting blind salvage
@@ -267,8 +267,8 @@
 - label: turn grace is a delegate option (unused by the goal loop since one worker session takes the whole budget): with grace the child is killed at timeout + grace (MI_PASS_END) and MI_PASS_SOFT is set at the cap, after which mi starts no new model request ("[pass time up: stopped at a turn boundary …]") but a running turn finishes and its tool calls run; a 0-byte declared artifact counts as missing for the mechanical judge skip
   command: grep -qF 'MI_PASS_SOFT' index.mjs && grep -qF '[pass time up: stopped at a turn boundary' index.mjs && grep -qF 'MI_PASS_SOFT: String(soft)' tools/delegate.mjs && ! grep -q 'grace' tools/goal.mjs && grep -qF 'st.isDirectory() || st.size > 0' tools/goal.mjs
   tags: [implemented]
-- label: MI_SESSION (a file path) makes a piped mi keep its conversation there — saved before every model request and when the run ends — and continue it on the next piped call (an unreadable file starts fresh); delegate never passes it on to a child unless the caller names it in env, so nested subagents cannot load or overwrite their parent's conversation
-  command: grep -qF 'saveSession = m => { if (process.env.MI_SESSION) writeFileSync(process.env.MI_SESSION, JSON.stringify(m)); }' index.mjs && grep -qF 'saveSession(messages); if (softUp())' index.mjs && grep -qF "if (old[0]?.role === 'system') history.splice(0, history.length, ...old)" index.mjs && grep -qF "MI_SESSION: '', ...env" tools/delegate.mjs
+- label: MI_SESSION (a file path) makes a one-shot mi (-p or piped) keep its conversation there — saved before every model request and when the run ends — and continue it on the next one-shot call (an unreadable file starts fresh); delegate never passes it on to a child unless the caller names it in env, so nested subagents cannot load or overwrite their parent's conversation
+  command: grep -qF 'saveSession = m => { if (!sessFile) return;' index.mjs && grep -qF 'saveSession(messages); if (softUp())' index.mjs && grep -qF "if (old[0]?.role === 'system') history.push(...old.slice(1))" index.mjs && grep -qF "MI_SESSION: '', ...env" tools/delegate.mjs
   tags: [implemented]
 - label: goal worker brief opens with the task framing (solve the task by running shell commands with the bash tool, a few at a time; analysis/plan lines before each call) and the task description, then short harness notes; measured on one write-compressor state with the benchmark's settings (34 single-request probes, 2026-10-04) the old brief drew 18k and 32k reasoning tokens before a trivial command, this one 0.8k, 1.4k and 7.9k
   command: grep -qF 'Your goal is to solve the task by running shell commands with the bash tool, a few at a time.' tools/goal.mjs && grep -qF 'Task Description:\n${goal}' tools/goal.mjs && grep -qF 'Harness notes (you are worker ${i}/${limit} of a goal loop)' tools/goal.mjs && ! grep -q 'complete the goal now' tools/goal.mjs
@@ -280,13 +280,13 @@
   command: grep -qF 'never a placeholder or an empty file' tools/goal.mjs && grep -qF 'a listed path that already exists may be a given input or already correct' tools/goal.mjs
   tags: [implemented]
 - label: context compaction can run again after a successful request — one worker session now lasts the whole budget, so it can outgrow the context more than once; two overflows in a row still throw
-  command: grep -qF 'retries = 0; compacted = false; messages.push(message)' index.mjs
+  command: grep -qF 'retries = 0; compacted = false;' index.mjs
   tags: [implemented]
 - label: preservation (K3: sanitize-git-repo r1/r2 `git gc --prune=now` lost original commit d6987af; compile-compcert r1 `dpkg -i --force-downgrade` broke apt) — worker PRESERVE rule (no history rewrite/prune, no forced package downgrades/removals, no deleting inputs unless the goal requires it), planner records ORIGINAL_HEADS for repos, judge rule 6h checks `apt-get check` and that pre-existing commits still resolve
   command: grep -qF 'PRESERVE: unless the goal explicitly requires it' tools/goal.mjs && grep -qF '6h. environment intact' tools/goal.mjs && grep -qF 'apt-get check' tools/goal.mjs && test $(grep -c 'ORIGINAL_HEADS' tools/goal.mjs) -ge 2
   tags: [implemented]
-- label: planner ARTIFACTS paths are cleaned of markdown/punctuation (leading/trailing `*`, `_`, backticks, quotes, brackets, `;`, `,`, `.`, `:`), deduplicated, and kept only if they match a plain absolute-path regex (K7: `/app/answer.txt**`, `/app/dclm;`, `/app/interp.py)` never existed)
-  command: grep -qF "const artList = s => [...new Set(" tools/goal.mjs && grep -qF ".replace(/[*_\`'\"()\[\]<>;,.:]+$/, '')" tools/goal.mjs
+- label: planner ARTIFACTS paths are cleaned of markdown/punctuation (leading/trailing `*`, backticks, quotes, brackets, `;`, `,`, `:`; a trailing `_` or `.` only when the name is not a plain path with it), deduplicated, and kept only if they match a plain absolute-path regex (K7: `/app/answer.txt**`, `/app/dclm;`, `/app/interp.py)` never existed)
+  command: grep -qF "artList = s => [...new Set(" tools/goal.mjs && grep -qF ".replace(/[*_\`'\"()\[\]<>;,.:]+$/, '')" tools/goal.mjs
   tags: [implemented]
 - label: goal isFatal matches only API credit wording (requires more credits, HTTP 402), not task text about funds or balances
   command: grep -qF "const isFatal = s => /requires more credits|HTTP 402\\b/i" tools/goal.mjs
@@ -305,4 +305,25 @@
   tags: [implemented]
 - label: a request cut off by the request time limit leaves the last 3000 chars of its streamed reasoning in the history as a harness note, so the retry or the next pass continues from it
   command: grep -q 'cut off by the request time limit' index.mjs
+  tags: [implemented]
+- label: no goal-loop prompt (planner, worker, judge, blind recheck) tells the agent to look for verifier or grader files or /tests; each forbids searching for, downloading or reading a grader's own tests, solutions or verifier scripts (2026-10-06 review, finding 1)
+  command: test "$(grep -c "never search for, download or read a grader's own files" tools/goal.mjs)" -ge 4 && ! grep -qE 'verify\*\.py|grade\*\.py|ls /tests|pytest tests/' tools/goal.mjs
+  tags: [implemented]
+- label: MI_DENY (case-insensitive regex) makes mi refuse any tool call whose arguments match it, answering "blocked by policy (MI_DENY)" instead of running the tool; delegates inherit it; the Harbor adapter sets it to BENCH_DENY (the benchmark's repositories and names, root-level /tests, /solution, /logs/verifier)
+  command: grep -q 'blocked by policy (MI_DENY)' index.mjs && grep -q '"MI_DENY": BENCH_DENY' bench/mi_agent.py
+  tags: [implemented]
+- label: bench/audit.py lists every tool call in a job's mi transcripts that names benchmark sources or test/solution/verifier paths and whether mi blocked it; exit status 1 when any such call was not blocked
+  command: python3 bench/audit.py --help | grep -q 'not blocked'
+  tags: [implemented]
+- label: a saved session (MI_SESSION) is written mode 0600 through a temporary file and rename; the goal loop keeps its worker session in a private 0700 mkdtemp directory removed when the goal run ends; compaction dumps are 0600
+  command: grep -q "mode: 0o600 }); renameSync(part, sessFile)" index.mjs && grep -q 'mkdtempSync(`${tmpdir()}/mi-goal-`)' tools/goal.mjs && grep -q "rmSync(sdir, { recursive: true, force: true })" tools/goal.mjs
+  tags: [implemented]
+- label: MI_SESSION applies to the one-shot modes (-p and pipe) alike — both continue the saved turns and save the result; the saved turns run under the current run's system message (cwd, date, SYSTEM_PROMPT, AGENTS.md, -f files), the saved system message is dropped; the REPL and -g never write the file
+  command: test "$(grep -o 'resume(); history.push' index.mjs | wc -l)" -eq 2 && grep -q 'history.push(...old.slice(1))' index.mjs
+  tags: [implemented]
+- label: goal artifacts — a declared name ending in _ or . is kept as written (resolved to the name without it only when that file exists and the literal one does not); a 0-byte artifact counts as present at once when the goal text asks for an empty/0-byte file and otherwise after one mechanical NACK that names it
+  command: grep -q 'emptyAsked' tools/goal.mjs && grep -q 'const real = p =>' tools/goal.mjs
+  tags: [implemented]
+- label: goal verdicts — ACK needs a verdict line that starts with ACK, no NACK verdict line, no measured failure ([FAIL] or FAIL on a measured= line) and a review that was not cut off by a timeout marker; a cut-off review is a no-verdict review; NACK parsing stays lenient
+  command: grep -q 'v.every(x => x === .ACK.) && !measuredFail(s) && !cutOff(s)' tools/goal.mjs
   tags: [implemented]

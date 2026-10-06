@@ -78,7 +78,8 @@ Requires Node 24.x in CI. `index.mjs`, `tools/`, and `skills/` are the published
 | `MI_JUDGE_MODEL` | unset (overrides `MODEL` for goal judge and skeptical-recheck delegates only) |
 | `MI_JUDGE_PARAMS` | unset (overrides `MI_API_PARAMS` for goal judge and skeptical-recheck delegates only) |
 | `MI_JOB_POLL_MS` | `30000` (goal loop poll interval for live background jobs) |
-| `MI_SESSION` | unset (file path; a piped `mi` saves its conversation there every turn and continues it on the next piped call; not inherited by delegates) |
+| `MI_SESSION` | unset (file path; a one-shot `mi` — `-p` or piped — saves its conversation there every turn, mode 0600, and the next one-shot call continues it under its own current system message; not inherited by delegates) |
+| `MI_DENY` | unset (case-insensitive regex; a tool call whose arguments match is refused with "blocked by policy"; inherited by delegates; the Harbor adapter uses it to keep the benchmark's own tests/solutions out of reach) |
 
 ## AGENTS.md auto-ingestion
 
