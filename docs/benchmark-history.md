@@ -1272,3 +1272,61 @@ were not rerun; the effect on the full 89-task score is unknown.
 Cost: $2.87 for the round (key usage 203.18 -> 206.05: analysis probes, two smoke runs $0.26, the run
 about $2.43, about $0.058 per trial). The spend guard's log stops four minutes into the run (the guard
 process did not survive); the run completed without it.
+
+## 2026-10-06: adversarial review fixes and the clean rerun — NO (controls 10/12)
+
+An independent review of this branch at `160a177` found that two passing round 1 trials had fetched the
+benchmark's own tests and solutions (sanitize-git-repo `SUyQHxi`, protein-assembly `UBG5avG`), and that the
+planner prompt told the agent to look for verifier files. Round 1's 22/30 and its p-values are therefore
+exploratory, contaminated development evidence, not a clean result. Fixes: `e178738` (no verifier-seeking
+prompts; `MI_DENY` blocks tool calls on the benchmark's sources and root-level `/tests`, `/solution`,
+`/logs/verifier`; `bench/audit.py`), `9c6c5dc` (private 0600 sessions; resume under the current system
+message; `-p` continues instead of overwriting), `66d01e7` (empty artifacts, literal names), `58101e4`
+(strict ACK), `886f867` (facts).
+
+One rerun under the fixed setup, `tb21-mi-review-clean-c1f1334-20261006`: the 14-task set plus the
+reviewer's 6 held-out tasks, 3 attempts, 60/60 trials finished, no Harbor exceptions, 4 h 21 min, $3.39.
+Bar: core >= 15/30 and controls >= 11/12. Result: core 21/30 (cleared), controls 10/12 (missed) — NO.
+
+| task | round 1 (contaminated setup, 27da25f) | clean rerun (c1f1334) |
+|---|---|---|
+| cobol-modernization | 3/3 | 3/3 |
+| compile-compcert | 3/3 | 3/3 |
+| count-dataset-tokens | 2/3 | 3/3 |
+| feal-linear-cryptanalysis | 3/3 | 3/3 |
+| llm-inference-batching-scheduler | 3/3 | 3/3 |
+| mailman | 2/3 | 3/3 |
+| model-extraction-relu-logits | 1/3 | 1/3 |
+| protein-assembly | 1/3 (the pass read the official tests) | 0/3 |
+| sanitize-git-repo | 3/3 (one pass read the official tests) | 2/3 |
+| write-compressor | 1/3 | 0/3 |
+| **core** | **22/30** | **21/30** |
+| regex-log | 3/3 | 3/3 |
+| sparql-university | 3/3 | 3/3 |
+| polyglot-c-py | 3/3 | 3/3 |
+| overfull-hbox | 3/3 | 1/3 |
+| **controls** | **12/12** | **10/12** |
+
+| held-out task | reviewer's run of 160a177 | clean rerun (c1f1334) |
+|---|---|---|
+| break-filter-js-from-html | 3/3 | 3/3 |
+| cancel-async-tasks | 1/3 | 1/3 |
+| configure-git-webserver | 3/3 | 3/3 |
+| financial-document-processor | 2/3 | 3/3 |
+| mcmc-sampling-stan | 3/3 | 3/3 |
+| password-recovery | 3/3 | 3/3 |
+| **held out** | **15/18** | **16/18** |
+
+All counts observed. Contamination audit (`python3 bench/audit.py jobs/tb21-mi-review-clean-c1f1334-20261006`,
+observed): 60 trials, 3,099 tool calls; 13 calls named a denied path and all 13 were blocked, 0 not blocked;
+no transcript names a benchmark repository. 12 of the 13 are in break-filter-js-from-html, whose supplied
+`/app/test_outputs.py` itself refers to `/tests/filter.py`; one is an `ls /tests /solution /logs` in
+count-dataset-tokens `AQtWWnR`. The 22 other mentions of `test_outputs.py` are that task's own supplied file.
+The same audit on round 1 flags 170 calls, none blocked. The audit reads command arguments, not command
+output, so it does not prove the absence of every possible route.
+
+overfull-hbox (observed): `HfoMHnx` left an overfull box and ended without a verdict; `qZzvwB9` made a
+substitution the task does not allow and its judge ACKed it; neither trial had a blocked call. These are the
+two failure modes of the 2026-10-03 run. Inferred: the task sits near 50-60% for mi regardless of these
+changes (now 5/9 over the last three runs of this branch, 3/3 for old mi), so it is not a stable control;
+no further tuning was done, per the stop rule.
