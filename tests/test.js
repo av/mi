@@ -3999,3 +3999,50 @@ test('review 5: an ACK is not accepted after a measured failure, a NACK, or from
   for (const out of ['a: measured=1 expected=1 [PASS]\nACK', 'a: measured=1 expected=1 [PASS]\n**ACK** — every criterion measured', 'ACK\nall of: a measured=1 expected=1 PASS', 'a: measured=1 required=1 [PASS]\nFinal verdict: **ACK**'])
     assert.match(await pre(out), /^goal already met/, out);
 });
+
+// ── Review #2, 2026-10-06 (release review of bench/tb2-reference at 25852cc): one block per deciding finding ──
+test('review2 1: the egress shim routes by the real destination and requested name, not by how a command was written', () => {
+  const py = `
+import os, sys, json
+os.environ["MI_EGRESS_WATCH"] = r"(^|\\.)(github\\.com|githubusercontent\\.com|mi-fixture)$"
+os.environ["MI_EGRESS_SOURCE_NETS"] = "140.82.112.0/20 185.199.108.0/22"
+sys.path.insert(0, "bench/egress")
+import shim, struct
+def hello(name):
+    n = name.encode(); ext = struct.pack("!HH", 0, len(n) + 5) + struct.pack("!HBH", len(n) + 3, 0, len(n)) + n
+    body = b"\\x03\\x03" + b"\\0" * 32 + b"\\0" + struct.pack("!H", 2) + b"\\x13\\x01" + b"\\x01\\0" + struct.pack("!H", len(ext)) + ext
+    hs = b"\\x01" + struct.pack("!I", len(body))[1:] + body
+    return b"\\x16\\x03\\x01" + struct.pack("!H", len(hs)) + hs
+print(json.dumps({
+  "sni": shim.sniff(hello("raw.githubusercontent.com")),
+  "host": shim.sniff(b"GET /a HTTP/1.1\\r\\nHost: MI-Fixture:80\\r\\n\\r\\n"),
+  "connect": shim.sniff(b"CONNECT github.com:443 HTTP/1.1\\r\\n\\r\\n"),
+  "none": shim.sniff(b"SSH-2.0-x\\r\\n"),
+  "watched": shim.decide("api.github.com", "140.82.112.5", False),
+  "watched_any_ip": shim.decide("mi-fixture", "172.20.0.9", False),
+  "alias_on_source_ip": shim.decide("alias.example", "140.82.112.5", False),
+  "no_name_on_source_ip": shim.decide("", "185.199.108.133", False),
+  "lookalike": shim.decide("notgithub.com", "93.184.216.34", False),
+  "ordinary": shim.decide("pypi.org", "151.101.0.223", False),
+  "after_agent_phase": shim.decide("github.com", "140.82.112.5", True),
+}))`;
+  const r = JSON.parse(execFileSync('python3', ['-c', py], { cwd: join(__dirname, '..'), encoding: 'utf8' }));
+  assert.deepStrictEqual(r, { sni: 'raw.githubusercontent.com', host: 'mi-fixture', connect: 'github.com', none: '',
+    watched: 'via-proxy', watched_any_ip: 'via-proxy', alias_on_source_ip: 'refused', no_name_on_source_ip: 'refused',
+    lookalike: 'direct', ordinary: 'direct', after_agent_phase: 'direct' });
+});
+
+test('review2 1: the egress overlay gives the task container no way around the shim, and the clean-run agent config requires it', () => {
+  const read = p => readFileSync(join(__dirname, '..', p), 'utf8');
+  const compose = read('bench/egress/compose.yaml'), main = compose.slice(compose.indexOf('\n  main:'));
+  assert.match(main, /network_mode: "service:mi-egress"/);
+  assert.match(main, /cap_drop: \[NET_RAW\]/);
+  assert.doesNotMatch(main, /cap_add|privileged/);
+  assert.match(read('bench/egress/shim.py'), /meta nfproto ipv4 meta l4proto tcp redirect to/);
+  assert.match(read('bench/egress/filter.py'), /unquote/);
+  assert.match(read('bench/configs/agent-mi-deepseek-v4.1-flash-egress.yaml'), /egress: true/);
+  assert.match(read('bench/configs/egress.yaml'), /bench\/egress\/compose\.yaml/);
+  const adapter = read('bench/mi_agent.py');
+  assert.match(adapter, /elif self\.options\.egress:\s+raise RuntimeError/);
+  assert.match(adapter, /finally:\s+self\._egress_finish\(environment\)/);
+});

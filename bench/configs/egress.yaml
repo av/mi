@@ -1,0 +1,6 @@
+# Network-level egress control for evaluation runs: stack this config onto a job (-c ... -c bench/configs/egress.yaml).
+# Every trial gets the mi-egress sidecars (bench/egress/compose.yaml); build the image first with bench/egress/build.sh.
+# Run harbor from the repository root (the path below is relative to it).
+environment:
+  extra_docker_compose:
+    - bench/egress/compose.yaml

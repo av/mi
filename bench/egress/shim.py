@@ -1,0 +1,219 @@
+#!/usr/bin/env python3
+"""Transparent egress shim for evaluation runs (runs in the sidecar whose network namespace the task container shares).
+
+Every outbound TCP connection of the task container is redirected here by nftables (the task container has no
+NET_ADMIN and cannot change that). For each connection the shim reads the original destination and the name the
+client asks for (TLS SNI, HTTP Host, or a CONNECT line) and decides:
+
+  via-proxy  the name is in a watched family (GitHub, Hugging Face, known mirrors, the probe fixture): the
+             connection is handed to the filtering proxy (filter.py), which sees the real URL after TLS and
+             refuses benchmark sources however the URL was put together
+  refused    the destination IP belongs to a watched source but the name does not (wrong or missing SNI,
+             ssh/git ports, a made-up alias for the address)
+  direct     everything else is relayed untouched
+
+IPv6 egress is rejected outright (IPv4 only). /run/mi-egress/passthrough (created from the host when the agent phase is over) turns the shim into a plain
+relay, so the verifier's own downloads are not intercepted.
+"""
+import asyncio
+import ipaddress
+import json
+import os
+import re
+import socket
+import struct
+import subprocess
+import threading
+import time
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
+PORT, CA_PORT, MARK = 12345, 12346, 0x1BD5
+PROXY = os.environ.get("MI_EGRESS_PROXY", "mi-egress-proxy:8080").rsplit(":", 1)
+WATCH = re.compile(os.environ["MI_EGRESS_WATCH"], re.I)
+SOURCE_HOSTS = os.environ.get("MI_EGRESS_SOURCE_HOSTS", "").split()
+SOURCE_NETS = [ipaddress.ip_network(n) for n in os.environ.get("MI_EGRESS_SOURCE_NETS", "").split()]
+PASS_FLAG, READY = "/run/mi-egress/passthrough", "/run/mi-egress/ready"
+resolved: set[str] = set()
+
+NFT = f"""
+table inet mi_egress {{
+  chain nat_out {{
+    type nat hook output priority -100;
+    meta mark {MARK} return
+    ip daddr 127.0.0.0/8 return
+    ip6 daddr ::1 return
+    meta nfproto ipv4 meta l4proto tcp redirect to :{PORT}
+  }}
+  chain filter_out {{
+    type filter hook output priority 0;
+    meta mark {MARK} accept
+    udp dport 443 reject
+    ip6 daddr != ::1 reject
+  }}
+}}
+"""
+
+
+def log(**kw):
+    print(json.dumps({"t": round(time.time(), 3), **kw}), flush=True)
+
+
+def refresh_sources():
+    while True:
+        found = set()
+        for h in SOURCE_HOSTS:
+            try:
+                found |= {a[4][0] for a in socket.getaddrinfo(h, None)}
+            except OSError:
+                pass
+        resolved.update(found)
+        time.sleep(120)
+
+
+def is_source(ip: str) -> bool:
+    try:
+        a = ipaddress.ip_address(ip)
+    except ValueError:
+        return False
+    return ip in resolved or any(a in n for n in SOURCE_NETS)
+
+
+def original_dst(sock) -> tuple[str, int]:
+    raw = sock.getsockopt(socket.SOL_IP, 80, 16)  # SO_ORIGINAL_DST
+    return socket.inet_ntoa(raw[4:8]), struct.unpack("!H", raw[2:4])[0]
+
+
+def sniff(data: bytes) -> str:
+    """The host name the client asks for: TLS SNI, HTTP Host header, or a CONNECT target ('' when none)."""
+    if len(data) > 5 and data[0] == 0x16 and data[1] == 3:
+        try:
+            p = 5 + 4 + 2 + 32  # record header, handshake header, version, random
+            p += 1 + data[p]  # session id
+            p += 2 + struct.unpack("!H", data[p:p + 2])[0]  # cipher suites
+            p += 1 + data[p]  # compression
+            end = p + 2 + struct.unpack("!H", data[p:p + 2])[0]
+            p += 2
+            while p + 4 <= min(end, len(data)):
+                typ, ln = struct.unpack("!HH", data[p:p + 4])
+                if typ == 0:
+                    return data[p + 9:p + 9 + struct.unpack("!H", data[p + 7:p + 9])[0]].decode("ascii", "replace").lower()
+                p += 4 + ln
+        except (IndexError, struct.error):
+            pass
+        return ""
+    head = data.split(b"\r\n\r\n", 1)[0].decode("latin1")
+    if m := re.match(r"CONNECT\s+\[?([^\s\]]+?)\]?:\d+\s", head, re.I):
+        return m.group(1).lower()
+    if re.match(r"[A-Z]+ \S+ HTTP/1\.[01]\r?\n", head):
+        if m := re.search(r"^host:\s*\[?([^\s\]:]+)", head, re.I | re.M):
+            return m.group(1).lower()
+    return ""
+
+
+def decide(host: str, ip: str, passthrough: bool) -> str:
+    if passthrough:
+        return "direct"
+    if host and WATCH.search(host):
+        return "via-proxy"
+    if is_source(ip):
+        return "refused"
+    return "direct"
+
+
+async def open_marked(host: str, port: int):
+    loop = asyncio.get_running_loop()
+    last = None
+    for fam, typ, proto, _, addr in await loop.getaddrinfo(host, port, type=socket.SOCK_STREAM):
+        s = socket.socket(fam, typ, proto)
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_MARK, MARK)
+        s.setblocking(False)
+        try:
+            await asyncio.wait_for(loop.sock_connect(s, addr), 20)
+            return await asyncio.open_connection(sock=s)
+        except (OSError, asyncio.TimeoutError) as e:
+            last = e
+            s.close()
+    raise last or OSError("no address")
+
+
+async def pipe(r, w):
+    try:
+        while data := await r.read(65536):
+            w.write(data)
+            await w.drain()
+    except (OSError, asyncio.IncompleteReadError):
+        pass
+    finally:
+        try:
+            w.close()
+        except OSError:
+            pass
+
+
+async def handle(reader, writer):
+    sock = writer.get_extra_info("socket")
+    try:
+        ip, port = original_dst(sock)
+    except OSError:
+        writer.close()
+        return
+    if port == PORT and ipaddress.ip_address(ip).is_loopback:  # someone connected to the shim itself
+        writer.close()
+        return
+    try:
+        first = await asyncio.wait_for(reader.read(8192), 3)
+    except asyncio.TimeoutError:
+        first = b""  # server-speaks-first protocol (ssh, smtp): no name to read
+    host = sniff(first)
+    action = decide(host, ip, os.path.exists(PASS_FLAG))
+    if action != "direct":
+        log(dst=ip, port=port, host=host, action=action)
+    try:
+        if action == "refused":
+            writer.close()
+            return
+        if action == "via-proxy":
+            ur, uw = await open_marked(PROXY[0], int(PROXY[1]))
+            uw.write(f"CONNECT {host}:{port} HTTP/1.1\r\nHost: {host}:{port}\r\n\r\n".encode())
+            await uw.drain()
+            status = await asyncio.wait_for(ur.readuntil(b"\r\n\r\n"), 30)
+            if b" 200 " not in status.split(b"\r\n", 1)[0]:
+                writer.close()
+                uw.close()
+                return
+        else:
+            ur, uw = await open_marked(ip, port)
+        if first:
+            uw.write(first)
+            await uw.drain()
+        await asyncio.gather(pipe(reader, uw), pipe(ur, writer))
+    except (OSError, asyncio.TimeoutError, asyncio.IncompleteReadError, asyncio.LimitOverrunError):
+        writer.close()
+
+
+class CA(BaseHTTPRequestHandler):
+    def do_GET(self):
+        body = open("/ca/mitmproxy-ca-cert.pem", "rb").read()
+        self.send_response(200)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, *a):
+        pass
+
+
+async def main():
+    os.makedirs("/run/mi-egress", exist_ok=True)
+    subprocess.run(["nft", "-f", "-"], input=NFT, text=True, check=True)
+    threading.Thread(target=refresh_sources, daemon=True).start()
+    threading.Thread(target=HTTPServer(("127.0.0.1", CA_PORT), CA).serve_forever, daemon=True).start()
+    server = await asyncio.start_server(handle, "0.0.0.0", PORT, limit=1 << 20)
+    open(READY, "w").close()
+    log(event="ready", watch=WATCH.pattern, source_nets=[str(n) for n in SOURCE_NETS])
+    async with server:
+        await server.serve_forever()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

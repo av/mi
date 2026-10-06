@@ -80,6 +80,32 @@ BENCH_DENY = (
     r"|(?<![\w.~-])/(tests|solution|logs/verifier)(?![\w.-])"
 )
 
+# Network-level egress control (bench/egress/, 2026-10-06 review #2: MI_DENY alone is an argument filter and a
+# URL assembled by the shell gets past it). With bench/egress/compose.yaml added to the trial, the task container
+# shares a sidecar's network namespace: all its outbound TCP is redirected into a shim it cannot change, and
+# requests to GitHub, Hugging Face and known mirrors go through a filtering proxy that sees the real URL.
+# The proxy re-signs those hosts with a run-local CA; EGRESS_CA_SETUP makes the container trust it.
+EGRESS_DIR = Path(__file__).resolve().parent / "egress"
+EGRESS_SERVICE, EGRESS_PROXY_SERVICE = "mi-egress", "mi-egress-proxy"
+EGRESS_CA_SETUP = r"""
+CA=/opt/mi/egress-ca.pem
+[ -f "$CA" ] || exit 0
+mark=$(sed -n 2p "$CA")
+mkdir -p /usr/local/share/ca-certificates && cp "$CA" /usr/local/share/ca-certificates/mi-egress.crt
+SYS=
+for b in /etc/ssl/certs/ca-certificates.crt /etc/pki/tls/certs/ca-bundle.crt /etc/ssl/cert.pem /etc/ssl/ca-bundle.pem; do
+  [ -f "$b" ] || continue
+  [ -n "$SYS" ] || SYS=$b
+  grep -qF "$mark" "$b" || { echo; cat "$CA"; } >> "$b"
+done
+# bundled Mozilla lists that Python HTTP clients use instead of the system store
+timeout 60 find / -xdev -name cacert.pem -path '*certifi*' 2>/dev/null | while read -r f; do
+  grep -qF "$mark" "$f" || { echo; cat "$CA"; } >> "$f"
+done
+echo "$SYS" > /opt/mi/egress-bundle
+chmod a+r "$CA" /opt/mi/egress-bundle
+"""
+
 # Node for mi: the task's own node if >= 18, else a private copy in
 # /opt/mi-node that the wrapper puts first on PATH (mi spawns subagents as
 # `node`), else apk's nodejs on musl images.
@@ -213,6 +239,10 @@ class MiOptions(InstalledAgentOptions):
         default=None,
         description="Package this mi checkout instead of the one holding this adapter (A/B of mi code under one adapter).",
     )
+    egress: bool = Field(
+        default=False,
+        description="Require the egress-control sidecar (bench/egress/compose.yaml): the trial fails at setup without it.",
+    )
 
 
 class MiAgent(BaseInstalledAgent):
@@ -271,6 +301,46 @@ class MiAgent(BaseInstalledAgent):
         if tarball := self._node_tarball(arch.strip()):
             await environment.upload_file(tarball, "/tmp/mi-node.tar.gz")
         await self.exec_as_root(environment, command=INSTALL)
+        if self._egress_container(environment, EGRESS_SERVICE):
+            await environment.upload_file(EGRESS_DIR / "ca" / "mitmproxy-ca-cert.pem", "/opt/mi/egress-ca.pem")
+            await self.exec_as_root(environment, command=EGRESS_CA_SETUP)
+        elif self.options.egress:
+            raise RuntimeError("mi: egress control required (kwargs.egress) but the trial has no mi-egress sidecar; "
+                               "add bench/configs/egress.yaml to the job")
+
+    @staticmethod
+    def _egress_container(environment: BaseEnvironment, service: str) -> str | None:
+        """Container id of an egress service of this trial's compose project (looked up from the host)."""
+        session = getattr(environment, "session_id", None)
+        if not session:
+            return None
+        from harbor.environments.docker.docker import _sanitize_docker_compose_project_name as project
+
+        out = subprocess.run(["docker", "ps", "-q", "--filter", f"label=com.docker.compose.project={project(session)}",
+                              "--filter", f"label=com.docker.compose.service={service}"], capture_output=True, text=True)
+        return out.stdout.split()[0] if out.stdout.split() else None
+
+    async def _egress_env(self, environment: BaseEnvironment) -> dict[str, str]:
+        """CA variables for the agent's processes (empty without the sidecar). A full bundle is only named when the
+        image has a system one; otherwise clients keep their own lists, which EGRESS_CA_SETUP extended."""
+        if not self._egress_container(environment, EGRESS_SERVICE):
+            return {}
+        env = {"NODE_EXTRA_CA_CERTS": "/opt/mi/egress-ca.pem", "MI_EGRESS_CA": "/opt/mi/egress-ca.pem"}
+        bundle = ((await environment.exec(command="cat /opt/mi/egress-bundle 2>/dev/null", user="root")).stdout or "").strip()
+        if bundle:
+            env |= {k: bundle for k in ("SSL_CERT_FILE", "REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE", "GIT_SSL_CAINFO",
+                                        "PIP_CERT", "CARGO_HTTP_CAINFO")}
+        return env
+
+    def _egress_finish(self, environment: BaseEnvironment) -> None:
+        """Agent phase over: keep the sidecars' decision logs with the trial (written from the host, outside the
+        container) and switch the shim to plain relaying so the verifier's own downloads are not intercepted."""
+        for service, name in ((EGRESS_SERVICE, "egress-shim.log"), (EGRESS_PROXY_SERVICE, "egress-proxy.log")):
+            if cid := self._egress_container(environment, service):
+                logs = subprocess.run(["docker", "logs", cid], capture_output=True, text=True)
+                (self.logs_dir / name).write_text(logs.stdout + logs.stderr)
+                if service == EGRESS_SERVICE:
+                    subprocess.run(["docker", "exec", cid, "touch", "/run/mi-egress/passthrough"], capture_output=True)
 
     def _task_timeout(self) -> int | None:
         """The agent timeout Harbor enforces for this trial, recomputed from the
@@ -324,6 +394,7 @@ class MiAgent(BaseInstalledAgent):
             env["OPENAI_BASE_URL"] = base_url
         if timeout := self._task_timeout():
             env["MI_TASK_TIMEOUT"] = str(timeout)
+        env |= await self._egress_env(environment)
         fd, task = tempfile.mkstemp(prefix="mi-task-", suffix=".md")
         os.close(fd)
         Path(task).write_text(instruction)
@@ -332,7 +403,10 @@ class MiAgent(BaseInstalledAgent):
         finally:
             os.unlink(task)
         await self.exec_as_root(environment, command="chmod a+r /opt/mi/task.md")
-        await self.exec_as_agent(environment, command="bash /opt/mi/bench-run.sh /opt/mi/task.md", env=env, cwd="/")
+        try:
+            await self.exec_as_agent(environment, command="bash /opt/mi/bench-run.sh /opt/mi/task.md", env=env, cwd="/")
+        finally:
+            self._egress_finish(environment)
 
     def populate_context_post_run(self, context: AgentContext) -> None:
         run = self.logs_dir / "run.txt"
@@ -351,3 +425,25 @@ class MiBaselineAgent(MiAgent):
     @staticmethod
     def name() -> str:
         return "mi-baseline"
+
+
+class EgressProbeAgent(MiAgent):
+    """No model: runs bench/egress/probe.sh in the task container during the agent phase, under the same setup
+    as a mi trial (install, CA, environment), and leaves its output in /logs/agent/probe.txt. With
+    bench/configs/egress-probe.yaml this is the named Harbor job that shows which access routes are refused."""
+
+    @staticmethod
+    def name() -> str:
+        return "mi-egress-probe"
+
+    async def run(self, instruction: str, environment: BaseEnvironment, context: AgentContext) -> None:
+        await environment.upload_file(EGRESS_DIR / "probe.sh", "/opt/mi/egress-probe.sh")
+        env = {"MI_DENY": BENCH_DENY, **await self._egress_env(environment)}
+        try:
+            await self.exec_as_agent(environment, command="bash /opt/mi/egress-probe.sh > /logs/agent/probe.txt 2>&1; true",
+                                     env=env, cwd="/")
+        finally:
+            self._egress_finish(environment)
+
+    def populate_context_post_run(self, context: AgentContext) -> None:
+        pass

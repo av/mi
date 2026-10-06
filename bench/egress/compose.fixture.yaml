@@ -1,0 +1,6 @@
+# Synthetic "benchmark source" for the egress probe only: a web server that would hand out a sentinel under
+# /terminal-bench/ (denied) and an ordinary file (allowed). No real benchmark content is involved.
+services:
+  mi-fixture:
+    image: mi-egress:1
+    entrypoint: ["sh", "-c", "mkdir -p /srv/terminal-bench /srv/ordinary && echo SYNTHETIC_ONLY_SENTINEL > /srv/terminal-bench/sentinel && echo ORDINARY_FILE > /srv/ordinary/file && cd /srv && exec python3 -m http.server 80"]
