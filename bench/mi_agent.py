@@ -80,13 +80,12 @@ BENCH_DENY = (
     r"|(?<![\w.~-])/(tests|solution|logs/verifier)(?![\w.-])"
 )
 
-# Network-level egress control (bench/egress/, 2026-10-06 review #2: MI_DENY alone is an argument filter and a
-# URL assembled by the shell gets past it). With bench/egress/compose.yaml added to the trial, the task container
-# shares a sidecar's network namespace: all its outbound TCP is redirected into a shim it cannot change. During
-# the agent phase every HTTP(S) request, to any host, goes through a filtering proxy that sees the real request;
-# nothing else leaves (review #3: a relay on an unlisted host and numeric GitHub API routes got past the first
-# version, which filtered listed hosts only). The proxy re-signs TLS with a run-local CA; EGRESS_CA_SETUP makes
-# the container trust it.
+# Network-level egress control (bench/egress/). MI_DENY above only matches the text of tool-call arguments. With
+# bench/egress/compose.yaml added to the trial, the task container shares a sidecar's network namespace and its
+# outbound TCP is redirected into a shim it cannot change. During the agent phase the shim hands HTTP and TLS to a
+# filtering proxy that allows only the hosts in bench/egress/allowlist.txt (GitHub: named repositories only) and
+# refuses everything else; see filter.py for the exact rules and for what is not checked. The proxy re-signs TLS
+# with a run-local CA; EGRESS_CA_SETUP makes the container trust it. Nothing is filtered during verification.
 EGRESS_DIR = Path(__file__).resolve().parent / "egress"
 EGRESS_SERVICE, EGRESS_PROXY_SERVICE = "mi-egress", "mi-egress-proxy"
 EGRESS_CA_SETUP = r"""

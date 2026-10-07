@@ -1,25 +1,27 @@
-"""mitmproxy addon: the evaluation egress policy, applied to every HTTP(S) request the task container makes
-during the agent phase (the shim sends all of them here; there is no direct path).
+"""mitmproxy addon: the evaluation egress policy. During the agent phase every HTTP(S) request of the task
+container arrives here (the shim sends all of them; nothing else leaves the container).
 
-The proxy sees the request after TLS, so it does not matter how the client assembled it (shell variables,
-encodings, a child process, another HTTP client). Three rules, each about a KIND of route:
+What is enforced, in this order:
 
-1. names     a request may not name a benchmark source (MI_EGRESS_DENY) — in its host, path, query or body,
-             percent-decoded, and in base64 tokens it carries.
-2. targets   a request that carries another address (a relay, reader, cache or fetching API given a URL to fetch)
-             is judged by that address as well: every URL or watched host found in the decoded request must pass
-             the same rules. A relay cannot be asked for what the client may not ask for itself.
-3. identity  on hosts that address repositories by opaque identity, only routes that carry the repository's
-             name are allowed. For the GitHub API that is an allowlist of path shapes (/repos/<owner>/<repo>/...,
-             /users/<login>, /orgs/<login>, /search, ...): /repositories/<id>, /user/<id>, /organizations/<id>,
-             /graphql and gists are refused as a class, whatever the id. Replies of that API are checked too: one
-             that names a benchmark source (a redirect, a search hit, repository metadata) is withheld.
+1. host allowlist (default deny). The request's host must be on allowlist.txt, and the name the connection was
+   opened for, the TLS server name and the Host header must all be that same name. A request to any other host
+   — including an address literal, a relay, reader, cache or mirror on a host that is not listed — is answered
+   403 and never sent. The proxy connects to the named host itself, so a client cannot attach an allowed name to
+   another machine's address.
+2. on the allowed hosts, a request may not name a benchmark source (MI_EGRESS_DENY) in its host or
+   percent-decoded path and query.
+3. GitHub is allowed for named repositories only: github.com/<owner>/<repo>/..., raw.githubusercontent.com and
+   codeload.github.com/<owner>/<repo>/..., api.github.com/repos/<owner>/<repo>/... . Every other GitHub route is
+   refused: routes by numeric id, /graphql, search, organisation and user listings, gists. The benchmark's own
+   organisations are refused by rule 2. Replies of api.github.com that name a benchmark source are withheld.
+4. the model API (MI_EGRESS_MODEL_HOSTS) may not be asked to browse or search the web for the model.
+5. tunnels are refused: CONNECT inside a connection, raw TCP after TLS, WebSockets.
 
-Requests to the model API (MI_EGRESS_MODEL_HOSTS) carry the whole conversation, so rules 1 and 2 are applied to
-their URL only; a body that asks the provider to browse or search the web for the model is refused.
-Tunnels are refused: CONNECT inside a connection, raw TCP after TLS, and WebSockets.
+What is NOT enforced: request headers and bodies are not inspected (apart from rule 4), so the policy rests on
+the allowlist containing no host that fetches arbitrary URLs for its caller. A copy of benchmark material under
+an unrelated name on an allowed host (a renamed fork, a dataset upload) is not recognised.
 """
-import base64
+import ipaddress
 import json
 import os
 import posixpath
@@ -34,16 +36,38 @@ except ImportError:  # the policy functions are importable (and unit-tested) wit
 
 DENY = re.compile(os.environ["MI_EGRESS_DENY"], re.I)
 MODEL_HOSTS = re.compile(os.environ.get("MI_EGRESS_MODEL_HOSTS") or r"(?!)", re.I)
-OPAQUE_HOSTS = re.compile(r"(^|\.)gist\.github(usercontent)?\.com$", re.I)
-GITHUB_API = re.compile(r"(^|\.)api\.github\.com$", re.I)
-NAME = r"(?!\d+(?:/|$))[^/]+"  # an owner, login or repository segment: present and not purely numeric
-GITHUB_API_SHAPES = re.compile(
-    rf"^/(?:|repos/{NAME}/{NAME}(?:/.*)?|users/{NAME}(?:/.*)?|orgs/{NAME}(?:/.*)?|search/.*|rate_limit|meta|zen|octocat"
-    r"|versions|emojis|licenses(?:/.*)?|gitignore/.*|markdown(?:/raw)?)$")
-URLISH = re.compile(r"https?:/{1,2}([^\s/\"'<>\\:]+)(?::\d+)?(/[^\s\"'<>\\]*)?", re.I)
-HOSTED = re.compile(r"\b((?:[a-z0-9-]+\.)*(?:github\.com|githubusercontent\.com))(/[^\s\"'<>\\]*)?", re.I)
-B64 = (re.compile(r"[A-Za-z0-9+/]{16,}={0,2}"), re.compile(r"[A-Za-z0-9_-]{16,}={0,2}"), re.compile(r"[A-Za-z0-9+]{16,}={0,2}"))
+ALLOWLIST = os.environ.get("MI_EGRESS_ALLOWLIST", os.path.join(os.path.dirname(os.path.abspath(__file__)), "allowlist.txt"))
+NAME = r"(?!\d+(?:/|$))[A-Za-z0-9][A-Za-z0-9._-]*"  # an owner or repository name: not purely numeric
+NOT_OWNERS = ("orgs|organizations|users|user|search|topics|explore|trending|collections|marketplace|sponsors|settings|login|logout|join|"
+              "signup|sessions|enterprises|enterprise|apps|features|notifications|pulls|issues|codespaces|gist|gists|repositories|"
+              "new|about|site|security|customer-stories|readme|events|dashboard|stars|watching")
+GITHUB_ROUTES = {
+    "github.com": re.compile(rf"^/(?!(?:{NOT_OWNERS})/){NAME}/{NAME}(?:/.*)?$", re.I),
+    "raw.githubusercontent.com": re.compile(rf"^/{NAME}/{NAME}/.+$"),
+    "codeload.github.com": re.compile(rf"^/{NAME}/{NAME}/.+$"),
+    "api.github.com": re.compile(rf"^/repos/{NAME}/{NAME}(?:/.*)?$"),
+}
 WEB_TOOLS = re.compile(r'"(plugins|web_search_options|web_search|tools)"\s*:\s*\[?\s*\{[^{}]*"(id|type)"\s*:\s*"(web|web_search[^"]*|browser[^"]*)"|"model"\s*:\s*"[^"]*:online"', re.I)
+
+
+def load_allowlist(path: str) -> tuple[set[str], tuple[str, ...]]:
+    exact, suffixes = set(), []
+    for line in open(path):
+        name = line.split("#", 1)[0].strip().lower()
+        if name:
+            (suffixes.append(name) if name.startswith(".") else exact.add(name))
+    return exact, tuple(suffixes)
+
+
+EXACT, SUFFIXES = load_allowlist(ALLOWLIST)
+
+
+def canon(host: str) -> str:
+    return (host or "").strip().lower().rstrip(".")
+
+
+def host_allowed(host: str) -> bool:
+    return host in EXACT or any(host.endswith(s) for s in SUFFIXES)
 
 
 def decoded(s: str) -> str:
@@ -52,48 +76,28 @@ def decoded(s: str) -> str:
     return s
 
 
-def expand(text: str) -> str:
-    """The text plus whatever its base64-looking tokens decode to (one level)."""
-    extra = []
-    for tok in {t for rx in B64 for t in rx.findall(text)[:200]}:
-        try:
-            raw = base64.b64decode(tok.replace("-", "+").replace("_", "/") + "=" * (-len(tok) % 4))
-            if raw.isascii():
-                extra.append(decoded(raw.decode("ascii")))
-        except Exception:
-            pass
-    return text + "\n" + "\n".join(extra) if extra else text
-
-
-def target_verdict(host: str, path: str) -> str | None:
-    """Reason to refuse an address (host + path, already decoded), or None."""
-    host, path = host.lower().rstrip("."), path or "/"
-    bare = re.sub(r"/{2,}", "/", path.split("?", 1)[0].split("#", 1)[0])
-    norm = posixpath.normpath(bare) if bare.startswith("/") else bare  # /a/../b is /b: judge the route the server will see
-    if DENY.search(host + path) or DENY.search(host + norm):
+def request_verdict(connect_host: str, host_header: str, sni: str, path: str, body: str = "") -> str | None:
+    """Reason to refuse a request, or None. connect_host: the name the connection was opened for."""
+    host = canon(connect_host)
+    try:
+        ipaddress.ip_address(host.strip("[]"))
+        return "the destination is an address, not a listed host name"
+    except ValueError:
+        pass
+    for other in (canon(host_header).rsplit(":", 1)[0] if host_header else "", canon(sni)):
+        if other and other != host:
+            return "the connection, TLS and Host names disagree"
+    if not host_allowed(host):
+        return "host is not on the allowlist"
+    path_d = decoded(path or "/")
+    bare = re.sub(r"/{2,}", "/", path_d.split("?", 1)[0].split("#", 1)[0])
+    norm = posixpath.normpath(bare) if bare.startswith("/") else bare  # /a/../b is /b: judge the route the server sees
+    if DENY.search(host + path_d) or DENY.search(host + norm):
         return "names a benchmark source"
-    if OPAQUE_HOSTS.search(host):
-        return "opaque repository route (gist)"
-    if GITHUB_API.search(host) and not (GITHUB_API_SHAPES.match(norm) and (bare.rstrip("/") or "/") == norm):
-        return "GitHub API route without a repository name (opaque identity)"
-    return None
-
-
-def request_verdict(host: str, sni: str, path: str, body: str, model_api: bool) -> str | None:
-    path_d = decoded(path)
-    for h in {host, sni} - {""}:
-        if why := target_verdict(h, path_d):
-            return why
-    if model_api:
-        return "asks the model provider to browse the web" if WEB_TOOLS.search(body) else None
-    text = expand(path_d + "\n" + decoded(body))
-    if DENY.search(text):
-        return "names a benchmark source"
-    carried = path_d[1:] + "\n" + text.split("\n", 1)[1]  # the request's own path is a path, not a carried address
-    for rx in (URLISH, HOSTED):
-        for m in rx.finditer(carried):
-            if why := target_verdict(m.group(1), decoded(m.group(2) or "/")):
-                return f"carries a target that {why}" if not why.startswith("names") else why
+    if (route := GITHUB_ROUTES.get(host)) and not (route.match(norm) and (bare.rstrip("/") or "/") == norm):
+        return "GitHub route that is not a named repository"
+    if MODEL_HOSTS.search(host) and WEB_TOOLS.search(body):
+        return "asks the model provider to browse the web"
     return None
 
 
@@ -103,7 +107,7 @@ def log(**kw):
 
 def refuse(flow, why: str, where: str = "request") -> None:
     r = flow.request
-    log(host=r.pretty_host, method=r.method, path=r.path[:300], action="blocked", where=where, why=why)
+    log(host=canon(r.host), method=r.method, path=r.path[:300], action="blocked", where=where, why=why)
     flow.response = http.Response.make(403, f"blocked by the evaluation egress policy ({why})\n".encode(), {"Content-Type": "text/plain"})
 
 
@@ -111,30 +115,21 @@ def request(flow) -> None:
     r = flow.request
     if r.method.upper() == "CONNECT":
         return refuse(flow, "tunnel inside a connection")
-    host, sni = r.pretty_host or r.host, (flow.client_conn.sni or "")
-    model_api = bool(MODEL_HOSTS.search(host)) and (not sni or bool(MODEL_HOSTS.search(sni)))
-    body = (r.get_content(strict=False) or b"")[:262144].decode("latin1")
-    if why := request_verdict(host, sni, r.path, body, model_api):
+    body = (r.get_content(strict=False) or b"")[:262144].decode("latin1") if MODEL_HOSTS.search(canon(r.host)) else ""
+    if why := request_verdict(r.host, r.host_header or "", flow.client_conn.sni or "", r.path, body):
         return refuse(flow, why)
-    log(host=host, method=r.method, path=r.path[:300], action="allowed")
+    log(host=canon(r.host), method=r.method, path=r.path[:300], action="allowed")
 
 
 def responseheaders(flow) -> None:
     r = flow.response
-    loc = decoded(r.headers.get("location", ""))
-    if loc and not MODEL_HOSTS.search(flow.request.pretty_host):
-        m = URLISH.match(loc)
-        why = target_verdict(m.group(1), m.group(2) or "/") if m else ("names a benchmark source" if DENY.search(loc) else None)
-        if why:
-            return refuse(flow, why, "redirect")
-    ctype = r.headers.get("content-type", "")
-    if "event-stream" in ctype or MODEL_HOSTS.search(flow.request.pretty_host):
+    if "event-stream" in r.headers.get("content-type", "") or MODEL_HOSTS.search(canon(flow.request.host)):
         r.stream = True  # model replies are streamed through as they come
 
 
 def response(flow) -> None:
     r = flow.response
-    if r is None or r.stream or not GITHUB_API.search(flow.request.pretty_host):
+    if r is None or r.stream or canon(flow.request.host) != "api.github.com":
         return
     body = (r.get_content(strict=False) or b"")[:1048576].decode("latin1")
     if DENY.search(decoded(body)):
@@ -147,5 +142,5 @@ def tcp_start(flow) -> None:
 
 
 def websocket_start(flow) -> None:
-    log(host=flow.request.pretty_host, action="blocked", where="websocket", why="WebSocket tunnel")
+    log(host=canon(flow.request.host), action="blocked", where="websocket", why="WebSocket tunnel")
     flow.kill()

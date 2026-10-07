@@ -1,22 +1,24 @@
 #!/usr/bin/env python3
 """Transparent egress shim for evaluation runs (runs in the sidecar whose network namespace the task container shares).
 
-Every outbound TCP connection of the task container is redirected here by nftables (the task container has no
-NET_ADMIN and cannot change that). While the agent phase runs there is NO direct path out: for each connection
-the shim reads the original destination and the first bytes, and decides:
+Every outbound IPv4 TCP connection of the task container is redirected here by nftables (the task container has
+neither NET_ADMIN nor NET_RAW and cannot change that). While the agent phase runs, the shim reads the first bytes
+of each connection and decides:
 
-  via-proxy  the connection speaks HTTP or TLS — to any host, any port. It is handed to the filtering proxy
-             (filter.py), which terminates TLS and applies the evaluation policy to the real request: its URL,
-             any target a relay or fetching service is asked for, and the reply. Nothing HTTP-shaped bypasses it.
-  refused    anything else (ssh, raw TCP, tunnels, server-speaks-first protocols): there is no way to inspect
-             it, so it does not leave. Also refused: a watched source's address under a name outside the watched
-             families (wrong or missing SNI, a made-up alias for the address).
-  direct     only connections to the proxy itself (a client using it explicitly), and hosts listed in
-             MI_EGRESS_ALLOW_RAW ("host:port ..."), which is empty by default.
+  via-proxy  the connection speaks HTTP or TLS and names a host (TLS server name, HTTP Host header, CONNECT
+             target). The shim asks the filtering proxy (filter.py) to open a connection to THAT NAME — not to the
+             address the client dialled — and relays the bytes. The proxy applies the host allowlist and the other
+             rules documented in filter.py.
+  refused    everything else: connections that are not HTTP or TLS (ssh, raw TCP, server-speaks-first protocols)
+             and HTTP or TLS connections that name no host. They do not leave the container.
+  direct     connections to the proxy itself (a client using it explicitly; it is filtered there), and
+             destinations listed in MI_EGRESS_ALLOW_RAW ("host:port ..."), which is empty by default.
 
-IPv6, QUIC and every UDP port except DNS are rejected outright. /run/mi-egress/passthrough (created from the
-host when the agent phase is over) turns the shim into a plain relay, so the verifier's own downloads are not
-intercepted.
+Also enforced by the nftables rules below: IPv6 is rejected, and so is every UDP port except 53.
+Not inspected: DNS (UDP 53 and the container's local resolver).
+
+/run/mi-egress/passthrough (created from the host when the agent phase is over) turns the shim into a plain
+relay: during verification nothing is filtered, so the verifier's own downloads work.
 """
 import asyncio
 import ipaddress
@@ -32,13 +34,9 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 PORT, CA_PORT, MARK = 12345, 12346, 0x1BD5
 PROXY = os.environ.get("MI_EGRESS_PROXY", "mi-egress-proxy:8080").rsplit(":", 1)
-WATCH = re.compile(os.environ["MI_EGRESS_WATCH"], re.I)
-SOURCE_HOSTS = os.environ.get("MI_EGRESS_SOURCE_HOSTS", "").split()
-SOURCE_NETS = [ipaddress.ip_network(n) for n in os.environ.get("MI_EGRESS_SOURCE_NETS", "").split()]
 ALLOW_RAW = set(os.environ.get("MI_EGRESS_ALLOW_RAW", "").split())
 proxy_ips: set[str] = set()
 PASS_FLAG, READY = "/run/mi-egress/passthrough", "/run/mi-egress/ready"
-resolved: set[str] = set()
 
 NFT = f"""
 table inet mi_egress {{
@@ -64,28 +62,13 @@ def log(**kw):
     print(json.dumps({"t": round(time.time(), 3), **kw}), flush=True)
 
 
-def refresh_sources():
+def refresh_proxy():
     while True:
         try:
             proxy_ips.update(a[4][0] for a in socket.getaddrinfo(PROXY[0], None))
         except OSError:
             pass
-        found = set()
-        for h in SOURCE_HOSTS:
-            try:
-                found |= {a[4][0] for a in socket.getaddrinfo(h, None)}
-            except OSError:
-                pass
-        resolved.update(found)
-        time.sleep(120)
-
-
-def is_source(ip: str) -> bool:
-    try:
-        a = ipaddress.ip_address(ip)
-    except ValueError:
-        return False
-    return ip in resolved or any(a in n for n in SOURCE_NETS)
+        time.sleep(30)
 
 
 def original_dst(sock) -> tuple[str, int]:
@@ -128,11 +111,9 @@ def decide(kind: str, host: str, ip: str, port: int, passthrough: bool) -> str:
         return "direct"  # the filtering proxy itself: whatever is sent to it is filtered there
     if f"{ip}:{port}" in ALLOW_RAW or (host and f"{host}:{port}" in ALLOW_RAW):
         return "direct"
-    if is_source(ip) and not (host and WATCH.search(host)):
-        return "refused"  # a watched source's address under another name, or under none
-    if kind in ("tls", "http"):
+    if kind in ("tls", "http") and host:
         return "via-proxy"
-    return "refused"  # not inspectable: no direct fallback during the agent phase
+    return "refused"  # not HTTP/TLS, or no host name: nothing the proxy could check
 
 
 async def open_marked(host: str, port: int):
@@ -189,7 +170,8 @@ async def handle(reader, writer):
             return
         if action == "via-proxy":
             ur, uw = await open_marked(PROXY[0], int(PROXY[1]))
-            uw.write(f"CONNECT {ip}:{port} HTTP/1.1\r\nHost: {ip}:{port}\r\n\r\n".encode())
+            # by NAME: the proxy resolves it and connects to the real host, whatever address the client dialled
+            uw.write(f"CONNECT {host}:{port} HTTP/1.1\r\nHost: {host}:{port}\r\n\r\n".encode())
             await uw.drain()
             status = await asyncio.wait_for(ur.readuntil(b"\r\n\r\n"), 30)
             if b" 200 " not in status.split(b"\r\n", 1)[0]:
@@ -221,11 +203,11 @@ class CA(BaseHTTPRequestHandler):
 async def main():
     os.makedirs("/run/mi-egress", exist_ok=True)
     subprocess.run(["nft", "-f", "-"], input=NFT, text=True, check=True)
-    threading.Thread(target=refresh_sources, daemon=True).start()
+    threading.Thread(target=refresh_proxy, daemon=True).start()
     threading.Thread(target=HTTPServer(("127.0.0.1", CA_PORT), CA).serve_forever, daemon=True).start()
     server = await asyncio.start_server(handle, "0.0.0.0", PORT, limit=1 << 20)
     open(READY, "w").close()
-    log(event="ready", watch=WATCH.pattern, source_nets=[str(n) for n in SOURCE_NETS])
+    log(event="ready", proxy=":".join(PROXY), allow_raw=sorted(ALLOW_RAW))
     async with server:
         await server.serve_forever()
 
