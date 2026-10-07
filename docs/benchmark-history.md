@@ -1487,3 +1487,82 @@ than what the code did, and are corrected here.
 What replaces both, and is all that is claimed from here on, is in `docs/benchmarking.md` ("Egress control for
 evaluation runs": a default-deny host allowlist, with its limits listed) and in the goal loop's verdict rule (a
 review passes only when its last line is exactly `VERDICT: PASS`).
+
+## 2026-10-07: review #4 design changes and the third frozen run
+
+Review #4 failed the release on two designs. Both were replaced, not patched (`6b7f9e5`; wording in `5d018fc`):
+
+- Verdict: a review (judge or blind recheck) passes only when its last non-empty line is exactly `VERDICT: PASS`.
+  `VERDICT: FAIL` is a failed review; any other ending, or a cut-off reply, is no verdict and never success. Tables
+  and prose are no longer read to decide a verdict. A blind recheck that ran and gave no verdict is no longer
+  overridden by the primary pass.
+- Egress: the proxy is default deny with a host allowlist (`bench/egress/allowlist.txt`, 31 names and 2 suffixes
+  from the proxy logs of `tb21-mi-frozen2-6d8b3a1-20261007`); GitHub only as named repositories outside the
+  benchmark's organisations. What is and is not enforced: `docs/benchmarking.md`.
+
+Probes (observed; outputs in `jobs/review4-probes-20261007/` and `jobs/egress-probe-allowlist-5d018fc-20261007/`):
+
+| probe | before (4af0037, the reviewer's recorded output) | after (5d018fc) |
+|---|---|---|
+| reviewer's `ack-variants.mjs`, 23 reviews | 12 failing reviews reported as "goal already met" | none; 0 of 23 accepted — the valid controls end in `ACK` without the verdict line, so they are not accepted either, as the rule requires |
+| reviewer's relay probe (`egress-cli-probe.mjs` through `reproduce-egress.sh`, run from a copy) | sentinel retrieved via 10 relay forms | sentinel retrieved via: none |
+| Harbor probe job, 73 routes, incl. denied hosts (example.com over HTTP and HTTPS, a reader service, a GitHub CDN mirror, the fixture, an address literal → 403) and named-repository GitHub (API, raw and web for `git/git` → 200; search, listings, numeric ids, gists, the benchmark's organisations → 403) | not applicable (new checks) | reward 1, 73 of 73 |
+| live literal-edit probe, real model: does the model end reviews with the exact line? | not applicable | 6 of 6 completed reviews ended with an exact verdict line (3 valid edits: 2 accepted, 1 review cut off by time; 1 forbidden edit rejected) |
+
+Image: `mi-egress:1` `sha256:b6bb0dbaefeb…`, built without cache at 15:50:05 from the clean tree at `5d018fc`
+(committed 15:49:36); its five source files were compared byte for byte with the commit before the run.
+
+Frozen run `tb21-mi-frozen3-5d018fc-20261007`: 20 tasks x 3, 60/60 finished, no Harbor exceptions, every trial
+reports agent `1.12.0+5d018fc`, 4 h 42 min, $2.81.
+
+| task | second frozen run (6d8b3a1) | third frozen run (5d018fc) | hosts denied by the allowlist in this run (all in trials that passed) |
+|---|---|---|---|
+| cobol-modernization | 3/3 | 3/3 | |
+| compile-compcert | 3/3 | 3/3 | compcert.org (21), opam.ocaml.org (2), xavierleroy.org (1), api.github.com non-repository route (2) |
+| count-dataset-tokens | 3/3 | 3/3 | |
+| feal-linear-cryptanalysis | 3/3 | 3/3 | |
+| llm-inference-batching-scheduler | 3/3 | 3/3 | |
+| mailman | 2/3 | 3/3 | |
+| model-extraction-relu-logits | 2/3 | 0/3 | |
+| protein-assembly | 0/3 | 2/3 | |
+| sanitize-git-repo | 3/3 | 3/3 | |
+| write-compressor | 3/3 | 0/3 | |
+| **core** | **25/30** | **23/30** | |
+| regex-log | 3/3 | 2/3 | |
+| sparql-university | 3/3 | 3/3 | |
+| polyglot-c-py | 3/3 | 3/3 | |
+| overfull-hbox | 3/3 | 2/3 | |
+| **controls** | **12/12** | **10/12** | |
+| break-filter-js-from-html | 3/3 | 3/3 | clients2.google.com (30), update.googleapis.com (1): browser update checks |
+| cancel-async-tasks | 3/3 | 2/3 | |
+| configure-git-webserver | 3/3 | 3/3 | an address literal (1) |
+| financial-document-processor | 2/3 | 3/3 | |
+| mcmc-sampling-stan | 1/3 | 3/3 | cran.rstudio.com (1) |
+| password-recovery | 3/3 | 3/3 | |
+| **held out** | **15/18** | **17/18** | |
+| **all** | **52/60** | **50/60** | |
+
+Against the bars used in the earlier rounds (core >= 15/30, controls >= 11/12, held out >= 15/18): core and held
+out clear them, controls at 10/12 do not.
+
+Allowlist cost (observed): the proxy refused 59 requests and the shim 8 connections, in 9 trials; all 9 earned
+reward 1. None of the 10 failed trials has a refused request or connection in its sidecar logs or a policy message
+in its transcript. So no task was lost to the allowlist in this run; nothing was added to the list.
+
+Failed trials (10, all ended with an internal NACK): write-compressor x3 and model-extraction-relu-logits x3
+(time used up: 6-20 tool calls and 3-4 request timeouts in ~700 s), regex-log `VgPERfw` (`test_regex_matches_dates`),
+overfull-hbox `Mtcnjap` (an overfull box left), protein-assembly `V8iGuhe` (`test_gblock`), cancel-async-tasks
+`QHyAqkz`. Neither of the two tasks at 0/3 uses the network.
+
+Verdicts (observed): 7 trials ended with an internal success, all 7 earned reward 1 (previous run: 21, of which 20
+rewarded). Every review that ran to its end finished with an exact verdict line; no review was lost to its format.
+The 44 reviews without a verdict were all cut off by time (42 judge, 2 recheck; previous run 31 and 2).
+
+Contamination (observed, at host and URL level): `python3 bench/audit.py jobs/tb21-mi-frozen3-5d018fc-20261007`
+(script unchanged) — `{"trials": 60, "tool_calls": 2543, "denied_pattern_calls": 10, "blocked": 10, "not_blocked": 0, "filename_mentions": 32}`,
+exit 0, all 10 in break-filter-js-from-html. The proxy allowed 6,871 requests, all to listed hosts.
+
+Inferred, not measured: why internal successes fell from 21 to 7 (more reviews cut off; a recheck without a
+verdict now counts against; the review prompt is longer), and whether runs that used to stop on an early success
+and now keep working cost regex-log or the two 0/3 tasks anything. At 3 trials per task the task-level changes
+are within noise; write-compressor has ranged from 0/3 to 3/3 across the last four runs of this branch.
