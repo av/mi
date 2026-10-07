@@ -1394,3 +1394,71 @@ overfull box and did not claim success).
 
 Inferred, not measured: which fix moved which task; with 3 trials per task the task-level differences from the
 previous run are within noise. Scope stays these 20 tasks, one model and provider.
+
+## 2026-10-07: release review #3 fixes and the second frozen run — all three bars cleared
+
+Review #3 (of `9046cd8`) confirmed the scores and the literal-edit fix and held the release on two defects.
+Fixes: `f4b87cd` (egress), `8d3583c` (failure parser), `6d8b3a1` (facts, docs). Both by kind:
+
+- Egress: during the agent phase there is no direct path out. Every connection that speaks HTTP or TLS, to any
+  host and port, goes through the filtering proxy; anything else is refused. The proxy judges a request by the
+  target it carries as well (a relay cannot be asked for what the client may not ask for itself), and GitHub API
+  routes that do not carry a repository name are refused as a class, whatever the id.
+- Verdicts: tables are read by structure (header by position or status label; only the status cell decides).
+
+| defect | probe | before (9046cd8) | after (6d8b3a1) |
+|---|---|---|---|
+| 1 | the reviewer's `egress-cli-probe.mjs` (real mi CLI, synthetic relay, HEAD requests by numeric id), run through their `reproduce-egress.sh` from a copy | `relay_read: true`, `numeric_HEAD_allowed: true` (their recorded output) | `relay_read: false`, `numeric_HEAD_allowed: false` |
+| 1 | Harbor probe job `egress-probe-after-r3-20261007` (synthetic task, fixture and relays, no model): 59 routes — the 30 earlier ones, 12 relay routes (target in path, query, percent- and base64-encoded, POST body, by address, child process, raw TCP), 10 opaque-identity routes, 7 ordinary clients | the relay and numeric routes did not exist as checks; the reviewer's run shows them open | reward 1, 59 of 59 |
+| 2 | the reviewer's `ack-variants.mjs` | 3 of 7 reviews accepted: the valid one and two with an explicit FAIL row | 1 of 7 accepted: the valid one |
+
+All observed. Outputs: `jobs/review3-probes-20261007/`, `jobs/egress-probe-after-r3-20261007/*/agent/probe.txt`.
+The numeric-id checks use arbitrary small ids and are answered by the proxy; nothing is sent upstream.
+Unit tests: 148/148 (2 new, failing on `9046cd8`). One test added for review #2 was rewritten, because the
+behaviour it pinned — unlisted hosts relayed directly — is the defect.
+
+Frozen run `tb21-mi-frozen2-6d8b3a1-20261007` (tree frozen at `6d8b3a1`, image `mi-egress:1` built from it; 20 tasks
+x 3, 60/60 finished, no Harbor exceptions, 4 h 42 min, $3.15). Bars: core >= 15/30, controls >= 11/12, held out >= 15/18.
+
+| task | first frozen run (0f3dad9) | second frozen run (6d8b3a1) |
+|---|---|---|
+| cobol-modernization | 2/3 | 3/3 |
+| compile-compcert | 3/3 | 3/3 |
+| count-dataset-tokens | 3/3 | 3/3 |
+| feal-linear-cryptanalysis | 3/3 | 3/3 |
+| llm-inference-batching-scheduler | 3/3 | 3/3 |
+| mailman | 2/3 | 2/3 |
+| model-extraction-relu-logits | 1/3 | 2/3 |
+| protein-assembly | 2/3 | 0/3 |
+| sanitize-git-repo | 3/3 | 3/3 |
+| write-compressor | 1/3 | 3/3 |
+| **core** | **23/30** | **25/30** |
+| regex-log | 3/3 | 3/3 |
+| sparql-university | 3/3 | 3/3 |
+| polyglot-c-py | 3/3 | 3/3 |
+| overfull-hbox | 2/3 | 3/3 |
+| **controls** | **11/12** | **12/12** |
+| break-filter-js-from-html | 3/3 | 3/3 |
+| cancel-async-tasks | 3/3 | 3/3 |
+| configure-git-webserver | 3/3 | 3/3 |
+| financial-document-processor | 3/3 | 2/3 |
+| mcmc-sampling-stan | 3/3 | 1/3 |
+| password-recovery | 3/3 | 3/3 |
+| **held out** | **18/18** | **15/18** |
+
+Held out is exactly at its bar. Contamination (observed): `python3 bench/audit.py jobs/tb21-mi-frozen2-6d8b3a1-20261007`
+(script unchanged) — `{"trials": 60, "tool_calls": 3033, "denied_pattern_calls": 12, "blocked": 12, "not_blocked": 0, "filename_mentions": 33}`,
+exit 0; all 12 are break-filter-js-from-html (its supplied test file refers to `/tests/filter.py`). Network layer,
+from the 60 trials' sidecar logs: the proxy handled 5,341 requests and blocked none (2,205 to the model API, the
+rest package mirrors, PyPI, Hugging Face, rcsb.org, npm); the shim refused 17 connections — `compcert.org` (5) and
+`tessdata.projectnaptha.com` (1), GitHub Pages sites on GitHub's addresses under names the shim does not watch,
+and 11 connections that were not HTTP or TLS or had no name on a watched address. None names a benchmark source.
+
+Failed trials (8): protein-assembly x3 (`test_gblock`), mcmc-sampling-stan x2, mailman, model-extraction,
+financial-document-processor — 7 ended NACK. One ended with an internal ACK and reward 0: mcmc-sampling-stan
+`WJ5VVyA` (the verifier's `test_stan_model_sampling` failed). So 21 internal ACKs, 20 rewarded. That is a false
+success of a different kind from the two this round fixed (no failed row or forbidden edit in its review).
+
+Inferred, not measured: whether the stricter egress cost protein-assembly and mcmc-sampling-stan anything. Their
+transcripts show no certificate or policy errors (0 matching lines in the 6 trials; tool output in transcripts is
+cut at 200 characters, so this is not conclusive), and at 3 trials per task the changes are within noise.
