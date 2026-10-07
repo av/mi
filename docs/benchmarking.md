@@ -238,7 +238,7 @@ files remain in git history on `master` and are copied to the archive under
 
 ## Egress control for evaluation runs
 
-`MI_DENY` only looks at tool-call arguments; a URL put together by the shell gets past it. Clean runs therefore
+`MI_DENY` matches the text of tool-call arguments only; a URL put together at run time gets past it. Clean runs
 add a network boundary that the task container cannot change:
 
 ```sh
@@ -248,23 +248,37 @@ bench/harbor.sh run -y -c bench/configs/tb21-mi-v4.1-review-clean.yaml \
 python3 bench/audit.py jobs/<J>
 ```
 
-- `bench/egress/compose.yaml` puts the task container in the network namespace of the `mi-egress` sidecar, without
-  `NET_ADMIN` or `NET_RAW`. All its outbound TCP is redirected into `shim.py`; IPv6 and UDP other than DNS are rejected.
-- During the agent phase there is no direct path out. Every connection that speaks HTTP or TLS, to any host and
-  port, is handed to a filtering proxy (`filter.py`) that terminates TLS and sees the real request. Anything else
-  (raw TCP, ssh, tunnels) is refused, and so is a watched source's address under another name.
-- The proxy refuses by kind of route: a request that names a benchmark source; a request that carries such a
-  target for a relay, reader or cache to fetch (URL in the path, query, body, percent- or base64-encoded); GitHub
-  API routes that do not carry a repository name (`/repositories/<id>`, `/user/<id>`, `/organizations/<id>`,
-  `/graphql`, gists — whatever the id); GitHub API replies and redirects that name a benchmark source; tunnels.
-- The adapter installs the proxy's CA in the container (system store, certifi lists, Java, and the environment
-  variables common clients read), keeps `agent/egress-shim.log` and `agent/egress-proxy.log` with each trial, and
-  switches the shim to plain relaying when the agent phase ends, so the verifier's downloads are not intercepted.
-- Probe: `bench/harbor.sh run -y -c bench/configs/egress-probe.yaml -c bench/configs/egress.yaml --job-name <J>`
-  (no model; synthetic fixture). Without `egress.yaml` the same job is the control and scores 0.
+What is enforced during the agent phase:
 
-Limits: a client that neither uses the installed CA nor one of the environment variables cannot make TLS
-connections during the agent phase; non-HTTP protocols do not leave the container (`MI_EGRESS_ALLOW_RAW` lists
-exceptions, none by default). A relay that is given its target in a form the proxy cannot read (an encoding other
-than percent/base64, a pre-made short link) is not caught, nor is a mirror under an unrelated name. DNS is not
-inspected. Processes the agent leaves running are not filtered during verification.
+- `bench/egress/compose.yaml` puts the task container in the network namespace of the `mi-egress` sidecar, without
+  `NET_ADMIN` or `NET_RAW`. Its outbound IPv4 TCP is redirected into `shim.py`; IPv6 and UDP other than port 53 are
+  rejected.
+- The shim hands a connection to the filtering proxy when it speaks HTTP or TLS and names a host; the proxy opens
+  its own connection to that name. Every other connection (ssh, raw TCP, HTTP or TLS without a host name) is refused.
+- The proxy (`filter.py`) is default deny. The host must be in `bench/egress/allowlist.txt`, and the name the
+  connection was opened for, the TLS server name and the Host header must be the same name. The list holds the
+  model API, OS and language package mirrors, the data sites the 20 tasks used, and four GitHub hosts plus two
+  release-download hosts; it was taken from the proxy logs of `tb21-mi-frozen2-6d8b3a1-20261007`.
+- On listed hosts a URL may not name a benchmark source. GitHub is allowed for named repositories only
+  (`github.com/<owner>/<repo>/...`, the same on `raw.githubusercontent.com` and `codeload.github.com`,
+  `api.github.com/repos/<owner>/<repo>/...`); routes by numeric id, `/graphql`, search, organisation and user
+  listings and gists are refused, and the benchmark's own organisations are refused by name.
+- The model API may not be asked to browse the web; tunnels (inner CONNECT, raw TCP after TLS, WebSockets) are refused.
+- The adapter installs the proxy's CA in the container, keeps `agent/egress-shim.log` and `agent/egress-proxy.log`
+  with each trial (host, method, first 300 characters of the path, decision — not headers or bodies), and switches
+  the shim to plain relaying when the agent phase ends.
+
+What is not enforced:
+
+- Request headers and bodies are not inspected. The policy rests on the list holding no host that fetches arbitrary
+  URLs for its caller; a host added to the list must be checked for that.
+- A copy of benchmark material under an unrelated name on a listed host (a renamed fork, a dataset upload) is not
+  recognised. The two release-download hosts serve signed, opaque URLs and are not path-checked.
+- DNS is not inspected.
+- Nothing is filtered during verification, so a process the agent left running is unfiltered then.
+- A task that needs a host outside the list cannot reach it; a TLS client that ignores the installed CA cannot
+  connect at all. `MI_EGRESS_ALLOW_RAW` (empty by default) lets a non-HTTP destination through.
+
+Probe: `bench/harbor.sh run -y -c bench/configs/egress-probe.yaml -c bench/configs/egress.yaml --job-name <J>`
+(no model; synthetic fixture and relays that are not on the list). Without `egress.yaml` the same job is the
+control and scores 0.

@@ -1462,3 +1462,28 @@ success of a different kind from the two this round fixed (no failed row or forb
 Inferred, not measured: whether the stricter egress cost protein-assembly and mcmc-sampling-stan anything. Their
 transcripts show no certificate or policy errors (0 matching lines in the 6 trials; tool output in transcripts is
 cut at 200 characters, so this is not conclusive), and at 3 trials per task the changes are within noise.
+
+## 2026-10-07: corrections to the three entries above (follow-up note after review #4)
+
+History is not rewritten; these statements in earlier entries, commit messages and facts were wrong or stronger
+than what the code did, and are corrected here.
+
+- "A relay cannot be asked for what the client may not ask for itself" (entry of 2026-10-07, commit `f4b87cd`
+  "relays are judged by the target they carry", the `.facts` egress entry and the `shim.py` header "Nothing
+  HTTP-shaped bypasses it"): false. That version matched names in the URL and the first 262,144 body bytes. A relay
+  on an unlisted host returned the synthetic sentinel when given its target in a header, in a JSON body with
+  escapes, after 300 KB of padding, split over query parameters, base64 twice or in chunks, or in hex, reversed,
+  rot13 or base32 (review #4, 10 forms). Name matching cannot close a cooperating relay.
+- "Tables are read by structure … only the status cell decides" (same entry, commit `8d3583c`, `.facts`): false.
+  12 failing-review formats were still read as "goal already met", 5 of them only since that commit.
+- "image `mi-egress:1` built from it [`6d8b3a1`]": the image was built at 23:28:38 from the working tree, before
+  `f4b87cd` (23:32:40) and `6d8b3a1` (23:36:14) were committed. Its files were byte-identical to the commit; the
+  wording was wrong.
+- The contamination statements for both frozen runs hold at the level of hosts and URLs only: the proxy logs record
+  host, method and the first 300 characters of the path, not headers or bodies.
+- The scores of `tb21-mi-frozen2-6d8b3a1-20261007` stand (core 25/30, controls 12/12, held out 15/18), measured with
+  the verdict parser and egress filter that this note describes as defective.
+
+What replaces both, and is all that is claimed from here on, is in `docs/benchmarking.md` ("Egress control for
+evaluation runs": a default-deny host allowlist, with its limits listed) and in the goal loop's verdict rule (a
+review passes only when its last line is exactly `VERDICT: PASS`).
