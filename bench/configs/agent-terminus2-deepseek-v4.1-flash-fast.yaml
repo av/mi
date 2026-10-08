@@ -1,0 +1,16 @@
+# Reference harness: Terminus 2 on DeepSeek V4.1 Flash, on a fast provider with the model card's sampling.
+# Why: the benchmark's time limits are wall-clock and the model writes 30-80k tokens per task at max effort.
+# Measured 2026-10-08 on one identical max-effort request per provider: DeepInfra FP8 60 tokens/s (the provider
+# of every earlier run here), CoreWeave FP8 212, Baidu FP8 288, Together 382. Baidu refused 12 of 16 requests at 8
+# in parallel and stalled trials in a pilot, so runs are pinned to CoreWeave FP8 (no errors at 8 in parallel). The model card's Terminal-Bench 2.1 numbers
+# (84-91% across scaffolds) use temperature 1.0, top_p 0.95, maximum reasoning effort.
+agents:
+  - name: terminus-2
+    model_name: openrouter/deepseek/deepseek-v4.1-flash
+    kwargs:
+      temperature: 1.0
+      llm_call_kwargs:
+        top_p: 0.95
+        extra_body:
+          reasoning: {effort: max}
+          provider: {order: [coreweave/fp8], allow_fallbacks: false}

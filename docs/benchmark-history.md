@@ -1566,3 +1566,39 @@ Inferred, not measured: why internal successes fell from 21 to 7 (more reviews c
 verdict now counts against; the review prompt is longer), and whether runs that used to stop on an early success
 and now keep working cost regex-log or the two 0/3 tasks anything. At 3 trials per task the task-level changes
 are within noise; write-compressor has ranged from 0/3 to 3/3 across the last four runs of this branch.
+
+## 2026-10-08: why our numbers sit below the public ones (diagnosis, no harness change)
+
+Public references for DeepSeek V4.1 Flash on Terminal-Bench 2.1: the model card reports 84.1-90.6% across eight
+scaffolds (mini-SWE 90.3%, "DeepSeek Harness Minimal" 90.6%; 3 samples per task, temperature 1.0, top_p 0.95,
+maximum effort, DeepSeek's own infrastructure); Antigma reports 83.9% for its harness (445 trials, 53 timeouts,
+99% prompt-cache hits). Terminus 2 is in neither. Our runs: Terminus 2 62/89, mi 49/89 (2026-09-29).
+
+What was tested (all observed):
+
+- Provider speed. One identical max-effort request per provider: DeepInfra FP8 (every earlier run) 60 tokens/s,
+  CoreWeave FP8 212, Baidu FP8 288, Together 382. Baidu refused 12 of 16 small requests at 8 in parallel and
+  stalled two trials of a pilot (`pilot-fast-provider-20261008`), so it is not usable at `-n 4`.
+- Effort setting. Through OpenRouter the effort parameter barely steers this model: on one hard request, three
+  samples each, reasoning tokens were 11-44k at low, 6-15k at medium, 17-98k at high, 30-36k at max, 15-26k unset.
+  `reasoning.max_tokens` is not honoured as a cap. A trivial question cost between 300 and 17,900 tokens.
+- Faster provider plus the model card's sampling (`tb21-halfA-fast-t2-vs-mi-807a45a-20261008`, CoreWeave FP8,
+  temperature 1.0, top_p 0.95; stopped at the spend cap after 20 paired tasks): Terminus 2 13/20 (14/20 on the
+  slow provider), mi 12/20 (11/20). Speed alone does not move either harness; Terminus 2 still timed out in 5 of
+  its 7 failures — with more speed the model writes more (up to 270k output tokens in one trial).
+- mini-SWE-agent with the same settings on the same tasks (`tb21-paired22-fast-miniswe-20261008`, stopped at its
+  cap after 18): 14/18, against Terminus 2 13/18 and mi 12/18 on those 18. Two of its four failures are an agent
+  exit error and a verifier timeout. It works in many small steps (median 47 commands per trial, up to 125).
+
+Reading (inferred): the gap to the public table is mostly a comparison against the wrong reference — Terminus 2
+is a mid-table harness for this model, on our setup about 70% whatever the provider — plus provider differences
+we cannot remove (FP8 third-party hosting, no prompt caching, DeepSeek's own API is excluded by the account's
+privacy setting). mini-SWE-agent is the reference to match; on 18 tasks it is ahead of mi by 2, within noise.
+
+mi lost four tasks that mini-SWE-agent passed: caffe-cifar-10 (six worker/judge rounds, model never trained to
+the end), dna-assembly and extract-elf (wrong result at the deadline, reviews cut off), pypi-server (internal
+success, verifier produced no result). Not yet analysed further.
+
+Spend: the account's key usage rose by about $16 during these runs, but the key is shared with other sessions —
+Harbor's own cost figures for the Terminus 2 and mini-SWE-agent trials add up to $3.2 — so the true cost of
+this work is below that. New configs: `bench/configs/agent-*-fast.yaml`, `tb21-half-a.yaml`, `tb21-half-b.yaml`.

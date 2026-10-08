@@ -1,0 +1,15 @@
+# Reference harness: mini-SWE-agent (Harbor built-in) on DeepSeek V4.1 Flash, same request settings as the other
+# *-fast configs (CoreWeave FP8, temperature 1.0, top_p 0.95, maximum reasoning effort). The model card reports
+# 90.3% on Terminal-Bench 2.1 for this harness and model on DeepSeek's own infrastructure.
+agents:
+  - name: mini-swe-agent
+    model_name: openrouter/deepseek/deepseek-v4.1-flash
+    kwargs:
+      config:
+        model:
+          model_kwargs:
+            temperature: 1.0
+            top_p: 0.95
+            extra_body:
+              reasoning: {effort: max}
+              provider: {order: [coreweave/fp8], allow_fallbacks: false}
