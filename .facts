@@ -339,3 +339,12 @@
 - label: the goal loop keeps a pristine copy of the working directory's small files (<= 1 MB each, 2000 files, 32 MB) taken before any worker runs, in its private run directory; worker, judge and blind recheck get a CHANGE-SET CHECK — diff every edited file against the pristine copy token by token and compare each original→replacement pair with the goal's allowed edits literally (exact case and punctuation)
   command: grep -q 'CHANGE-SET CHECK' tools/goal.mjs && grep -q '/pristine`' tools/goal.mjs && grep -q 'copyFileSync(s, d)' tools/goal.mjs
   tags: [implemented]
+- label: a model reply with no text and no tool call does not crash the run or get resent blind — the end of its reasoning is fed back with a request to act; after 4 such replies in a row (12 under a pass deadline) or with under 45s left the run stops cleanly; the finish reason and reasoning length are logged
+  command: grep -q 'ended without a tool call and without an answer' index.mjs && grep -q 'no action: the model kept replying' index.mjs
+  tags: [implemented]
+- label: under a pass deadline a timed-out model request is retried while at least 45s remain (not only twice); under a goal deadline worker requests are capped at 15% of the total budget, 120-300s, unless MI_REQUEST_TIMEOUT is set
+  command: grep -q 'tmo && passLeft() < Infinity' index.mjs && grep -q 'Math.min(300, Math.max(120, totalS \* 0.15))' tools/goal.mjs
+  tags: [implemented]
+- label: MI_GOAL_PLAN=0 skips the goal loop's planner call (no declared artifacts, so no draft gate and no missing-artifact review skip); the Harbor adapter sets it
+  command: grep -q "process.env.MI_GOAL_PLAN === '0'" tools/goal.mjs && grep -q '"MI_GOAL_PLAN": "0"' bench/mi_agent.py
+  tags: [implemented]

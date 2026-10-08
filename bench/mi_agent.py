@@ -399,6 +399,8 @@ class MiAgent(BaseInstalledAgent):
             "SYSTEM_PROMPT": self.options.system_prompt or EVAL_SYSTEM_PROMPT,
             "MI_GOAL_CHECK": TERMINAL_BENCH_CHECK,
             "MI_DENY": BENCH_DENY,
+            # no planner call in timed runs: it was cut at its limit in every inspected trial (see tools/goal.mjs)
+            "MI_GOAL_PLAN": "0",
             "PAGER": "cat", "GIT_PAGER": "cat", "GIT_EDITOR": "true", "VISUAL": "true", "EDITOR": "true", "TERM": "dumb",
             **self.resolve_env_vars(),
         }

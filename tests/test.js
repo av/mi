@@ -4138,3 +4138,58 @@ test('review3 2: failed criteria in a NACK review still reach the worker as feed
   const worker = calls.find(c => c.kind === 'worker').prompt;
   assert.match(worker, /\| line count \| 0 \| 1 \| FAIL \|/);
 });
+
+// ── 2026-10-09: what mi lost to mini-SWE-agent on the same model (caffe-cifar-10, dna-assembly, extract-elf) ──
+test('a reply with reasoning but no tool call and no answer keeps the run alive: its reasoning is fed back and the model is asked to act', async () => {
+  const bodies = [];
+  requestHandler = (req, res, body) => {
+    bodies.push(body);
+    res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+    const d = (delta, finish_reason = null) => res.write(`data: ${JSON.stringify({ choices: [{ delta, finish_reason }] })}\n\n`);
+    if (bodies.length <= 2) { d({ reasoning: `design ${bodies.length}: primers chosen, next write the fasta file` }); d({}, 'stop'); }
+    else if (bodies.length === 3) d({ tool_calls: [{ index: 0, id: 'c1', type: 'function', function: { name: 'bash', arguments: JSON.stringify({ command: 'echo wrote' }) } }] });
+    else d({ content: 'done' });
+    res.end('data: [DONE]\n\n');
+  };
+  const r = await runMi(['-p', 'go']);
+  assert.strictEqual(r.status, 0, r.stderr);
+  assert.strictEqual(bodies.length, 4);
+  const fed = bodies[2].messages.filter(m => m.role === 'user').map(m => m.content);
+  assert.strictEqual(fed.length, 3, 'the task and one harness message per empty reply');
+  assert.match(fed[1], /ended without a tool call and without an answer[\s\S]*design 1: primers chosen, next write the fasta file[\s\S]*act now/);
+  assert.match(fed[2], /design 2: primers chosen/);
+  assert.match(r.stderr, /empty reply 1 \(finish=stop, reasoning \d+ chars\)/);
+  assert.match(r.stdout, /done/);
+});
+
+test('a model that never acts stops the run cleanly instead of crashing it', async () => {
+  let calls = 0;
+  requestHandler = (req, res) => { calls++; res.writeHead(200, { 'Content-Type': 'text/event-stream' }); res.end(`data: ${JSON.stringify({ choices: [{ delta: { reasoning: 'thinking' }, finish_reason: 'stop' }] })}\n\ndata: [DONE]\n\n`); };
+  const r = await runMi(['-p', 'go']);
+  assert.strictEqual(r.status, 0, r.stderr);
+  assert.strictEqual(calls, 5, 'four asks to act after the first empty reply, then stop');
+  assert.match(r.stdout, /\[no action: the model kept replying without a tool call or an answer; stopped/);
+  assert.doesNotMatch(r.stderr, /empty completion \(no text, no tool calls\)\n\s+at /, 'no uncaught error');
+});
+
+test('goal: MI_GOAL_PLAN=0 skips the planner; under a deadline the worker gets a request cap of 15% of the budget (120-300s)', async () => {
+  const run = async (env, extra = {}) => withDelegate((p, o, k) => k === 'worker' ? WORK : k === 'planner' ? 'ARTIFACTS: none\nAMBIGUITIES: none' : 'a: measured=0 expected=1 [FAIL]\nVERDICT: FAIL', async (goal, calls) => {
+    const saved = { plan: process.env.MI_GOAL_PLAN, cap: process.env.MI_REQUEST_TIMEOUT };
+    Object.assign(process.env, env); if (!('MI_REQUEST_TIMEOUT' in env)) delete process.env.MI_REQUEST_TIMEOUT;
+    try { await goal.handler({ goal: 'make it work', check: 'check', max: 1, ...extra }); } finally { for (const [k, v] of [['MI_GOAL_PLAN', saved.plan], ['MI_REQUEST_TIMEOUT', saved.cap]]) v === undefined ? delete process.env[k] : process.env[k] = v; }
+    return calls;
+  });
+  const dl = s => ({ deadline: Math.floor(Date.now() / 1000) + s });
+  const noPlan = await run({ MI_GOAL_PLAN: '0' }, dl(900));
+  assert.ok(!noPlan.some(c => c.kind === 'planner'), 'no planner call');
+  const worker = noPlan.find(c => c.kind === 'worker');
+  assert.doesNotMatch(worker.prompt, /planner's notes/);
+  assert.strictEqual(worker.env.MI_REQUEST_TIMEOUT, '135', '15% of 900s');
+  assert.match(noPlan.find(c => c.kind === 'judge').prompt, /no planner ran: derive every criterion from the goal text/);
+  const withPlan = await run({ MI_GOAL_PLAN: '1' }, dl(3600));
+  assert.strictEqual(withPlan[0].kind, 'planner');
+  assert.strictEqual(withPlan.find(c => c.kind === 'worker').env.MI_REQUEST_TIMEOUT, '300', 'capped at 300s');
+  assert.strictEqual((await run({ MI_GOAL_PLAN: '1' }, dl(300))).find(c => c.kind === 'worker').env.MI_REQUEST_TIMEOUT, '120', 'at least 120s');
+  assert.strictEqual((await run({ MI_GOAL_PLAN: '1', MI_REQUEST_TIMEOUT: '600' }, dl(900))).find(c => c.kind === 'worker').env.MI_REQUEST_TIMEOUT, undefined, 'an explicit setting is left alone');
+  assert.strictEqual((await run({ MI_GOAL_PLAN: '1' })).find(c => c.kind === 'worker').env.MI_REQUEST_TIMEOUT, undefined, 'no cap without a deadline');
+});
