@@ -1644,3 +1644,24 @@ Not fixed: dna-assembly's second attempt failed the same check as before (`test_
 both times on the same wrong address base — model errors that the harness now leaves more time to find but does
 not prevent. Why this model so often stops after reasoning without acting through mi's tool-call format is not
 known; mini-SWE-agent's logs on the same model and provider show no such steps.
+
+## 2026-10-09: root cause of the empty replies, fixed at the source
+
+Observed: under mi, DeepSeek V4.1 Flash often ended a reply with reasoning only — no content, no tool call
+(159 times in ten trials; 8 of 32 replies on two synthetic tasks captured through a logging proxy). In 7 of those 8
+the reasoning ended with a complete tool call in the model's own call syntax (`<｜DSML｜ calls> … invoke … parameter …`):
+the model wrote its call inside the reasoning, where the provider does not parse it. mini-SWE-agent on the same model
+and provider showed none.
+
+Cause, by replaying 14 captured requests three times each, twice: with mi's reasoning notes in the assistant
+message's content (`[my notes before these calls] …`, added on 2026-10-04) the call landed in the reasoning in 7 and
+8 of 42 replies; with the notes removed, 0 and 0 of 42; with the same text in the message's `reasoning_content` /
+`reasoning` fields, 0 and 0 of 42. The provider does pass those fields to the model (prompt tokens 14,825 against
+11,332 without). So the cause was mi's own change, and mini-SWE-agent avoids it because it returns reasoning in
+`reasoning_content`.
+
+Fix (`f966e60`): the notes go back in the reasoning fields; a call block that still ends a reply's reasoning is parsed
+and run. After: 0 of 59 replies without an action on the same two synthetic tasks. Evidence: `jobs/empty-replies-20261009/`.
+
+Not done: the held-out comparison against mini-SWE-agent. The key's balance was $0.95 when it was due to start
+(the replays and capture runs cost more than planned, and the key is shared). The set is `bench/configs/tb21-heldout.yaml`.
