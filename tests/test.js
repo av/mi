@@ -3811,7 +3811,10 @@ test('reasoning of a tool-calling turn is kept in the history as notes; a final 
   assert.strictEqual(r.status, 0, r.stderr);
   assert.strictEqual(bodies.length, 2);
   const turn = bodies[1].messages.find(m => m.role === 'assistant');
-  assert.match(turn.content, /^\[my notes before these calls\] the format is LZ77; next: count the bytes$/);
+  // 2026-10-09: the notes go back in the reasoning fields, not in the visible content (in the content they made the model write its next tool call inside its reasoning)
+  assert.strictEqual(turn.reasoning_content, 'the format is LZ77; next: count the bytes');
+  assert.strictEqual(turn.reasoning, turn.reasoning_content);
+  assert.ok(!/LZ77/.test(turn.content || ''), 'not in the content');
   assert.ok(!r.stdout.includes('my notes'), 'notes are not printed');
   assert.match(r.stdout, /done/);
 });
@@ -4192,4 +4195,28 @@ test('goal: MI_GOAL_PLAN=0 skips the planner; under a deadline the worker gets a
   assert.strictEqual((await run({ MI_GOAL_PLAN: '1' }, dl(300))).find(c => c.kind === 'worker').env.MI_REQUEST_TIMEOUT, '120', 'at least 120s');
   assert.strictEqual((await run({ MI_GOAL_PLAN: '1', MI_REQUEST_TIMEOUT: '600' }, dl(900))).find(c => c.kind === 'worker').env.MI_REQUEST_TIMEOUT, undefined, 'an explicit setting is left alone');
   assert.strictEqual((await run({ MI_GOAL_PLAN: '1' })).find(c => c.kind === 'worker').env.MI_REQUEST_TIMEOUT, undefined, 'no cap without a deadline');
+});
+
+test('a tool call the model wrote inside its reasoning (DeepSeek call syntax) is recovered and run instead of counting as an empty reply', async () => {
+  const bodies = [], marker = `/tmp/mi-test-dsml-${process.pid}`;
+  const dsml = cmds => 'I have the design. Let me write it now.\n\n<｜DSML｜ calls>\n' + cmds.map(c => `<｜DSML｜ invoke name="bash">\n<｜DSML｜ parameter name="command" string="true">${c}</｜DSML｜ parameter>\n<｜DSML｜ parameter name="timeout" string="false">120000</｜DSML｜ parameter>\n</｜DSML｜ invoke>\n`).join('') + '</｜DSML｜ calls>';
+  requestHandler = (req, res, body) => {
+    bodies.push(body);
+    res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+    const d = (delta, finish_reason = null) => res.write(`data: ${JSON.stringify({ choices: [{ delta, finish_reason }] })}\n\n`);
+    if (bodies.length === 1) { const text = 'an earlier draft: <｜DSML｜ calls>\n<｜DSML｜ invoke name="bash">\n<｜DSML｜ parameter name="command" string="true">touch ' + marker + '.draft</｜DSML｜ parameter>\n</｜DSML｜ invoke>\n</｜DSML｜ calls> no, better:\n' + dsml([`printf 'a<b && "q"\\n' > ${marker}.1`, `touch ${marker}.2`]); for (let i = 0; i < text.length; i += 37) d({ reasoning: text.slice(i, i + 37) }); d({}, 'stop'); }
+    else d({ content: 'done' });
+    res.end('data: [DONE]\n\n');
+  };
+  let made, first;
+  try { const r = await runMi(['-p', 'go']); assert.strictEqual(r.status, 0, r.stderr); assert.match(r.stderr, /recovered 2 tool call\(s\) written inside the reasoning/); made = ['draft', '1', '2'].filter(x => existsSync(`${marker}.${x}`)); first = existsSync(`${marker}.1`) ? readFileSync(`${marker}.1`, 'utf8') : null; }
+  finally { for (const x of ['draft', '1', '2']) rmSync(`${marker}.${x}`, { force: true }); }
+  assert.deepStrictEqual(made, ['1', '2'], 'only the final call block ran, not the draft earlier in the reasoning');
+  assert.strictEqual(first, 'a<b && "q"\n');
+  assert.strictEqual(bodies.length, 2, 'no extra round trip');
+  const turn = bodies[1].messages.find(m => m.role === 'assistant');
+  assert.strictEqual(turn.tool_calls.length, 2);
+  assert.deepStrictEqual(JSON.parse(turn.tool_calls[0].function.arguments).timeout, 120000);
+  assert.ok(!turn.reasoning_content.includes(`touch ${marker}.2`) && turn.reasoning_content.endsWith('no, better:\nI have the design. Let me write it now.'), 'the executed call block is not repeated in the reasoning sent back');
+  assert.strictEqual(bodies[1].messages.filter(m => m.role === 'tool').length, 2);
 });
