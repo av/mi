@@ -1,0 +1,30 @@
+# Held-out comparison set (2026-10-09): every other task of tb21-half-b.yaml (22 of its 44). None was used in the
+# fast-provider runs or in any fix round; chosen by position, before any result.
+jobs_dir: jobs
+n_attempts: 1
+n_concurrent_trials: 4
+datasets:
+  - name: terminal-bench/terminal-bench-2-1
+    task_names:
+      - terminal-bench/bn-fit-modify
+      - terminal-bench/build-pov-ray
+      - terminal-bench/circuit-fibsqrt
+      - terminal-bench/configure-git-webserver
+      - terminal-bench/custom-memory-heap-crash
+      - terminal-bench/dna-insert
+      - terminal-bench/feal-linear-cryptanalysis
+      - terminal-bench/fix-git
+      - terminal-bench/git-multibranch
+      - terminal-bench/install-windows-3.11
+      - terminal-bench/llm-inference-batching-scheduler
+      - terminal-bench/make-mips-interpreter
+      - terminal-bench/modernize-scientific-stack
+      - terminal-bench/nginx-request-logging
+      - terminal-bench/path-tracing
+      - terminal-bench/portfolio-optimization
+      - terminal-bench/pytorch-model-cli
+      - terminal-bench/query-optimize
+      - terminal-bench/reshard-c4-data
+      - terminal-bench/schemelike-metacircular-eval
+      - terminal-bench/torch-pipeline-parallelism
+      - terminal-bench/video-processing
