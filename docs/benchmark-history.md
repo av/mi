@@ -1602,3 +1602,45 @@ success, verifier produced no result). Not yet analysed further.
 Spend: the account's key usage rose by about $16 during these runs, but the key is shared with other sessions —
 Harbor's own cost figures for the Terminus 2 and mini-SWE-agent trials add up to $3.2 — so the true cost of
 this work is below that. New configs: `bench/configs/agent-*-fast.yaml`, `tb21-half-a.yaml`, `tb21-half-b.yaml`.
+
+## 2026-10-09: the four tasks mi lost to mini-SWE-agent — causes, harness changes, confirmation sample
+
+Same model and request settings for both harnesses (DeepSeek V4.1 Flash, CoreWeave FP8, temperature 1.0, top_p
+0.95, maximum effort). Before = mi at `807a45a` in `tb21-halfA-fast-t2-vs-mi-807a45a-20261008`; mini-SWE-agent =
+`tb21-paired22-fast-miniswe-20261008`; after = mi at `c2bf924` in `mi-r1-lost4-c2bf924-20261009` (10 tasks) and
+`mi-r1b-lost4-c2bf924-20261009` (the four lost tasks again).
+
+Causes (observed in the trajectories unless marked):
+
+| task | why mi failed | harness change |
+|---|---|---|
+| caffe-cifar-10 | Every worker pass ended in `empty completion (no text, no tool calls)`: three such replies in a row crashed the worker (6 crashes, 31 empty replies, ~505 s), each crash was followed by a review (967 s of reviews), and the run ended with 1,475 s unused while training had diverged. | An empty reply no longer crashes or is resent blind: the end of its reasoning is fed back with a request to act. |
+| dna-assembly | 9 empty replies cost 748 s and two worker crashes; 18 worker commands in 1,600 s against 66 for mini-SWE-agent, so the wrong reading of the Tm rule was never tested. The misreading itself is the model's. | Same change; plus a cap on a single model request under a deadline, retried while time remains. |
+| extract-elf | Five model requests took 640 of 665 s; the worker ran out of time just as it planned to test the alternative address base. mini-SWE-agent's pass on this task came from cloning the benchmark's repository and installing the reference solution — contamination, not a harness advantage. | Request cap, as above. |
+| pypi-server | mi's work was correct (internal success after 290 s); the verifier's own set-up failed to reach astral.sh and ran no test. Not an agent failure. | None. |
+
+All four runs also lost 75 s to a planner call that hit its limit; the adapter now skips it (`MI_GOAL_PLAN=0`).
+
+| task | mi before | mi after (attempt 1, attempt 2) | mini-SWE-agent |
+|---|---|---|---|
+| caffe-cifar-10 | fail | pass, pass | pass |
+| dna-assembly | fail | pass, fail | pass |
+| extract-elf | fail | fail, fail | pass (read the reference solution) |
+| pypi-server | fail (verifier set-up) | pass, pass | pass |
+| adaptive-rejection-sampler | pass | pass | pass (after its time limit) |
+| pytorch-model-recovery | pass | pass | pass |
+| write-compressor | pass | pass | pass |
+| regex-log | pass | pass | pass |
+| cobol-modernization | pass | pass | pass |
+| mcmc-sampling-stan | pass | pass | pass |
+| **first attempt, 10 tasks** | **6/10** | **9/10** | **10/10** (9/10 without the contaminated pass) |
+
+All counts observed; one or two trials per task, so each cell is weak evidence on its own. In the ten after-fix
+trials of the first attempt the model returned reasoning with no action 159 times (finish reason `stop` in 157;
+median 9,400 characters of reasoning; 121 were resolved by one request to act, 27 took two, 11 three) — before the
+fix any three in a row ended the worker. Reviews gave a verdict in 4 of the 10 trials.
+
+Not fixed: dna-assembly's second attempt failed the same check as before (`test_primers`), and extract-elf failed
+both times on the same wrong address base — model errors that the harness now leaves more time to find but does
+not prevent. Why this model so often stops after reasoning without acting through mi's tool-call format is not
+known; mini-SWE-agent's logs on the same model and provider show no such steps.
