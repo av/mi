@@ -4472,3 +4472,43 @@ test('contract (roles): the next prompt of a continued session, a prompt after -
     assert.deepStrictEqual(bodies[2].messages.map(m => m.role), ['system', 'user', 'assistant', 'user'], 'a continuation request follows the assistant message');
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+// review #6: the three gaps left open at 0ba52af
+test('contract (roles): a continued session with a new -f image — image and prompt are one user message after the saved turns', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'mi-resume-img-')), sess = join(dir, 's.json'), img = join(dir, 'a.png'), bodies = [], saved = [{ role: 'system', content: 'old' }, { role: 'user', content: 'first task' }, { role: 'assistant', content: 'first answer' }], parts = m => m.content.map(p => p.text || p.type);
+  writeFileSync(img, 'png');
+  requestHandler = (req, res, body) => { bodies.push(body); strict(res, body, () => chunks(res, [ch({ content: 'done' }, 'stop')])); };
+  try {
+    writeFileSync(sess, JSON.stringify(saved));
+    let r = await runMi(['-f', img, '-p', 'what is in the picture'], { MI_SESSION: sess });
+    assert.strictEqual(r.status, 0, r.stderr);
+    assert.deepStrictEqual(bodies[0].messages.map(m => m.role), ['system', 'user', 'assistant', 'user']);
+    assert.strictEqual(bodies[0].messages[1].content, 'first task', 'the image is not attached to the old task');
+    assert.deepStrictEqual(parts(bodies[0].messages[3]), ['attached images', 'image_url', 'what is in the picture']);
+    assert.deepStrictEqual(JSON.parse(readFileSync(sess, 'utf8')).map(m => m.role), ['system', 'user', 'assistant', 'user', 'assistant'], 'the saved session alternates too');
+    // a saved session that ends in a user message (a harness note), continued by a piped prompt: everything joins that message
+    writeFileSync(sess, JSON.stringify([...saved, { role: 'user', content: '[harness] your last reply was cut off by the request time limit.' }]));
+    r = await runMi(['-f', img], { MI_SESSION: sess }, 'and this one');
+    assert.strictEqual(r.status, 0, r.stderr);
+    assert.deepStrictEqual(bodies[1].messages.map(m => m.role), ['system', 'user', 'assistant', 'user']);
+    assert.deepStrictEqual(parts(bodies[1].messages[3]), ['[harness] your last reply was cut off by the request time limit.', 'attached images', 'image_url', 'and this one']);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('contract (OpenRouter): reasoning_details without an index or an id — the objects of one delta stay separate blocks and an explicit null id is sent back', async () => {
+  const bodies = [], s = summary => ({ type: 'reasoning.summary', summary, id: null, format: 'openai-responses-v1' });
+  const sent = async first => { bodies.length = 0; requestHandler = (req, res, body) => { bodies.push(body); if (bodies.length === 1) chunks(res, [...first, ch(callDelta('echo hi')), ch({}, 'tool_calls')]); else chunks(res, [ch({ content: 'done' }), ch({}, 'stop')]); }; const r = await runMi(['-p', 'go']); assert.strictEqual(r.status, 0, r.stderr); return bodies[1].messages.find(m => m.role === 'assistant').reasoning_details; };
+  assert.deepStrictEqual(await sent([ch({ reasoning_details: [s('first complete summary'), s('second complete summary')] })]), [s('first complete summary'), s('second complete summary')], 'two anonymous summaries in one delta');
+  assert.deepStrictEqual(await sent([ch({ reasoning_details: [s('first'), s('second ')] }), ch({ reasoning_details: [{ type: 'reasoning.summary', summary: 'continued' }] })]), [s('first'), s('second continued')], 'a piece in a later delta still joins the last block');
+});
+
+test('contract (SSE): a bare CR ends a line like LF and CRLF, also when a line end falls on a chunk boundary', async () => {
+  let n = 0;
+  const pieces = (res, list) => { res.writeHead(200, { 'Content-Type': 'text/event-stream' }); const next = () => list.length ? (res.write(list.shift()), setTimeout(next, 20)) : res.end(); next(); };
+  requestHandler = (req, res) => { n++; if (n === 1) pieces(res, [': keep-alive\r\rdata: ' + JSON.stringify(ch(callDelta('echo bare-cr'), 'tool_calls')) + '\r', '\r', 'data: [DONE]\r\r']); else pieces(res, ['data: {"choices":[\r', '\ndata: {"index":0,"delta":{"content":"split crlf"},"finish_reason":"stop"}]}\r', '\n\r', '\ndata: [DONE]\r\n\r\n']); };
+  const r = await runMi(['-p', 'go']);
+  assert.strictEqual(r.status, 0, r.stderr);
+  assert.match(r.stdout, /echo bare-cr/);
+  assert.match(r.stdout, /split crlf/);
+  assert.strictEqual(n, 2);
+});
