@@ -1,0 +1,3 @@
+⟡ boom({})
+Error: tool "boom" failed: network socket hang up
+Tool boom returned "Error: tool 'boom' failed: network socket hang up".

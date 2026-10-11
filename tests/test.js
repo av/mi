@@ -3812,8 +3812,8 @@ test('reasoning of a tool-calling turn is kept in the history as notes; a final 
   assert.strictEqual(bodies.length, 2);
   const turn = bodies[1].messages.find(m => m.role === 'assistant');
   // 2026-10-09: the notes go back in the reasoning fields, not in the visible content (in the content they made the model write its next tool call inside its reasoning)
-  assert.strictEqual(turn.reasoning_content, 'the format is LZ77; next: count the bytes');
-  assert.strictEqual(turn.reasoning, turn.reasoning_content);
+  assert.strictEqual(turn.reasoning, 'the format is LZ77; next: count the bytes', 'complete, in the field it arrived in');
+  assert.ok(!('reasoning_content' in turn), 'not duplicated into a field the server did not use');
   assert.ok(!/LZ77/.test(turn.content || ''), 'not in the content');
   assert.ok(!r.stdout.includes('my notes'), 'notes are not printed');
   assert.match(r.stdout, /done/);
@@ -4217,6 +4217,139 @@ test('a tool call the model wrote inside its reasoning (DeepSeek call syntax) is
   const turn = bodies[1].messages.find(m => m.role === 'assistant');
   assert.strictEqual(turn.tool_calls.length, 2);
   assert.deepStrictEqual(JSON.parse(turn.tool_calls[0].function.arguments).timeout, 120000);
-  assert.ok(!turn.reasoning_content.includes(`touch ${marker}.2`) && turn.reasoning_content.endsWith('no, better:\nI have the design. Let me write it now.'), 'the executed call block is not repeated in the reasoning sent back');
+  assert.ok(!turn.reasoning.includes(`touch ${marker}.2`) && turn.reasoning.trimEnd().endsWith('no, better:\nI have the design. Let me write it now.'), 'the executed call block is not repeated in the reasoning sent back');
   assert.strictEqual(bodies[1].messages.filter(m => m.role === 'tool').length, 2);
+});
+
+// ── 2026-10-11: model API contracts (docs/api-contracts.md). One test per clause that was violated. ──
+const chunks = (res, list, { sep = '\n\n', prefix = 'data: ', done = true, tail = true } = {}) => { res.writeHead(200, { 'Content-Type': 'text/event-stream' }); const all = list.map(c => prefix + JSON.stringify(c)); if (done) all.push(prefix + '[DONE]'); res.end(all.join(sep) + (tail ? sep : '')); };
+const ch = (delta, finish_reason = null, extra = {}) => ({ choices: [{ index: 0, delta, finish_reason }], ...extra });
+const callDelta = (cmd, o = {}) => ({ tool_calls: [{ index: 0, id: 'c1', type: 'function', function: { name: 'bash', arguments: JSON.stringify({ command: cmd }) }, ...o }] });
+
+test('contract (DeepSeek, llama.cpp): reasoning streamed as reasoning_content is sent back complete in reasoning_content on every later request', async () => {
+  const bodies = [], long = 'step '.repeat(1500);
+  requestHandler = (req, res, body) => { bodies.push(body); if (bodies.length === 1) chunks(res, [ch({ reasoning_content: long }), ch({ reasoning_content: 'therefore run it' }), ch(callDelta('echo one')), ch({}, 'tool_calls')]); else if (bodies.length === 2) chunks(res, [ch({ reasoning_content: 'second thought' }), ch(callDelta('echo two')), ch({}, 'tool_calls')]); else chunks(res, [ch({ reasoning_content: 'final thought' }), ch({ content: 'done' }), ch({}, 'stop')]); };
+  const r = await runMi(['-p', 'go']);
+  assert.strictEqual(r.status, 0, r.stderr);
+  const a = bodies[2].messages.filter(m => m.role === 'assistant');
+  assert.strictEqual(a[0].reasoning_content, long + 'therefore run it', 'complete and unmodified, not a tail');
+  assert.strictEqual(a[1].reasoning_content, 'second thought');
+  assert.ok(!('reasoning' in a[0]) && !('reasoning_details' in a[0]));
+});
+
+test('contract (OpenRouter): reasoning_details are merged by index and sent back as the same sequence, signatures and encrypted blocks intact', async () => {
+  const bodies = [];
+  requestHandler = (req, res, body) => { bodies.push(body); if (bodies.length === 1) chunks(res, [
+    ch({ reasoning: 'I should ', reasoning_details: [{ type: 'reasoning.text', text: 'I should ', format: 'anthropic-claude-v1', index: 0 }] }),
+    ch({ reasoning: 'list files', reasoning_details: [{ type: 'reasoning.text', text: 'list files', index: 0 }] }),
+    ch({ reasoning_details: [{ type: 'reasoning.text', signature: 'SIG123', index: 0 }] }),
+    ch({ reasoning_details: [{ type: 'reasoning.encrypted', data: 'ENC', id: 'rs_1', format: 'anthropic-claude-v1', index: 1 }] }),
+    ch({ reasoning_details: [{ type: 'reasoning.encrypted', data: 'RYPTED', index: 1 }] }),
+    ch(callDelta('echo hi')), ch({}, 'tool_calls')]); else chunks(res, [ch({ content: 'done' }), ch({}, 'stop')]); };
+  const r = await runMi(['-p', 'go']);
+  assert.strictEqual(r.status, 0, r.stderr);
+  const a = bodies[1].messages.find(m => m.role === 'assistant');
+  assert.deepStrictEqual(a.reasoning_details, [{ type: 'reasoning.text', text: 'I should list files', format: 'anthropic-claude-v1', index: 0, signature: 'SIG123' }, { type: 'reasoning.encrypted', data: 'ENCRYPTED', id: 'rs_1', format: 'anthropic-claude-v1', index: 1 }]);
+  assert.ok(!('reasoning' in a) && !('reasoning_content' in a), 'the details are the one copy sent back');
+});
+
+test('contract (SSE): CRLF line endings, "data:" without a space, comment lines and a last event without a blank line are all read', async () => {
+  let n = 0;
+  requestHandler = (req, res) => { n++; res.writeHead(200, { 'Content-Type': 'text/event-stream' }); if (n === 1) res.end(': keep-alive\r\n\r\ndata:' + JSON.stringify(ch(callDelta('echo crlf'))) + '\r\n\r\ndata:' + JSON.stringify(ch({}, 'tool_calls')) + '\r\n\r\ndata:[DONE]\r\n\r\n'); else res.end('data: ' + JSON.stringify(ch({ content: 'no trailing blank line' }, 'stop'))); };
+  const r = await runMi(['-p', 'go']);
+  assert.strictEqual(r.status, 0, r.stderr);
+  assert.match(r.stdout, /echo crlf/);
+  assert.match(r.stdout, /no trailing blank line/);
+  assert.strictEqual(n, 2);
+});
+
+test('contract (tool calls): a call without an id gets one that its result names; chunks without an index are joined; empty arguments become {}; unparsable arguments are not sent back', async () => {
+  const bodies = [];
+  requestHandler = (req, res, body) => { bodies.push(body); if (bodies.length === 1) chunks(res, [
+    ch({ tool_calls: [{ type: 'function', function: { name: 'bash', arguments: '{"command":' } }] }), ch({ tool_calls: [{ function: { arguments: '"echo joined"}' } }] }),
+    ch({ tool_calls: [{ id: 'given', type: 'function', function: { name: 'skill', arguments: '' } }] }),
+    ch({ tool_calls: [{ id: 'bad', type: 'function', function: { name: 'bash', arguments: '{"command": "echo tru' } }] }), ch({}, 'tool_calls')]); else chunks(res, [ch({ content: 'done' }), ch({}, 'stop')]); };
+  const r = await runMi(['-p', 'go']);
+  assert.strictEqual(r.status, 0, r.stderr);
+  const a = bodies[1].messages.find(m => m.role === 'assistant'), results = bodies[1].messages.filter(m => m.role === 'tool');
+  assert.strictEqual(a.tool_calls.length, 3);
+  assert.match(a.tool_calls[0].id, /^call_/);
+  assert.deepStrictEqual(JSON.parse(a.tool_calls[0].function.arguments), { command: 'echo joined' });
+  assert.strictEqual(a.tool_calls[1].function.arguments, '{}');
+  assert.strictEqual(a.tool_calls[2].function.arguments, '{}', 'the unparsable text is replaced in the history');
+  assert.deepStrictEqual(results.map(m => m.tool_call_id), a.tool_calls.map(c => c.id), 'one result per call, same ids, same order');
+  assert.match(results[0].content, /joined/);
+  assert.match(results[2].content, /malformed JSON in tool arguments: \{"command": "echo tru/);
+});
+
+test('contract (tool calls): a tool that throws still gets its result message, so the next request is well formed', async () => {
+  const home = mkdtempSync(join(tmpdir(), 'mi-test-throw-')), bodies = [];
+  mkdirSync(join(home, 'tools'));
+  writeFileSync(join(home, 'tools', 'boom.mjs'), "export default { name: 'boom', description: 'always fails', parameters: { type: 'object', properties: {} }, handler: () => { throw new Error('network socket hang up'); } };");
+  requestHandler = (req, res, body) => { bodies.push(body); if (bodies.length === 1) chunks(res, [ch({ tool_calls: [{ index: 0, id: 'b1', type: 'function', function: { name: 'boom', arguments: '{}' } }, { index: 1, id: 'c2', type: 'function', function: { name: 'bash', arguments: '{"command":"echo after"}' } }] }), ch({}, 'tool_calls')]); else chunks(res, [ch({ content: 'done' }), ch({}, 'stop')]); };
+  let r; try { r = await runMi(['-p', 'go'], { MI_HOME: home }); } finally { rmSync(home, { recursive: true, force: true }); }
+  assert.strictEqual(r.status, 0, r.stderr);
+  assert.strictEqual(bodies.length, 2, 'no blind resend of a conversation with an unanswered call');
+  const results = bodies[1].messages.filter(m => m.role === 'tool');
+  assert.deepStrictEqual(results.map(m => m.tool_call_id), ['b1', 'c2']);
+  assert.match(results[0].content, /^Error: tool "boom" failed: network socket hang up/);
+  assert.match(results[1].content, /after/);
+});
+
+test('contract (finish_reason): length continues a cut-off answer and explains cut-off tool arguments; content_filter is an error; a refusal is shown', async () => {
+  let bodies = [];
+  requestHandler = (req, res, body) => { bodies.push(body); if (bodies.length === 1) chunks(res, [ch({ content: 'first half, ' }), ch({}, 'length')]); else chunks(res, [ch({ content: 'second half.' }), ch({}, 'stop')]); };
+  let r = await runMi(['-p', 'go']);
+  assert.strictEqual(r.status, 0, r.stderr);
+  assert.match(r.stdout, /first half, \n?second half\./);
+  assert.match(bodies[1].messages.at(-1).content, /cut off by the output token limit \(finish_reason=length\)\. continue exactly where it stopped/);
+  bodies = [];
+  requestHandler = (req, res, body) => { bodies.push(body); if (bodies.length === 1) chunks(res, [ch({ tool_calls: [{ index: 0, id: 't1', type: 'function', function: { name: 'bash', arguments: '{"command": "cat > f <<EOF\\nlong' } }] }), ch({}, 'length')]); else chunks(res, [ch({ content: 'ok' }), ch({}, 'stop')]); };
+  r = await runMi(['-p', 'go']);
+  assert.match(bodies[1].messages.find(m => m.role === 'tool').content, /cut off by the output token limit before the tool arguments were complete/);
+  requestHandler = (req, res) => chunks(res, [ch({}, 'content_filter')]);
+  r = await runMi(['-p', 'go']);
+  assert.notStrictEqual(r.status, 0);
+  assert.match(r.stderr, /finish_reason=content_filter/);
+  requestHandler = (req, res) => chunks(res, [ch({ refusal: 'I cannot help with that.' }), ch({}, 'stop')]);
+  r = await runMi(['-p', 'go']);
+  assert.strictEqual(r.status, 0, r.stderr);
+  assert.match(r.stdout, /I cannot help with that\./);
+});
+
+test('contract (errors): the HTTP status decides retries when the body carries a string code; Retry-After is honoured; 408 is retried', async () => {
+  const seen = [];
+  requestHandler = (req, res) => { seen.push(Date.now()); if (seen.length === 1) { res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '1' }); res.end(JSON.stringify({ error: { message: 'slow down', code: 'rate_limit_exceeded' } })); } else if (seen.length === 2) { res.writeHead(408, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: { message: 'timed out', code: 408 } })); } else chunks(res, [ch({ content: 'ok' }), ch({}, 'stop')]); };
+  const r = await runMi(['-p', 'go']);
+  assert.strictEqual(r.status, 0, r.stderr);
+  assert.strictEqual(seen.length, 3);
+  assert.ok(seen[1] - seen[0] >= 950, `waited ${seen[1] - seen[0]}ms for Retry-After: 1`);
+});
+
+test('contract (compaction): the summary request carries MI_API_PARAMS, and a server that rejects chat_template_kwargs gets the plain request', async () => {
+  const bodies = [];
+  requestHandler = (req, res, body) => {
+    bodies.push(body);
+    if (bodies.length === 1) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ error: { message: 'This model maximum context length is 10 tokens', code: 'context_length_exceeded' } })); }
+    if (body.stream === false && body.chat_template_kwargs) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ error: { message: 'Unrecognized request argument supplied: chat_template_kwargs' } })); }
+    if (body.stream === false) { res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ choices: [{ message: { role: 'assistant', content: 'GOAL: go' } }] })); }
+    chunks(res, [ch({ content: 'done' }), ch({}, 'stop')]);
+  };
+  const r = await runMi(['-p', 'go'], { MI_API_PARAMS: JSON.stringify({ provider: { order: ['x/y'], allow_fallbacks: false }, temperature: 0.3 }) });
+  assert.strictEqual(r.status, 0, r.stderr);
+  const compact = bodies.filter(b => b.stream === false);
+  assert.strictEqual(compact.length, 2);
+  assert.ok(compact[0].chat_template_kwargs && !compact[1].chat_template_kwargs);
+  for (const c of compact) assert.deepStrictEqual(c.provider, { order: ['x/y'], allow_fallbacks: false });
+  assert.match(r.stdout, /done/);
+});
+
+test('contract (roles): a timed-out request adds one harness message, not two user messages in a row', async () => {
+  const bodies = [];
+  requestHandler = (req, res, body) => { bodies.push(body); res.writeHead(200, { 'Content-Type': 'text/event-stream' }); if (bodies.length === 1) return void res.write(`data: ${JSON.stringify(ch({ reasoning: 'half a thought' }))}\n\n`); res.end(`data: ${JSON.stringify(ch({ content: 'done' }, 'stop'))}\n\ndata: [DONE]\n\n`); };
+  const r = await runMi(['-p', 'go'], { MI_REQUEST_TIMEOUT: '1' });
+  assert.strictEqual(r.status, 0, r.stderr);
+  const roles = bodies[1].messages.map(m => m.role);
+  assert.deepStrictEqual(roles, ['system', 'user', 'user']);
+  assert.match(bodies[1].messages[2].content, /cut off by the request time limit[\s\S]*half a thought[\s\S]*reply in smaller steps/);
 });

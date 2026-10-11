@@ -1,0 +1,7 @@
+⟡ bash({"command":"echo alpha"})
+alpha
+
+⟡ bash({"command":"echo beta"})
+beta
+
+finished

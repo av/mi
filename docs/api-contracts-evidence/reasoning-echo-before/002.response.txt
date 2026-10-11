@@ -1,0 +1,22 @@
+data: {"id":"chatcmpl-190","object":"chat.completion.chunk","created":1791709188,"model":"qwen3.5:9b","system_fingerprint":"fp_ollama","choices":[{"index":0,"delta":{"role":"assistant","content":"","reasoning":"Got"},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-190","object":"chat.completion.chunk","created":1791709188,"model":"qwen3.5:9b","system_fingerprint":"fp_ollama","choices":[{"index":0,"delta":{"content":"","reasoning":" alpha"},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-190","object":"chat.completion.chunk","created":1791709188,"model":"qwen3.5:9b","system_fingerprint":"fp_ollama","choices":[{"index":0,"delta":{"content":"","reasoning":"."},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-190","object":"chat.completion.chunk","created":1791709188,"model":"qwen3.5:9b","system_fingerprint":"fp_ollama","choices":[{"index":0,"delta":{"content":"","reasoning":" Now"},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-190","object":"chat.completion.chunk","created":1791709188,"model":"qwen3.5:9b","system_fingerprint":"fp_ollama","choices":[{"index":0,"delta":{"content":"","reasoning":" run"},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-190","object":"chat.completion.chunk","created":1791709188,"model":"qwen3.5:9b","system_fingerprint":"fp_ollama","choices":[{"index":0,"delta":{"content":"","reasoning":" echo"},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-190","object":"chat.completion.chunk","created":1791709188,"model":"qwen3.5:9b","system_fingerprint":"fp_ollama","choices":[{"index":0,"delta":{"content":"","reasoning":" beta"},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-190","object":"chat.completion.chunk","created":1791709188,"model":"qwen3.5:9b","system_fingerprint":"fp_ollama","choices":[{"index":0,"delta":{"content":"","reasoning":"."},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-190","object":"chat.completion.chunk","created":1791709188,"model":"qwen3.5:9b","system_fingerprint":"fp_ollama","choices":[{"index":0,"delta":{"content":"","tool_calls":[{"id":"call_5ofdozb2","index":0,"type":"function","function":{"name":"bash","arguments":"{\"command\":\"echo beta\"}"}}]},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-190","object":"chat.completion.chunk","created":1791709188,"model":"qwen3.5:9b","system_fingerprint":"fp_ollama","choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}]}
+
+data: [DONE]
+

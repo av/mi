@@ -1,0 +1,6 @@
+data: {"id":"chatcmpl-914","object":"chat.completion.chunk","created":1791709215,"model":"qwen3.5:9b","system_fingerprint":"fp_ollama","choices":[{"index":0,"delta":{"role":"assistant","content":""},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-914","object":"chat.completion.chunk","created":1791709215,"model":"qwen3.5:9b","system_fingerprint":"fp_ollama","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}
+
+data: [DONE]
+

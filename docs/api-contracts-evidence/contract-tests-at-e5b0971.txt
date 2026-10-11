@@ -1,0 +1,11 @@
+not ok 1 - contract (DeepSeek, llama.cpp): reasoning streamed as reasoning_content is sent back complete in re
+not ok 2 - contract (OpenRouter): reasoning_details are merged by index and sent back as the same sequence, si
+not ok 3 - contract (SSE): CRLF line endings, "data:" without a space, comment lines and a last event without 
+not ok 4 - contract (tool calls): a call without an id gets one that its result names; chunks without an index
+not ok 5 - contract (tool calls): a tool that throws still gets its result message, so the next request is wel
+not ok 6 - contract (finish_reason): length continues a cut-off answer and explains cut-off tool arguments; co
+not ok 7 - contract (errors): the HTTP status decides retries when the body carries a string code; Retry-After
+not ok 8 - contract (compaction): the summary request carries MI_API_PARAMS, and a server that rejects chat_te
+not ok 9 - contract (roles): a timed-out request adds one harness message, not two user messages in a row
+# pass 0
+# fail 9

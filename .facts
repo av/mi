@@ -300,8 +300,8 @@
 - label: harbor adapter can package another mi checkout (kwargs.checkout) and exposes it as bench.mi_agent:MiBaselineAgent named mi-baseline, so one job A/Bs two mi versions under the same adapter
   command: grep -q 'class MiBaselineAgent(MiAgent)' bench/mi_agent.py && grep -q 'return "mi-baseline"' bench/mi_agent.py && grep -q 'checkout: str | None' bench/mi_agent.py
   tags: [implemented]
-- label: a tool-calling turn sends the last 3000 chars of its streamed reasoning back in the assistant message's reasoning_content and reasoning fields, never in its content (2026-10-09: in the content, as "[my notes before these calls]", it made DeepSeek V4.1 Flash write its next tool call inside its reasoning in 15 of 84 replays, against 0 of 84 without or with the fields); a provider that drops those fields simply loses the notes
-  command: grep -q 'message.reasoning_content = message.reasoning = think.trim().slice(-3000)' index.mjs && ! grep -q 'my notes before these calls' index.mjs
+- label: reasoning is sent back to the server complete and unmodified, in the field it arrived in — OpenRouter reasoning_details as the same merged sequence (signatures and encrypted blocks intact), otherwise the reasoning or reasoning_content string — and never in the message content; see docs/api-contracts.md
+  command: grep -q 'message.reasoning_details = rDetails.filter(Boolean)' index.mjs && grep -q "message\[rField || 'reasoning'\] = think" index.mjs && ! grep -q 'my notes before these calls' index.mjs && ! grep -q 'slice(-3000); messages.push(message)' index.mjs
   tags: [implemented]
 - label: a reply with no content and no tool calls whose reasoning ends in a DeepSeek call block (<｜DSML｜ calls> … invoke … parameter …) has its calls recovered from that final block and run
   command: grep -q 'tool call(s) written inside the reasoning' index.mjs
@@ -350,4 +350,7 @@
   tags: [implemented]
 - label: MI_GOAL_PLAN=0 skips the goal loop's planner call (no declared artifacts, so no draft gate and no missing-artifact review skip); the Harbor adapter sets it
   command: grep -q "process.env.MI_GOAL_PLAN === '0'" tools/goal.mjs && grep -q '"MI_GOAL_PLAN": "0"' bench/mi_agent.py
+  tags: [implemented]
+- label: chat-completions contract handling (docs/api-contracts.md) — SSE with CRLF, "data:" without a space and an unterminated last event; reasoning read from delta.reasoning, delta.reasoning_content and delta.reasoning_details; delta.refusal shown; tool calls without id or index repaired, empty or unparsable arguments sent back as {}; a throwing tool still yields its tool message; finish_reason length continues (3 times) and content_filter is an error; HTTP status kept for retries, Retry-After honoured, 408 retried; compaction carries MI_API_PARAMS and drops chat_template_kwargs on HTTP 400; one harness message per timed-out request
+  command: grep -q 'const feed = event' index.mjs && grep -q "delta.reasoning_content === 'string'" index.mjs && grep -q 'delta.refusal' index.mjs && grep -q 'c.id ||=' index.mjs && grep -q 'finish_reason=content_filter' index.mjs && grep -q "retry-after" index.mjs && grep -q 'r = await ask({}); /\* chat_template_kwargs' index.mjs && test -f docs/api-contracts.md
   tags: [implemented]
