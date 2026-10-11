@@ -1,0 +1,2 @@
+HTTP 400
+{"error":{"code":400,"message":"Unable to generate parser for this template. Automatic parser generation failed: \n------------\nWhile executing CallExpression at line 19, column 27 in source:\n...% 2 == 0) -%}↵        {{ raise_exception(\"Conversation roles must alternate user...\n                                           ^\nError: Jinja Exception: Conversation roles must alternate user/assistant/user/assistant/...","type":"invalid_request_error"}}

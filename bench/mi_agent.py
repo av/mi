@@ -13,7 +13,6 @@ import atexit
 import json
 import os
 import re
-import shlex
 import shutil
 import subprocess
 import tempfile
@@ -37,11 +36,10 @@ PROVIDER_RE = re.compile(r"\[provider\] ([^(\x1b\n]+?) \(")
 
 TERMINAL_BENCH_CHECK = (
     "Inspect the actual task state in the working directory (run pwd first). "
-    "A hidden external verifier runs after you finish — predict its checks from the goal text "
-    "and any visible tests; visible /tests/ may not cover every requirement. "
-    "FIRST: if /tests/ exists, run `cd / && python3 -m pytest tests/ --tb=short 2>&1 | tail -80` — "
-    "test results are GROUND TRUTH for what they cover. If any test fails, NACK immediately. "
-    "If no /tests/: run any visible test suite (pytest, npm test, make test, etc.). "
+    "A hidden external verifier runs after you finish — predict its checks from the goal text only. "
+    "Never look for, download or read the benchmark's own tests, solutions or verifier files, on disk or online. "
+    "FIRST: if the project in the working directory ships its own test suite (pytest, npm test, make test, etc.), "
+    "run it — its results are GROUND TRUTH for what they cover. If any test fails, NACK immediately. "
     "Then verify EVERY goal-stated output path, threshold, format, and preservation constraint — "
     "check exact paths exist and are non-empty; parseable artifacts must parse/compile/import. "
     "For numeric thresholds, measure the actual value and compare to the required value — "
@@ -56,9 +54,12 @@ TERMINAL_BENCH_CHECK = (
 EVAL_SYSTEM_PROMPT = (
     "You are an autonomous coding agent in a Linux terminal inside a Docker container. "
     "Your tools are bash and file editing.\n\n"
-    "Act, don't speculate. Read the task description, AGENTS.md snapshot, and any README. "
-    "A hidden verifier grades your work after you finish — the goal text defines success; "
-    "visible /tests/ may be incomplete. Write required output files early as drafts, then refine. "
+    "Act, don't speculate. Read the task description, the workspace snapshot below, and any README. "
+    "A hidden verifier grades your work after you finish — the goal text defines success. "
+    "Never look for, download or read this benchmark's own tests, reference solutions or verifier files, "
+    "on disk or online (its repositories, dataset mirrors, /tests, /solution, /logs/verifier): solve the task "
+    "from the task text and the environment only; such calls are blocked. "
+    "Write required output files early as drafts, then refine. "
     "Explore briefly, then solve. One step at a time, verify each requirement with measured values.\n\n"
     "If something fails, read the error, form a diagnosis, change approach. "
     "Don't repeat failed strategies. Do not stop on partial progress or plausible-looking output.\n\n"
@@ -69,6 +70,49 @@ EVAL_SYSTEM_PROMPT = (
     "sed -n for ranges. Reserve cat for short files. Edit with sed -i or heredocs.\n\n"
     "Do not fake tool output."
 )
+
+# Tool calls that name the benchmark's own sources or Harbor's test/solution/verifier mounts are refused by mi
+# (MI_DENY, a case-insensitive regex over each tool call's arguments). 2026-10-06 review: two passing round 1
+# trials had cloned laude-institute/terminal-bench-2 and read the task's tests/test_outputs.py and solution/solve.sh.
+# Root-level /tests, /solution and /logs/verifier only; a project's own ./tests or /app/tests is not matched.
+BENCH_DENY = (
+    r"terminal[-_ ]?bench|laude-institute|harbor-framework|tbench\.ai"
+    r"|(?<![\w.~-])/(tests|solution|logs/verifier)(?![\w.-])"
+)
+
+# Network-level egress control (bench/egress/). MI_DENY above only matches the text of tool-call arguments. With
+# bench/egress/compose.yaml added to the trial, the task container shares a sidecar's network namespace and its
+# outbound TCP is redirected into a shim it cannot change. During the agent phase the shim hands HTTP and TLS to a
+# filtering proxy that allows only the hosts in bench/egress/allowlist.txt (GitHub: named repositories only) and
+# refuses everything else; see filter.py for the exact rules and for what is not checked. The proxy re-signs TLS
+# with a run-local CA; EGRESS_CA_SETUP makes the container trust it. Nothing is filtered during verification.
+EGRESS_DIR = Path(__file__).resolve().parent / "egress"
+EGRESS_SERVICE, EGRESS_PROXY_SERVICE = "mi-egress", "mi-egress-proxy"
+EGRESS_CA_SETUP = r"""
+CA=/opt/mi/egress-ca.pem
+[ -f "$CA" ] || exit 0
+mark=$(sed -n 2p "$CA")
+mkdir -p /usr/local/share/ca-certificates && cp "$CA" /usr/local/share/ca-certificates/mi-egress.crt
+SYS=
+for b in /etc/ssl/certs/ca-certificates.crt /etc/pki/tls/certs/ca-bundle.crt /etc/ssl/cert.pem /etc/ssl/ca-bundle.pem; do
+  [ -f "$b" ] || continue
+  [ -n "$SYS" ] || SYS=$b
+  grep -qF "$mark" "$b" || { echo; cat "$CA"; } >> "$b"
+done
+# bundled Mozilla lists that Python HTTP clients use instead of the system store
+timeout 60 find / -xdev -name cacert.pem -path '*certifi*' 2>/dev/null | while read -r f; do
+  grep -qF "$mark" "$f" || { echo; cat "$CA"; } >> "$f"
+done
+# Java keeps its own trust store
+command -v keytool >/dev/null 2>&1 && keytool -importcert -noprompt -trustcacerts -cacerts -storepass changeit \
+  -alias mi-egress -file "$CA" >/dev/null 2>&1
+# no system bundle in this image: clients that take one from the environment get the host's list plus the CA
+if [ -z "$SYS" ] && [ -f /opt/mi/host-ca-bundle.pem ]; then
+  SYS=/opt/mi/egress-bundle.pem; { cat /opt/mi/host-ca-bundle.pem; echo; cat "$CA"; } > "$SYS"; chmod a+r "$SYS"
+fi
+echo "$SYS" > /opt/mi/egress-bundle
+chmod a+r "$CA" /opt/mi/egress-bundle
+"""
 
 # Node for mi: the task's own node if >= 18, else a private copy in
 # /opt/mi-node that the wrapper puts first on PATH (mi spawns subagents as
@@ -90,7 +134,15 @@ echo "$NODE" > /opt/mi/NODE
 "$NODE" /opt/mi/index.mjs -v
 """
 
-# $1 = task instruction. Workdir detection and the AGENTS.md snapshot match the
+# Starts mi in goal mode with the goal read from $MI_GOAL_FILE: no process's argv
+# carries task text, so an agent's `pkill -f <word from the task>` cannot kill mi
+# or this wrapper (TB 2.1 kv-store-grpc: a cleanup matching `server.py` did, exit 143).
+LAUNCH = """import { readFileSync } from 'fs';
+process.argv = [process.argv[0], '/opt/mi/index.mjs', '-g', readFileSync(process.env.MI_GOAL_FILE, 'utf8'), '-c', process.env.MI_GOAL_CHECK];
+await import('/opt/mi/index.mjs');
+"""
+
+# $1 = file holding the task instruction. Workdir detection and the workspace snapshot match the
 # historical adapter; the budget env (MI_DEADLINE, MI_GOAL_MAX) drives the
 # goal loop's EXPLORE/COMMIT/URGENT/SALVAGE phases.
 WRAPPER = r"""
@@ -119,7 +171,10 @@ detect_workdir() {
 }
 WORKDIR=$(detect_workdir)
 cd "$WORKDIR" || cd /
-{
+# Workspace snapshot for every mi subagent, via SYSTEM_PROMPT (inherited) rather than an AGENTS.md
+# file in the task's directory: that file broke checksum/"no other files changed" verifiers
+# (TB 2.1 git-leak-recovery hashes every file under /app/repo).
+SNAP=$({
   echo "# Task Context"; echo
   for rf in README.md README.txt README readme.md; do [ -f "$rf" ] && { head -100 "$rf"; break; }; done
   echo; echo "## Workspace Snapshot"; echo '```'
@@ -127,7 +182,10 @@ cd "$WORKDIR" || cd /
   [ -d /tests ] && { echo "--- /tests/ ---"; ls -la /tests/ 2>/dev/null | head -20; }
   find . -maxdepth 2 -type f 2>/dev/null | head -40
   echo '```'
-} > AGENTS.md
+})
+export SYSTEM_PROMPT="$SYSTEM_PROMPT
+
+$SNAP"
 { echo "workdir=$WORKDIR"; echo "task_timeout=${MI_TASK_TIMEOUT:-unset}"; echo "deadline=${MI_DEADLINE:-unset}"
   echo "goal_max=${MI_GOAL_MAX:-unset}"; echo "node=$NODE"; echo "start=$START"; } > "$LOG/run.txt"
 
@@ -135,10 +193,25 @@ stamp() { while IFS= read -r line; do printf '[%6ds] %s\n' "$SECONDS" "$line"; d
 SECONDS=0
 # Process substitutions, not a pipeline: services mi leaves running for the
 # verifier may keep the log pipes open, and the wrapper must not wait for them.
-"$NODE" /opt/mi/index.mjs -g "$1" -c "$MI_GOAL_CHECK" < /dev/null \
+export MI_GOAL_FILE="$1"
+# the goal loop's own progress and event logs live in /tmp; keep them with the trial for trajectory analysis.
+# Copied every 20 s while mi runs, not only on EXIT: Harbor kills the wrapper at its timeout without running
+# the trap (7 of 64 corefix trials lost their event logs). The copier's stdio is detached so it holds no log pipe.
+# mi-goal-*.session.json matches nothing since 2026-10-06: the worker's conversation now lives in a private directory that the
+# goal run removes when it ends, and is deliberately not copied out (mi-output.txt keeps every tool call with its full arguments)
+synclogs() { cp /tmp/mi-goal-*.md /tmp/mi-goal-*.jsonl /tmp/mi-goal-*.session.json "$LOG/" 2>/dev/null; }
+( while sleep 20; do synclogs; done ) < /dev/null > /dev/null 2>&1 &
+SYNC=$!
+trap 'kill $SYNC 2>/dev/null; synclogs' EXIT
+"$NODE" /opt/mi/launch.mjs < /dev/null \
   > >(exec > "$LOG/mi-output.txt" 2>/dev/null; stamp) 2> >(exec > "$LOG/mi-stderr.txt" 2>/dev/null; stamp)
 CODE=$?
 sleep 1  # let the stampers flush
+# mi can end a run with exit 0 after its model API refused every request
+# (no credits, bad key); surface that as a failed agent run, not a task miss.
+if [ "$CODE" = 0 ] && FATAL=$(grep -m1 -hE "requires more credits|insufficient_quota|No auth credentials found" "$LOG/mi-output.txt" "$LOG/mi-stderr.txt"); then
+  echo "mi: model API error: $FATAL" >&2; CODE=3
+fi
 echo "end=$(date +%s)" >> "$LOG/run.txt"; echo "exit_code=$CODE" >> "$LOG/run.txt"
 exit $CODE
 """
@@ -170,12 +243,20 @@ class MiOptions(InstalledAgentOptions):
         default=None, description="Seconds for the goal budget (default: the trial's real agent timeout)."
     )
     system_prompt: str | None = Field(default=None, description="Replaces the eval system prompt.")
+    checkout: str | None = Field(
+        default=None,
+        description="Package this mi checkout instead of the one holding this adapter (A/B of mi code under one adapter).",
+    )
+    egress: bool = Field(
+        default=False,
+        description="Require the egress-control sidecar (bench/egress/compose.yaml): the trial fails at setup without it.",
+    )
 
 
 class MiAgent(BaseInstalledAgent):
     options_model = MiOptions
     MODEL_CONNECTION = ModelConnectionSpec()
-    _stage: Path | None = None
+    _stages: dict[Path, Path] = {}
 
     @staticmethod
     def name() -> str:
@@ -184,22 +265,29 @@ class MiAgent(BaseInstalledAgent):
     def get_version_command(self) -> str | None:
         return "cat /opt/mi/VERSION"
 
+    def _repo(self) -> Path:
+        repo = Path(self.options.checkout).expanduser().resolve() if self.options.checkout else REPO
+        if not (repo / "index.mjs").is_file():
+            raise RuntimeError(f"mi: checkout {repo} has no index.mjs")
+        return repo
+
     @classmethod
-    def _staged_checkout(cls) -> Path:
-        """Copy of the checkout's runtime files, built once per Harbor process."""
-        if cls._stage is None:
+    def _staged_checkout(cls, repo: Path = REPO) -> Path:
+        """Copy of a checkout's runtime files, built once per checkout per Harbor process."""
+        if repo not in cls._stages:
             stage = Path(tempfile.mkdtemp(prefix="mi-bench-"))
             atexit.register(shutil.rmtree, stage, True)
             for name in PACKAGE_PATHS:
-                src = REPO / name
+                src = repo / name
                 (shutil.copytree if src.is_dir() else shutil.copy2)(src, stage / name)
-            version = json.loads((REPO / "package.json").read_text())["version"]
-            git = lambda *a: subprocess.run(["git", "-C", str(REPO), *a], capture_output=True, text=True).stdout.strip()
+            version = json.loads((repo / "package.json").read_text())["version"]
+            git = lambda *a: subprocess.run(["git", "-C", str(repo), *a], capture_output=True, text=True).stdout.strip()
             sha, dirty = git("rev-parse", "--short", "HEAD"), git("status", "--porcelain", "--", *PACKAGE_PATHS)
             (stage / "VERSION").write_text(f"{version}+{sha or 'nogit'}{'-dirty' if dirty else ''}\n")
             (stage / "bench-run.sh").write_text(WRAPPER)
-            cls._stage = stage
-        return cls._stage
+            (stage / "launch.mjs").write_text(LAUNCH)
+            cls._stages[repo] = stage
+        return cls._stages[repo]
 
     @staticmethod
     def _node_tarball(arch: str) -> Path | None:
@@ -216,11 +304,55 @@ class MiAgent(BaseInstalledAgent):
         return path
 
     async def install(self, environment: BaseEnvironment) -> None:
-        await environment.upload_dir(self._staged_checkout(), "/opt/mi")
+        await environment.upload_dir(self._staged_checkout(self._repo()), "/opt/mi")
         arch = (await environment.exec(command="uname -m", user="root")).stdout or ""
         if tarball := self._node_tarball(arch.strip()):
             await environment.upload_file(tarball, "/tmp/mi-node.tar.gz")
         await self.exec_as_root(environment, command=INSTALL)
+        if self._egress_container(environment, EGRESS_SERVICE):
+            await environment.upload_file(EGRESS_DIR / "ca" / "mitmproxy-ca-cert.pem", "/opt/mi/egress-ca.pem")
+            for host_bundle in ("/etc/ssl/certs/ca-certificates.crt", "/etc/pki/tls/certs/ca-bundle.crt", "/etc/ssl/cert.pem"):
+                if Path(host_bundle).is_file():
+                    await environment.upload_file(Path(host_bundle), "/opt/mi/host-ca-bundle.pem")
+                    break
+            await self.exec_as_root(environment, command=EGRESS_CA_SETUP)
+        elif self.options.egress:
+            raise RuntimeError("mi: egress control required (kwargs.egress) but the trial has no mi-egress sidecar; "
+                               "add bench/configs/egress.yaml to the job")
+
+    @staticmethod
+    def _egress_container(environment: BaseEnvironment, service: str) -> str | None:
+        """Container id of an egress service of this trial's compose project (looked up from the host)."""
+        session = getattr(environment, "session_id", None)
+        if not session:
+            return None
+        from harbor.environments.docker.docker import _sanitize_docker_compose_project_name as project
+
+        out = subprocess.run(["docker", "ps", "-q", "--filter", f"label=com.docker.compose.project={project(session)}",
+                              "--filter", f"label=com.docker.compose.service={service}"], capture_output=True, text=True)
+        return out.stdout.split()[0] if out.stdout.split() else None
+
+    async def _egress_env(self, environment: BaseEnvironment) -> dict[str, str]:
+        """CA variables for the agent's processes (empty without the sidecar): the image's system bundle, or the
+        host's list when the image has none, each with the run-local CA added by EGRESS_CA_SETUP."""
+        if not self._egress_container(environment, EGRESS_SERVICE):
+            return {}
+        env = {"NODE_EXTRA_CA_CERTS": "/opt/mi/egress-ca.pem", "MI_EGRESS_CA": "/opt/mi/egress-ca.pem"}
+        bundle = ((await environment.exec(command="cat /opt/mi/egress-bundle 2>/dev/null", user="root")).stdout or "").strip()
+        if bundle:
+            env |= {k: bundle for k in ("SSL_CERT_FILE", "REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE", "GIT_SSL_CAINFO",
+                                        "PIP_CERT", "CARGO_HTTP_CAINFO")}
+        return env
+
+    def _egress_finish(self, environment: BaseEnvironment) -> None:
+        """Agent phase over: keep the sidecars' decision logs with the trial (written from the host, outside the
+        container) and switch the shim to plain relaying so the verifier's own downloads are not intercepted."""
+        for service, name in ((EGRESS_SERVICE, "egress-shim.log"), (EGRESS_PROXY_SERVICE, "egress-proxy.log")):
+            if cid := self._egress_container(environment, service):
+                logs = subprocess.run(["docker", "logs", cid], capture_output=True, text=True)
+                (self.logs_dir / name).write_text(logs.stdout + logs.stderr)
+                if service == EGRESS_SERVICE:
+                    subprocess.run(["docker", "exec", cid, "touch", "/run/mi-egress/passthrough"], capture_output=True)
 
     def _task_timeout(self) -> int | None:
         """The agent timeout Harbor enforces for this trial, recomputed from the
@@ -266,6 +398,9 @@ class MiAgent(BaseInstalledAgent):
             "MI_JUDGE_PARAMS": self.options.judge_params or params,
             "SYSTEM_PROMPT": self.options.system_prompt or EVAL_SYSTEM_PROMPT,
             "MI_GOAL_CHECK": TERMINAL_BENCH_CHECK,
+            "MI_DENY": BENCH_DENY,
+            # no planner call in timed runs: it was cut at its limit in every inspected trial (see tools/goal.mjs)
+            "MI_GOAL_PLAN": "0",
             "PAGER": "cat", "GIT_PAGER": "cat", "GIT_EDITOR": "true", "VISUAL": "true", "EDITOR": "true", "TERM": "dumb",
             **self.resolve_env_vars(),
         }
@@ -273,9 +408,19 @@ class MiAgent(BaseInstalledAgent):
             env["OPENAI_BASE_URL"] = base_url
         if timeout := self._task_timeout():
             env["MI_TASK_TIMEOUT"] = str(timeout)
-        await self.exec_as_agent(
-            environment, command=f"bash /opt/mi/bench-run.sh {shlex.quote(instruction)}", env=env, cwd="/"
-        )
+        env |= await self._egress_env(environment)
+        fd, task = tempfile.mkstemp(prefix="mi-task-", suffix=".md")
+        os.close(fd)
+        Path(task).write_text(instruction)
+        try:
+            await environment.upload_file(task, "/opt/mi/task.md")
+        finally:
+            os.unlink(task)
+        await self.exec_as_root(environment, command="chmod a+r /opt/mi/task.md")
+        try:
+            await self.exec_as_agent(environment, command="bash /opt/mi/bench-run.sh /opt/mi/task.md", env=env, cwd="/")
+        finally:
+            self._egress_finish(environment)
 
     def populate_context_post_run(self, context: AgentContext) -> None:
         run = self.logs_dir / "run.txt"
@@ -284,3 +429,35 @@ class MiAgent(BaseInstalledAgent):
         logs = [self.logs_dir / n for n in ("mi-output.txt", "mi-stderr.txt")]
         meta["providers"] = sorted({m for f in logs if f.exists() for m in PROVIDER_RE.findall(f.read_text(errors="replace"))})
         context.metadata = {**(context.metadata or {}), "mi": meta}
+
+
+class MiBaselineAgent(MiAgent):
+    """The same adapter under another name, so one job can run two mi versions side by side:
+    point `kwargs.checkout` at the baseline checkout (e.g. a `git worktree`); compare with
+    `bench/compare.py --a JOB@mi-baseline --b JOB@mi`."""
+
+    @staticmethod
+    def name() -> str:
+        return "mi-baseline"
+
+
+class EgressProbeAgent(MiAgent):
+    """No model: runs bench/egress/probe.sh in the task container during the agent phase, under the same setup
+    as a mi trial (install, CA, environment), and leaves its output in /logs/agent/probe.txt. With
+    bench/configs/egress-probe.yaml this is the named Harbor job that shows which access routes are refused."""
+
+    @staticmethod
+    def name() -> str:
+        return "mi-egress-probe"
+
+    async def run(self, instruction: str, environment: BaseEnvironment, context: AgentContext) -> None:
+        await environment.upload_file(EGRESS_DIR / "probe.sh", "/opt/mi/egress-probe.sh")
+        env = {"MI_DENY": BENCH_DENY, **await self._egress_env(environment)}
+        try:
+            await self.exec_as_agent(environment, command="bash /opt/mi/egress-probe.sh > /logs/agent/probe.txt 2>&1; true",
+                                     env=env, cwd="/")
+        finally:
+            self._egress_finish(environment)
+
+    def populate_context_post_run(self, context: AgentContext) -> None:
+        pass

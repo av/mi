@@ -7,7 +7,7 @@ agentic coding in 30 loc. a loop, two tools, and an llm.
 - works with any OpenAI-compatible API: OpenAI, ollama, lmstudio, litellm, vllm, local models
 - `bash` tool gives full system access: git, curl, compilers, file I/O (`cat`, `sed -i`, heredocs); optional `timeout=<ms>` and `bg=truthy` for background tasks
 - `delegate` tool spawns a mi subagent with a prompt — runs in the same directory, same API, streams output in real-time; optional `timeout=<ms>`
-- `goal` tool pursues a high-level goal by iterating subagents until a bash check command exits 0 — uses a progress file so iterations build on prior work (up to 128 by default)
+- `goal` tool pursues a high-level goal by iterating subagents until a judge subagent accepts the work — the `check` is the judge's prompt (what to inspect or run), not a command mi executes; a progress file lets iterations build on prior work (up to 128 by default)
 - recursive agents: `delegate` and `goal` tools spawn sub-agents natively; any tool can also call `mi` as a child process
 - self-extending: agent can write its own tools via the `self` skill
 - `skill` tool loads markdown playbooks from `skills/` and `~/.agents/skills/` (auto-advertised in system prompt)
@@ -233,17 +233,17 @@ done.
 
 optional `timeout` (ms) kills the subagent if it runs too long. ctrl-c kills the child process group.
 
-**`goal`** wraps delegate in a retry loop. it takes a `goal` (what to achieve), a `check` (bash command that exits 0 on success), and an optional `max` (iteration limit, default 128). before starting, it runs the check — if it already passes, it returns immediately. otherwise it loops:
+**`goal`** wraps delegate in a plan/work/judge loop. it takes a `goal` (what to achieve), a `check` (a prompt for the judge: what to inspect or run, and when to accept), and an optional `max` (iteration limit, default 128). mi does not execute the check itself: a judge subagent reads it, inspects the work with its own tool calls and ends its review with `VERDICT: PASS` or `VERDICT: FAIL`. a check like `npm test` therefore means "judge, run npm test and decide" — the verdict is the judge's, not the command's exit code. a planner subagent first turns the goal into exit criteria, then the judge reviews the starting state — if that review passes, the tool returns immediately. otherwise it loops:
 
-1. create a progress file (`/tmp/mi-goal-<ts>.md`) with the goal, check command, and pre-check output
-2. spawn a subagent with instructions to read the progress file, do the work, and append notes
-3. run the check command (30s timeout)
-4. if the check passes, done. if not, append the check output to the progress file and iterate
+1. create a progress file (`/tmp/mi-goal-<ts>.md`) with the goal, the check and the first review
+2. spawn a worker subagent with instructions to read the progress file, do the work, and append notes
+3. run the judge subagent on the result
+4. if the review's last line is exactly `VERDICT: PASS`, done (when budget allows, a second, blind review has to agree). if not, the review goes to the progress file and the next iteration
 
-the progress file is key: it prevents subagents from re-inventing the world. each iteration reads what was tried before and what the check output was, then picks up where the last one left off.
+the progress file is key: it prevents subagents from re-inventing the world. each iteration reads what was tried before and what the judge found, then picks up where the last one left off.
 
 ```
-⟡ goal({"goal":"make all tests pass","check":"npm test"})
+⟡ goal({"goal":"make all tests pass","check":"run npm test — ACK if it passes, NACK otherwise"})
 ── goal 1/128 ──
   [subagent 1 streams here]
 ── ✗ ──

@@ -1,0 +1,51 @@
+# The other 44 tasks of Terminal-Bench 2.1 (see tb21-half-a.yaml).
+jobs_dir: jobs
+n_attempts: 1
+n_concurrent_trials: 4
+datasets:
+  - name: terminal-bench/terminal-bench-2-1
+    task_names:
+      - terminal-bench/bn-fit-modify
+      - terminal-bench/build-cython-ext
+      - terminal-bench/build-pov-ray
+      - terminal-bench/cancel-async-tasks
+      - terminal-bench/circuit-fibsqrt
+      - terminal-bench/code-from-image
+      - terminal-bench/configure-git-webserver
+      - terminal-bench/count-dataset-tokens
+      - terminal-bench/custom-memory-heap-crash
+      - terminal-bench/distribution-search
+      - terminal-bench/dna-insert
+      - terminal-bench/extract-moves-from-video
+      - terminal-bench/feal-linear-cryptanalysis
+      - terminal-bench/financial-document-processor
+      - terminal-bench/fix-git
+      - terminal-bench/gcode-to-text
+      - terminal-bench/git-multibranch
+      - terminal-bench/headless-terminal
+      - terminal-bench/install-windows-3.11
+      - terminal-bench/large-scale-text-editing
+      - terminal-bench/llm-inference-batching-scheduler
+      - terminal-bench/mailman
+      - terminal-bench/make-mips-interpreter
+      - terminal-bench/merge-diff-arc-agi-task
+      - terminal-bench/modernize-scientific-stack
+      - terminal-bench/mteb-retrieve
+      - terminal-bench/nginx-request-logging
+      - terminal-bench/overfull-hbox
+      - terminal-bench/path-tracing
+      - terminal-bench/polyglot-c-py
+      - terminal-bench/portfolio-optimization
+      - terminal-bench/prove-plus-comm
+      - terminal-bench/pytorch-model-cli
+      - terminal-bench/qemu-alpine-ssh
+      - terminal-bench/query-optimize
+      - terminal-bench/regex-chess
+      - terminal-bench/reshard-c4-data
+      - terminal-bench/sam-cell-seg
+      - terminal-bench/schemelike-metacircular-eval
+      - terminal-bench/sqlite-db-truncate
+      - terminal-bench/torch-pipeline-parallelism
+      - terminal-bench/train-fasttext
+      - terminal-bench/video-processing
+      - terminal-bench/winning-avg-corewars

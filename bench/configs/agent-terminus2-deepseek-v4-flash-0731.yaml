@@ -1,0 +1,12 @@
+# Reproduction anchor: Terminus 2 on DeepSeek V4 Flash 0731, the previous V4 Flash
+# snapshot, which Artificial Analysis published at 78.65% on TB 2.1 (Terminus 2,
+# "Reasoning, Max Effort", pass@1 over 3 repeats). Same settings as the V4.1 runs.
+agents:
+  - name: terminus-2
+    model_name: openrouter/deepseek/deepseek-v4-flash-0731
+    kwargs:
+      temperature: 0.6
+      llm_call_kwargs:
+        extra_body:
+          reasoning: {effort: max}
+          provider: {order: [deepinfra/fp8], allow_fallbacks: false}

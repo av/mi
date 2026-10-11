@@ -1,0 +1,15 @@
+# Named probe job for the egress boundary: a synthetic task and fixture, no model, no benchmark content.
+#   with the boundary:    bench/harbor.sh run -y -c bench/configs/egress-probe.yaml -c bench/configs/egress.yaml --job-name <J>
+#   without it (control): bench/harbor.sh run -y -c bench/configs/egress-probe.yaml --job-name <J>
+# reward 1 = every route in bench/egress/probe.sh behaved as required; the route list is in the trial's agent/probe.txt
+jobs_dir: jobs
+n_attempts: 1
+n_concurrent_trials: 1
+environment:
+  extra_docker_compose:
+    - bench/egress/compose.fixture.yaml
+tasks:
+  - path: bench/egress/probe-task
+agents:
+  - import_path: bench.mi_agent:EgressProbeAgent
+    model_name: openrouter/deepseek/deepseek-v4.1-flash

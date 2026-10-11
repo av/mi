@@ -1,0 +1,53 @@
+# Every other task of Terminal-Bench 2.1 in alphabetical order (45 of 89): a cheaper stand-in for the full set.
+# The other half is tb21-half-b.yaml.
+jobs_dir: jobs
+n_attempts: 1
+n_concurrent_trials: 4
+datasets:
+  - name: terminal-bench/terminal-bench-2-1
+    task_names:
+      - terminal-bench/adaptive-rejection-sampler
+      - terminal-bench/break-filter-js-from-html
+      - terminal-bench/build-pmars
+      - terminal-bench/caffe-cifar-10
+      - terminal-bench/chess-best-move
+      - terminal-bench/cobol-modernization
+      - terminal-bench/compile-compcert
+      - terminal-bench/constraints-scheduling
+      - terminal-bench/crack-7z-hash
+      - terminal-bench/db-wal-recovery
+      - terminal-bench/dna-assembly
+      - terminal-bench/extract-elf
+      - terminal-bench/feal-differential-cryptanalysis
+      - terminal-bench/filter-js-from-html
+      - terminal-bench/fix-code-vulnerability
+      - terminal-bench/fix-ocaml-gc
+      - terminal-bench/git-leak-recovery
+      - terminal-bench/gpt2-codegolf
+      - terminal-bench/hf-model-inference
+      - terminal-bench/kv-store-grpc
+      - terminal-bench/largest-eigenval
+      - terminal-bench/log-summary-date-ranges
+      - terminal-bench/make-doom-for-mips
+      - terminal-bench/mcmc-sampling-stan
+      - terminal-bench/model-extraction-relu-logits
+      - terminal-bench/mteb-leaderboard
+      - terminal-bench/multi-source-data-merger
+      - terminal-bench/openssl-selfsigned-cert
+      - terminal-bench/password-recovery
+      - terminal-bench/path-tracing-reverse
+      - terminal-bench/polyglot-rust-c
+      - terminal-bench/protein-assembly
+      - terminal-bench/pypi-server
+      - terminal-bench/pytorch-model-recovery
+      - terminal-bench/qemu-startup
+      - terminal-bench/raman-fitting
+      - terminal-bench/regex-log
+      - terminal-bench/rstan-to-pystan
+      - terminal-bench/sanitize-git-repo
+      - terminal-bench/sparql-university
+      - terminal-bench/sqlite-with-gcov
+      - terminal-bench/torch-tensor-parallelism
+      - terminal-bench/tune-mjcf
+      - terminal-bench/vulnerable-secret
+      - terminal-bench/write-compressor

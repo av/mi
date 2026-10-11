@@ -1,0 +1,15 @@
+# Synthetic fixtures for the egress probe only. mi-fixture stands in for a benchmark source: a web server that
+# would hand out a sentinel under /terminal-bench/ (denied) and an ordinary file (allowed). mi-relay stands in for
+# a reader/cache/fetching service on a host the policy does not know; it fetches only from mi-fixture.
+# No real benchmark content is involved.
+services:
+  mi-fixture:
+    image: mi-egress:1
+    entrypoint: ["sh", "-c", "mkdir -p /srv/terminal-bench /srv/ordinary && echo SYNTHETIC_ONLY_SENTINEL > /srv/terminal-bench/sentinel && echo ORDINARY_FILE > /srv/ordinary/file && cd /srv && exec python3 -m http.server 80"]
+  mi-relay:
+    image: mi-egress:1
+    entrypoint: ["python3", "/opt/mi-egress/relay.py"]
+  mi-rawrelay:
+    # a relay that does not speak HTTP: any line sent to port 9000 is answered with the sentinel
+    image: mi-egress:1
+    entrypoint: ["python3", "-c", "import socketserver\nclass H(socketserver.StreamRequestHandler):\n    def handle(self):\n        self.rfile.readline(); self.wfile.write(b'SYNTHETIC_ONLY_SENTINEL\\n')\nsocketserver.ThreadingTCPServer.allow_reuse_address = True\nsocketserver.ThreadingTCPServer(('0.0.0.0', 9000), H).serve_forever()"]

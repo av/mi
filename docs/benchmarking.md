@@ -9,7 +9,7 @@ earlier approach taught: `docs/benchmark-history.md`.
 
 | Path | What |
 |---|---|
-| `bench/mi_agent.py` | Harbor installed agent `bench.mi_agent:MiAgent`: uploads this checkout to `/opt/mi`, runs `mi -g <task> -c <check>`, sets the goal budget from the trial's real timeout |
+| `bench/mi_agent.py` | Harbor installed agent `bench.mi_agent:MiAgent` (and `MiBaselineAgent`, the same adapter named `mi-baseline` for same-job A/Bs of another checkout): uploads this checkout (or `kwargs.checkout`) to `/opt/mi`, runs `mi -g <task> -c <check>`, sets the goal budget from the trial's real timeout |
 | `bench/configs/mi.yaml` | base Harbor JobConfig: agent, model, determinism kwargs, concurrency |
 | `bench/configs/{smoke,subset,full}.yaml` | task selection, stacked on `mi.yaml` |
 | `bench/harbor.sh` | runs `harbor` pinned to 0.23.0 (`HARBOR_VERSION` to change) with `bench.mi_agent` importable |
@@ -38,7 +38,7 @@ summary (mean, pass@k, exceptions). Extra arguments go straight to
 npm run bench:subset -- -k 3                     # 3 trials per task (pass@1..3)
 npm run bench:full -- -n 2                       # lower concurrency
 npm run bench:full -- -d terminal-bench@2.0      # TB 2.0 instead of 2.1
-npm run bench:smoke -- -i 'terminal-bench/fix-git'   # narrow to one task
+npm run bench:smoke -- -d terminal-bench/terminal-bench-2-1 -i terminal-bench/fix-git   # one task (-i needs -d)
 bench/harbor.sh run -c bench/configs/mi.yaml -c my-tasks.yaml   # any other selection
 ```
 
@@ -61,6 +61,90 @@ NOISE result. It also reads the archived runs, e.g.
 Protocol: one run is a smoke test, not a measurement. Single runs of the same
 commit differed by 6/22 before the pins and by ~3/22 after. Decide A/B
 questions with `-k 3` or more on both sides.
+
+## Harness comparison (mi vs Terminus 2)
+
+Stack a dataset config with agent configs; Harbor interleaves the agents task
+by task, so both harnesses meet the same host and provider conditions.
+
+```sh
+export OPENROUTER_API_KEY=...
+J=tb21-deepseek-v4-$(date +%Y%m%d)
+bench/harbor.sh run -y -c bench/configs/full.yaml \
+  -c bench/configs/agent-terminus2-deepseek-v4.1-flash.yaml \
+  -c bench/configs/agent-mi-deepseek-v4.1-flash.yaml \
+  -c bench/configs/agent-terminus2-deepseek-v4-flash-0731.yaml \
+  -n 4 --job-name $J &
+bench/guard.py jobs/$J --cap 40 &     # stops the job on spend, low disk or API refusals
+bench/compare.py --a jobs/$J@terminus-2/deepseek-v4.1-flash --b jobs/$J@mi
+bench/compare.py jobs/$J@terminus-2/deepseek-v4-flash-0731   # vs published 78.65%
+```
+
+Pilot first on a few tasks (same command plus
+`-d terminal-bench/terminal-bench-2-1 -i terminal-bench/<task> ...`) and
+scale Harbor's per-trial `cost_usd` before a full run. Results of the
+2026-09-27 run: `docs/benchmark-history.md`.
+
+## Rerunning a failure set
+
+To measure a harness change cheaply, rerun only the tasks a previous run failed,
+with the same agent config:
+
+```sh
+bench/harbor.sh run -y -c bench/configs/tb21-mi-v4.1-failed.yaml \
+  -c bench/configs/agent-mi-deepseek-v4.1-flash.yaml -n 4 --job-name tb21-mi-fix-$(date +%Y%m%d) &
+bench/guard.py jobs/tb21-mi-fix-$(date +%Y%m%d) --cap 5 &
+```
+
+Each trial's `agent/mi-goal-*.md` holds the goal loop's planner, worker and
+judge log. Its "judge summary" shows whether an iteration ended at its cap or
+with the declared artifact still missing.
+
+## A/B of two mi versions in one job
+
+To compare mi code changes under identical host, provider and adapter
+conditions, run both versions in one Harbor job. `bench.mi_agent:MiBaselineAgent`
+is the same adapter class under the name `mi-baseline`. Its `checkout` kwarg
+points at another checkout, which it packages instead of the adapter's own. A
+`git worktree` outside the repo keeps the main checkout and its branch
+untouched. Both arms then use this checkout's adapter, wrapper, prompts and
+goal check, and only the packaged mi code (`index.mjs`, `tools/`, `skills/`)
+differs. `agent_info.version` in each `result.json` shows which code ran
+(`1.12.0+<sha>`).
+
+Harbor 0.23 expands trials as attempts × tasks × agents and does not
+deduplicate agents. A repeated agent entry therefore gives repeated trials of
+that arm, interleaved per task.
+
+Observed on 2026-10-02 with the regex-log task:
+- `--install-only` with 1 baseline and 3 fixed entries ran 4 trials, versioned `1.12.0+4a1f56a` and `1.12.0+7ea0dbb`.
+- A real run with one trial per arm passed in both arms. It cost $0.065 in total.
+
+```sh
+git worktree add --detach ~/code/mi-baseline-4a1f56a 4a1f56a     # baseline code, once
+export OPENROUTER_API_KEY=...
+J=tb21-mi-ab-4a1f56a-vs-fixed-$(date +%Y%m%d)
+setsid nohup bench/harbor.sh run -y -c bench/configs/tb21-mi-v4.1-discriminating.yaml \
+  -c bench/configs/agent-mi-ab-baseline-4a1f56a-deepseek-v4.1-flash.yaml \
+  -n 4 --job-name $J > /tmp/$J.log 2>&1 < /dev/null &
+setsid nohup python3 bench/guard.py jobs/$J --cap 5.5 > /tmp/$J-guard.log 2>&1 < /dev/null &
+bench/compare.py --a jobs/$J@mi-baseline --b jobs/$J@mi
+git worktree remove ~/code/mi-baseline-4a1f56a                  # afterwards
+```
+
+Launched on 2026-10-02 at 16:07 CEST with exactly these commands, as job
+`tb21-mi-ab-4a1f56a-vs-fixed-20261002`: 14 tasks × 4 trials = 56 trials. The fixed arm reports
+version `1.12.0+07bff7c`; its mi code is identical to 7ea0dbb. The decision rule is in
+`docs/benchmark-history.md`, section "2026-10-02".
+
+`agent-mi-ab-baseline-4a1f56a-deepseek-v4.1-flash.yaml` lists the baseline once
+and the current checkout three times. For another A/B, edit `checkout` and the
+counts. Every agent entry needs its full `model_name` and `kwargs`: an entry
+without them runs with no model and fails at once.
+
+Export `OPENROUTER_API_KEY` in the guard's own shell. In
+`export X && cmd &`, the whole chain goes to the background, so the export
+never reaches the commands after it.
 
 ## Parameters
 
@@ -151,3 +235,62 @@ files remain in git history on `master` and are copied to the archive under
 |---|---|---|
 | `judge-merged` | fully merged into `master`; checked out in `.claude/worktrees/agent-a4c21b306b6d18f67` | left for Ivan (`git worktree remove` + `git branch -d`) |
 | `worktree-agent-a4c21b306b6d18f67` | fully merged into `master` | left for Ivan (`git branch -d`) |
+
+## Egress control for evaluation runs
+
+`MI_DENY` matches the text of tool-call arguments only; a URL put together at run time gets past it. Clean runs
+add a network boundary that the task container cannot change:
+
+```sh
+bench/egress/build.sh        # builds mi-egress:1 (it holds filter.py, entrypoint.sh and allowlist.txt: rebuild after changing them) and, once, the run-local CA in bench/egress/ca/ (not committed)
+bench/harbor.sh run -y -c bench/configs/tb21-mi-v4.1-review-clean.yaml \
+  -c bench/configs/agent-mi-deepseek-v4.1-flash-egress.yaml -c bench/configs/egress.yaml -n 4 --job-name <J>
+python3 bench/audit.py jobs/<J>
+```
+
+What is enforced during the agent phase:
+
+- `bench/egress/compose.yaml` puts the task container in the network namespace of the `mi-egress` sidecar, without
+  `NET_ADMIN` or `NET_RAW`. Its outbound IPv4 TCP is redirected into `shim.py`; IPv6 and UDP other than port 53 are
+  rejected.
+- The shim hands a connection to the filtering proxy when it speaks HTTP or TLS and names a host; the proxy opens
+  its own connection to that name. Every other connection (ssh, raw TCP, HTTP or TLS without a host name) is refused.
+- The proxy (`filter.py`) is default deny. The host must be in `bench/egress/allowlist.txt`, and the name the
+  connection was opened for, the TLS server name and the Host header must be the same name. The list holds the
+  model API, OS and language package mirrors, the data sites the 20 tasks used, and four GitHub hosts plus two
+  release-download hosts; it was taken from the proxy logs of `tb21-mi-frozen2-6d8b3a1-20261007`.
+- On listed hosts a URL may not name a benchmark source. GitHub is allowed for named repositories only
+  (`github.com/<owner>/<repo>/...`, the same on `raw.githubusercontent.com` and `codeload.github.com`,
+  `api.github.com/repos/<owner>/<repo>/...`); routes by numeric id, `/graphql`, search, organisation and user
+  listings and gists are refused, and the benchmark's own organisations are refused by name.
+- A request to the model API may not ask the provider to search or fetch for the model. The proxy reads the whole
+  request body, whatever its size (request bodies are never streamed past the filter), and parses it as JSON; a body
+  that is not one JSON object, or that the filter cannot judge, is refused. In that object these are refused, in every value of a repeated key: a
+  `model` or `models` entry with the `:online` suffix; `web_search_options` or `web_search`; a `plugins` entry with
+  id `web`, or whose id cannot be read; a `tools` entry whose type is not `function` (server tools such as
+  `openrouter:web_search`); a non-text content part of `messages` or `input` that carries an http(s) URL (an image
+  or file the provider would download). The field names are OpenRouter's and OpenAI's as documented on 2026-10-11.
+- Tunnels (inner CONNECT, raw TCP after TLS, WebSockets) are refused.
+- The adapter installs the proxy's CA in the container, keeps `agent/egress-shim.log` and `agent/egress-proxy.log`
+  with each trial (host, method, first 300 characters of the path, decision — not headers or bodies), and switches
+  the shim to plain relaying when the agent phase ends.
+
+What is not enforced:
+
+- Request headers and bodies are not inspected, except the model API body as described above. The policy rests on
+  the list holding no host that fetches arbitrary URLs for its caller; a host added to the list must be checked for
+  that.
+- The model API rule knows the request fields listed above and no others. Search switched on outside the request
+  (an account default or a preset at the provider), a model that searches by itself, a field added by a provider
+  later, or the fields of another provider's API are not recognised. Whether OpenRouter acts on each refused shape
+  was not tested (paid API); the rule was tested against a local stand-in for the model host.
+- A copy of benchmark material under an unrelated name on a listed host (a renamed fork, a dataset upload) is not
+  recognised. The two release-download hosts serve signed, opaque URLs and are not path-checked.
+- DNS is not inspected.
+- Nothing is filtered during verification, so a process the agent left running is unfiltered then.
+- A task that needs a host outside the list cannot reach it; a TLS client that ignores the installed CA cannot
+  connect at all. `MI_EGRESS_ALLOW_RAW` (empty by default) lets a non-HTTP destination through.
+
+Probe: `bench/harbor.sh run -y -c bench/configs/egress-probe.yaml -c bench/configs/egress.yaml --job-name <J>`
+(no model; synthetic fixture and relays that are not on the list). Without `egress.yaml` the same job is the
+control and scores 0.

@@ -1,0 +1,21 @@
+# Held-out comparison set (2026-10-09): the tasks of tb21-half-b.yaml that were in none of mi's earlier tuning or
+# rerun sets (the 20-task review set, the head-to-head sample, the failed-task reruns) and in none of the
+# fast-provider runs. Run them in this order and stop where the budget ends; both harnesses get the same tasks.
+jobs_dir: jobs
+n_attempts: 1
+n_concurrent_trials: 4
+datasets:
+  - name: terminal-bench/terminal-bench-2-1
+    task_names:
+      - terminal-bench/code-from-image
+      - terminal-bench/distribution-search
+      - terminal-bench/dna-insert
+      - terminal-bench/gcode-to-text
+      - terminal-bench/git-multibranch
+      - terminal-bench/headless-terminal
+      - terminal-bench/merge-diff-arc-agi-task
+      - terminal-bench/prove-plus-comm
+      - terminal-bench/reshard-c4-data
+      - terminal-bench/sam-cell-seg
+      - terminal-bench/train-fasttext
+      - terminal-bench/video-processing

@@ -4,7 +4,7 @@ import { spawn } from 'node:child_process';
 import * as http from 'node:http';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { readFileSync, writeFileSync, unlinkSync, existsSync, symlinkSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, writeFileSync, unlinkSync, existsSync, symlinkSync, readdirSync, statSync, utimesSync } from 'node:fs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const INDEX_PATH = join(__dirname, '../index.mjs');
@@ -319,7 +319,7 @@ test('-g goal mode takes precedence over non-tty stdin', async () => {
     } else {
       assert.match(prompt, /you are a judge for a goal loop/);
       assert.match(prompt, /do not invent criteria/);
-      sse(res, { role: 'assistant', content: 'already done [PASS]\nACK' });
+      sse(res, { role: 'assistant', content: 'already done [PASS]\nACK\nVERDICT: PASS' });
     }
   };
 
@@ -362,15 +362,19 @@ test('goal workers do work instead of receiving judge criteria', async () => {
       assert.match(prompt, /\[ASSUMED\] decisions MUST be re-derived/);
       assert.match(prompt, /method different IN KIND from the worker's/);
       assert.match(prompt, /do not invent criteria/);
-      sse(res, { role: 'assistant', content: 'missing files [FAIL]\nNACK' });
+      sse(res, { role: 'assistant', content: 'missing files [FAIL]\nNACK\nVERDICT: FAIL' });
     } else if (prompts.length === 3) {
       assert.match(prompt, /you are worker 1\/128/);
-      assert.match(prompt, /complete the goal now/);
+      assert.match(prompt, /solve the task by running shell commands with the bash tool, a few at a time/);
+      assert.match(prompt, /Task Description:\ncreate files\n/);
       assert.match(prompt, /progress file:/);
-      assert.match(prompt, /verifier contract and plan:/);
+      assert.match(prompt, /Refined Exit Criteria And Verification Plan" section holds a planner's notes \(verifier contract and plan: a hypothesis, not a spec\)/);
+      assert.doesNotMatch(prompt, /exact files exist/, 'the planner transcript is referenced, not pasted into the brief');
       assert.match(prompt, /judge feedback and checkpoint:\n[\s\S]*missing files/);
       assert.match(prompt, /guidance:/);
-      assert.match(prompt, /one noninteractive bash script/);
+      assert.match(prompt, /PERSIST ON PASS: the moment you have a candidate result/);
+      assert.match(prompt, /small write-and-test steps/);
+      assert.doesNotMatch(prompt, /one noninteractive bash script/);
       assert.match(prompt, /do not judge/);
       assert.doesNotMatch(prompt, /criteria: inspect state/);
       assert.doesNotMatch(prompt, /judge criteria/);
@@ -378,7 +382,7 @@ test('goal workers do work instead of receiving judge criteria', async () => {
     } else if (prompts.length === 4) {
       assert.match(prompt, /you are a judge for a goal loop/);
       assert.match(prompt, /criteria: inspect state/);
-      sse(res, { role: 'assistant', content: 'all files exist [PASS]\nACK' });
+      sse(res, { role: 'assistant', content: 'all files exist [PASS]\nACK\nVERDICT: PASS' });
     } else {
       assert.match(prompt, /BLIND SKEPTICAL RECHECK/);
       assert.match(prompt, /STRICTLY READ-ONLY/);
@@ -387,11 +391,11 @@ test('goal workers do work instead of receiving judge criteria', async () => {
       assert.match(prompt, /method different IN KIND/);
       assert.match(prompt, /state which method you used/);
       assert.doesNotMatch(prompt, /plan and verifier contract/);
-      sse(res, { role: 'assistant', content: 'independently verified — all files exist [PASS]\nACK' });
+      sse(res, { role: 'assistant', content: 'independently verified — all files exist [PASS]\nACK\nVERDICT: PASS' });
     }
   };
 
-  const result = await runMi(['-g', 'create files', '-c', 'inspect state; end with ACK or NACK']);
+  const result = await runMi(['-g', 'create files', '-c', 'inspect state; end with ACK or NACK\nVERDICT: FAIL']);
   assert.strictEqual(result.status, 0);
   assert.strictEqual(prompts.length, 5);
   assert.match(result.stdout, /independently verified/);
@@ -405,15 +409,15 @@ test('MI_JUDGE_MODEL overrides model for judge and recheck only', async () => {
     if (seen.length === 1) {
       sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- files exist\nARTIFACTS: none\nVERIFIER_SHAPE_CONTRACT\n- files\nVERIFICATION_PLAN\n- inspect\nCURRENT_STATE\n- missing' });
     } else if (seen.length === 2) {
-      sse(res, { role: 'assistant', content: 'missing files [FAIL]\nNACK' });
+      sse(res, { role: 'assistant', content: 'missing files [FAIL]\nNACK\nVERDICT: FAIL' });
     } else if (seen.length === 3) {
       sse(res, { role: 'assistant', content: 'created files' });
     } else {
-      sse(res, { role: 'assistant', content: 'verified [PASS]\nACK' });
+      sse(res, { role: 'assistant', content: 'verified [PASS]\nACK\nVERDICT: PASS' });
     }
   };
 
-  const result = await runMi(['-g', 'create files', '-c', 'inspect; ACK or NACK'], { MODEL: 'worker-model', MI_JUDGE_MODEL: 'judge-model' });
+  const result = await runMi(['-g', 'create files', '-c', 'inspect; ACK or NACK\nVERDICT: FAIL'], { MODEL: 'worker-model', MI_JUDGE_MODEL: 'judge-model' });
   assert.strictEqual(result.status, 0);
   assert.strictEqual(seen.length, 5);
   assert.strictEqual(seen[0].model, 'worker-model');   // planner
@@ -436,18 +440,18 @@ test('goal loop monitors live background jobs from shared registry before judgin
     if (prompts.length === 1) {
       sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- done\nARTIFACTS: none\nVERIFIER_SHAPE_CONTRACT\n- out\nVERIFICATION_PLAN\n- inspect\nCURRENT_STATE\n- running' });
     } else if (prompts.length === 2) {
-      sse(res, { role: 'assistant', content: 'not done [FAIL]\nNACK' });
+      sse(res, { role: 'assistant', content: 'not done [FAIL]\nNACK\nVERDICT: FAIL' });
     } else if (prompts.length === 3) {
       assert.match(prompts[2], /check for running background jobs from previous iterations/);
       assert.match(prompts[2], /do NOT restart or duplicate it/);
       sse(res, { role: 'assistant', content: 'job still running, waiting' });
     } else {
       assert.match(prompts[3], /a live background job .* is work in progress/);
-      sse(res, { role: 'assistant', content: 'done [PASS]\nACK' });
+      sse(res, { role: 'assistant', content: 'done [PASS]\nACK\nVERDICT: PASS' });
     }
   };
   try {
-    const result = await runMi(['-g', 'finish compute', '-c', 'inspect; ACK or NACK'], { MI_SESSION_ID: sid, MI_JOB_POLL_MS: '100' });
+    const result = await runMi(['-g', 'finish compute', '-c', 'inspect; ACK or NACK\nVERDICT: FAIL'], { MI_SESSION_ID: sid, MI_JOB_POLL_MS: '100' });
     assert.strictEqual(result.status, 0);
     // monitor detected the live registered job and polled it (stall guard: log never grew → 3 polls then judge)
     assert.match(result.stdout, /waiting on 1 live bg job/);
@@ -484,14 +488,14 @@ test('goal skips judge with mechanical NACK while declared artifacts are missing
     } else if (prompts.length === 4) {
       // artifact exists now → the skip stops, real judge runs
       assert.match(prompt, /you are a judge for a goal loop/);
-      sse(res, { role: 'assistant', content: 'file exists and passes [PASS]\nACK' });
+      sse(res, { role: 'assistant', content: 'file exists and passes [PASS]\nACK\nVERDICT: PASS' });
     } else {
       assert.match(prompt, /BLIND SKEPTICAL RECHECK/);
-      sse(res, { role: 'assistant', content: 'independently verified [PASS]\nACK' });
+      sse(res, { role: 'assistant', content: 'independently verified [PASS]\nACK\nVERDICT: PASS' });
     }
   };
   try {
-    const result = await runMi(['-g', 'write the file', '-c', 'inspect; ACK or NACK']);
+    const result = await runMi(['-g', 'write the file', '-c', 'inspect; ACK or NACK\nVERDICT: FAIL']);
     assert.strictEqual(result.status, 0);
     assert.strictEqual(prompts.length, 5);
     // exactly one judge model call, and only after the artifact existed
@@ -516,13 +520,13 @@ test('goal parses header-form ARTIFACTS section (paths on following lines)', asy
       sse(res, { role: 'assistant', content: 'wrote the file\nSTRATEGY: direct write' });
     } else if (prompts.length === 3) {
       assert.match(prompt, /you are a judge for a goal loop/);
-      sse(res, { role: 'assistant', content: 'file exists [PASS]\nACK' });
+      sse(res, { role: 'assistant', content: 'file exists [PASS]\nACK\nVERDICT: PASS' });
     } else {
-      sse(res, { role: 'assistant', content: 'verified [PASS]\nACK' });
+      sse(res, { role: 'assistant', content: 'verified [PASS]\nACK\nVERDICT: PASS' });
     }
   };
   try {
-    const result = await runMi(['-g', 'write the file', '-c', 'inspect; ACK or NACK']);
+    const result = await runMi(['-g', 'write the file', '-c', 'inspect; ACK or NACK\nVERDICT: FAIL']);
     assert.strictEqual(result.status, 0);
     assert.strictEqual(prompts.length, 4);
   } finally { try { unlinkSync(art); } catch {} }
@@ -539,7 +543,7 @@ test('goal parses inline-refined and mid-line DECISION forms', async () => {
     } else if (prompts.length === 2) {
       // 'ARTIFACTS: none' refinement won → no mechanical NACK, real pre-check judge runs
       assert.match(prompt, /you are a judge for a goal loop/);
-      sse(res, { role: 'assistant', content: 'not done [FAIL]\nNACK' });
+      sse(res, { role: 'assistant', content: 'not done [FAIL]\nNACK\nVERDICT: FAIL' });
     } else if (prompts.length === 3) {
       // mid-line DECISION parsed verbatim from DECISION: onward
       assert.match(prompt, /you are worker 1\/128/);
@@ -548,43 +552,43 @@ test('goal parses inline-refined and mid-line DECISION forms', async () => {
       assert.match(prompt, /^DECISION: units → seconds BECAUSE "timeout is given in seconds" \[DERIVED\]$/m);
       sse(res, { role: 'assistant', content: 'done\nSTRATEGY: fix units' });
     } else if (prompts.length === 4) {
-      sse(res, { role: 'assistant', content: 'done [PASS]\nACK' });
+      sse(res, { role: 'assistant', content: 'done [PASS]\nACK\nVERDICT: PASS' });
     } else {
-      sse(res, { role: 'assistant', content: 'verified [PASS]\nACK' });
+      sse(res, { role: 'assistant', content: 'verified [PASS]\nACK\nVERDICT: PASS' });
     }
   };
-  const result = await runMi(['-g', 'convert units', '-c', 'inspect; ACK or NACK']);
+  const result = await runMi(['-g', 'convert units', '-c', 'inspect; ACK or NACK\nVERDICT: FAIL']);
   assert.strictEqual(result.status, 0);
   assert.strictEqual(prompts.length, 5);
 });
 
 test('goal mode passes deadline from -d flag and MI_DEADLINE env', async () => {
-  let calls = 0;
+  // With a fresh deadline budget the pre-work judge is skipped: planner, then worker 1, then judges that see budget info.
+  let order = [];
   requestHandler = (req, res, body) => {
-    calls++;
     const prompt = body.messages.at(-1).content;
-    if (calls === 1) {
-      assert.match(prompt, /you are the planner for a goal loop/);
+    if (/you are the planner for a goal loop/.test(prompt)) {
+      order.push('planner');
       sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- done\nVERIFIER_SHAPE_CONTRACT\n- checked\nVERIFICATION_PLAN\n- inspect\nCURRENT_STATE\n- clean' });
-    } else {
-      // Judge should see budget info when deadline is set
-      assert.match(prompt, /you are a judge for a goal loop/);
+    } else if (/you are a judge for a goal loop/.test(prompt)) {
+      order.push('judge');
       assert.match(prompt, /budget:.*remaining of.*total/);
-      sse(res, { role: 'assistant', content: 'done [PASS]\nACK' });
+      sse(res, { role: 'assistant', content: 'done [PASS]\nACK\nVERDICT: PASS' });
+    } else if (/you are worker/.test(prompt)) {
+      order.push('worker');
+      sse(res, { role: 'assistant', content: 'did it\nSTRATEGY: s\nFILES_MODIFIED: x\nCOMMANDS_SUCCEEDED: y\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
+    } else {
+      order.push('other');
+      sse(res, { role: 'assistant', content: 'confirmed [PASS]\nACK\nVERDICT: PASS' });
     }
   };
-
-  // Test with -d flag
   const dl = Math.floor(Date.now() / 1000) + 300;
-  const result = await runMi(['-g', 'deadline test', '-c', 'check it', '-d', String(dl)]);
-  assert.strictEqual(result.status, 0);
-  assert.strictEqual(calls, 2);
-
-  // Test with MI_DEADLINE env var
-  calls = 0;
-  const result2 = await runMi(['-g', 'deadline test', '-c', 'check it'], { MI_DEADLINE: String(dl) });
-  assert.strictEqual(result2.status, 0);
-  assert.strictEqual(calls, 2);
+  for (const [args, env] of [[['-g', 'deadline test', '-c', 'check it', '-d', String(dl)], {}], [['-g', 'deadline test', '-c', 'check it'], { MI_DEADLINE: String(dl) }]]) {
+    order = [];
+    const result = await runMi(args, env);
+    assert.strictEqual(result.status, 0);
+    assert.deepStrictEqual(order.slice(0, 3), ['planner', 'worker', 'judge'], order.join(','));
+  }
 });
 
 test('goal NACK iteration includes strategy fingerprint and diversity warning in next worker', async () => {
@@ -597,7 +601,7 @@ test('goal NACK iteration includes strategy fingerprint and diversity warning in
       sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- tests pass\nVERIFIER_SHAPE_CONTRACT\n- npm test\nVERIFICATION_PLAN\n- run tests\nCURRENT_STATE\n- failing' });
     } else if (prompts.length === 2) {
       // Pre-check judge → NACK
-      sse(res, { role: 'assistant', content: 'tests fail [FAIL]\nNACK' });
+      sse(res, { role: 'assistant', content: 'tests fail [FAIL]\nNACK\nVERDICT: FAIL' });
     } else if (prompts.length === 3) {
       // Worker 1 — no strategy warning yet (first iteration)
       assert.match(prompt, /you are worker 1/);
@@ -605,7 +609,7 @@ test('goal NACK iteration includes strategy fingerprint and diversity warning in
       sse(res, { role: 'assistant', content: 'tried fixing imports\n\n1. STRATEGY: fixed import paths\n2. FILES_MODIFIED: src/index.js\n3. COMMANDS_SUCCEEDED: npm install\n4. COMMANDS_FAILED: npm test (3 failures)\n5. BLOCKERS: type errors\n6. REMAINING: fix types' });
     } else if (prompts.length === 4) {
       // Judge 1 → NACK
-      sse(res, { role: 'assistant', content: '3 tests still fail [FAIL]\nNACK' });
+      sse(res, { role: 'assistant', content: '3 tests still fail [FAIL]\nNACK\nVERDICT: FAIL' });
     } else if (prompts.length === 5) {
       // Worker 2 — should have strategy warning with fingerprint from iteration 1
       assert.match(prompt, /you are worker 2/);
@@ -615,7 +619,7 @@ test('goal NACK iteration includes strategy fingerprint and diversity warning in
       sse(res, { role: 'assistant', content: 'rewrote module\n\n1. STRATEGY: complete rewrite\n2. FILES_MODIFIED: src/index.js\n3. COMMANDS_SUCCEEDED: npm test\n4. COMMANDS_FAILED: none\n5. BLOCKERS: none\n6. REMAINING: none' });
     } else {
       // Judge 2 → ACK
-      sse(res, { role: 'assistant', content: 'all tests pass [PASS]\nACK' });
+      sse(res, { role: 'assistant', content: 'all tests pass [PASS]\nACK\nVERDICT: PASS' });
     }
   };
 
@@ -633,13 +637,13 @@ test('goal NACK iteration passes structured checkpoint to next worker', async ()
     if (prompts.length === 1) {
       sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- done\nVERIFIER_SHAPE_CONTRACT\n- checked\nVERIFICATION_PLAN\n- inspect\nCURRENT_STATE\n- empty' });
     } else if (prompts.length === 2) {
-      sse(res, { role: 'assistant', content: 'not done [FAIL]\nNACK' });
+      sse(res, { role: 'assistant', content: 'not done [FAIL]\nNACK\nVERDICT: FAIL' });
     } else if (prompts.length === 3) {
       // Worker 1 returns structured summary
       sse(res, { role: 'assistant', content: 'did work\n\n1. STRATEGY: built from scratch\n2. FILES_MODIFIED: app.py, config.json\n3. COMMANDS_SUCCEEDED: python setup.py\n4. COMMANDS_FAILED: pytest (2 errors)\n5. BLOCKERS: missing dependency\n6. REMAINING: install deps and rerun' });
     } else if (prompts.length === 4) {
       // Judge 1 → NACK
-      sse(res, { role: 'assistant', content: 'still broken [FAIL]\nNACK' });
+      sse(res, { role: 'assistant', content: 'still broken [FAIL]\nNACK\nVERDICT: FAIL' });
     } else if (prompts.length === 5) {
       // Worker 2 should receive structured checkpoint, not raw judge output
       assert.match(prompt, /FILES_MODIFIED:.*app\.py/);
@@ -647,7 +651,7 @@ test('goal NACK iteration passes structured checkpoint to next worker', async ()
       assert.match(prompt, /BLOCKERS:.*missing dependency/);
       sse(res, { role: 'assistant', content: 'fixed it\n\nSTRATEGY: installed deps\nFILES_MODIFIED: requirements.txt\nCOMMANDS_SUCCEEDED: pip install, pytest\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
     } else {
-      sse(res, { role: 'assistant', content: 'all good [PASS]\nACK' });
+      sse(res, { role: 'assistant', content: 'all good [PASS]\nACK\nVERDICT: PASS' });
     }
   };
 
@@ -666,28 +670,28 @@ test('goal measured/expected ledger surfaces PARAMETER HISTORY after oscillating
       sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- sim stable\nVERIFIER_SHAPE_CONTRACT\n- check timestep\nVERIFICATION_PLAN\n- run sim\nCURRENT_STATE\n- unstable' });
     } else if (prompts.length === 2) {
       // Pre-check NACK, no measured pairs
-      sse(res, { role: 'assistant', content: 'sim unstable [FAIL]\nNACK' });
+      sse(res, { role: 'assistant', content: 'sim unstable [FAIL]\nNACK\nVERDICT: FAIL' });
     } else if (prompts.length === 3) {
       // Worker 1 — single NACK so far, no history table yet
       assert.doesNotMatch(prompt, /PARAMETER HISTORY/);
       sse(res, { role: 'assistant', content: '1. STRATEGY: guessed timestep 0.004\n2. FILES_MODIFIED: model.xml\n3. COMMANDS_SUCCEEDED: sim\n4. COMMANDS_FAILED: check\n5. BLOCKERS: unstable\n6. REMAINING: tune' });
     } else if (prompts.length === 4) {
       // Judge 1 → NACK with measured pair
-      sse(res, { role: 'assistant', content: 'timestep drift: measured=0.004 expected=0.001 [FAIL]\nNACK' });
+      sse(res, { role: 'assistant', content: 'timestep drift: measured=0.004 expected=0.001 [FAIL]\nNACK\nVERDICT: FAIL' });
     } else if (prompts.length === 5) {
       // Worker 2 — one ledger entry only, still no table
       assert.doesNotMatch(prompt, /PARAMETER HISTORY/);
       sse(res, { role: 'assistant', content: '1. STRATEGY: guessed timestep 0.0005\n2. FILES_MODIFIED: model.xml\n3. COMMANDS_SUCCEEDED: sim\n4. COMMANDS_FAILED: check\n5. BLOCKERS: unstable\n6. REMAINING: tune' });
     } else if (prompts.length === 6) {
       // Judge 2 → NACK, same criterion, DIFFERENT measured value
-      sse(res, { role: 'assistant', content: 'timestep drift: measured=0.0005 expected=0.001 [FAIL]\nNACK' });
+      sse(res, { role: 'assistant', content: 'timestep drift: measured=0.0005 expected=0.001 [FAIL]\nNACK\nVERDICT: FAIL' });
     } else if (prompts.length === 7) {
       // Worker 3 — oscillation detected, history table appears
       assert.match(prompt, /PARAMETER HISTORY timestep drift: tried→got: \[0\.004, 0\.0005\]; expected 0\.001/);
       assert.match(prompt, /interpolate\/bisect/);
       sse(res, { role: 'assistant', content: '1. STRATEGY: bisected to 0.001\n2. FILES_MODIFIED: model.xml\n3. COMMANDS_SUCCEEDED: sim, check\n4. COMMANDS_FAILED: none\n5. BLOCKERS: none\n6. REMAINING: none' });
     } else {
-      sse(res, { role: 'assistant', content: 'timestep drift: measured=0.001 expected=0.001 [PASS]\nACK' });
+      sse(res, { role: 'assistant', content: 'timestep drift: measured=0.001 expected=0.001 [PASS]\nACK\nVERDICT: PASS' });
     }
   };
 
@@ -706,26 +710,26 @@ test('goal ledger harvests markdown-table FAIL rows into PARAMETER HISTORY', asy
       sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- tm in range\nVERIFIER_SHAPE_CONTRACT\n- check tm\nVERIFICATION_PLAN\n- run\nCURRENT_STATE\n- off' });
     } else if (prompts.length === 2) {
       // Pre-check NACK, no measured pairs
-      sse(res, { role: 'assistant', content: 'off [FAIL]\nNACK' });
+      sse(res, { role: 'assistant', content: 'off [FAIL]\nNACK\nVERDICT: FAIL' });
     } else if (prompts.length === 3) {
       assert.doesNotMatch(prompt, /PARAMETER HISTORY/);
       sse(res, { role: 'assistant', content: '1. STRATEGY: primer A\n2. FILES_MODIFIED: p.txt\n3. COMMANDS_SUCCEEDED: sim\n4. COMMANDS_FAILED: check\n5. BLOCKERS: hot\n6. REMAINING: tune' });
     } else if (prompts.length === 4) {
       // Judge 1 → NACK as markdown table row only (no canonical line)
-      sse(res, { role: 'assistant', content: '| Criterion | Measured | Required | Status |\n| --- | --- | --- | --- |\n| Melting temperature (forward) | 74.35°C | 58-72°C | FAIL |\nNACK' });
+      sse(res, { role: 'assistant', content: '| Criterion | Measured | Required | Status |\n| --- | --- | --- | --- |\n| Melting temperature (forward) | 74.35°C | 58-72°C | FAIL |\nNACK\nVERDICT: FAIL' });
     } else if (prompts.length === 5) {
       assert.doesNotMatch(prompt, /PARAMETER HISTORY/);
       sse(res, { role: 'assistant', content: '1. STRATEGY: primer B\n2. FILES_MODIFIED: p.txt\n3. COMMANDS_SUCCEEDED: sim\n4. COMMANDS_FAILED: check\n5. BLOCKERS: cold\n6. REMAINING: tune' });
     } else if (prompts.length === 6) {
       // Judge 2 → NACK as table row, same criterion, DIFFERENT measured value
-      sse(res, { role: 'assistant', content: '| Melting temperature (forward) | 55.10°C | 58-72°C | FAIL |\nNACK' });
+      sse(res, { role: 'assistant', content: '| Melting temperature (forward) | 55.10°C | 58-72°C | FAIL |\nNACK\nVERDICT: FAIL' });
     } else if (prompts.length === 7) {
       // Worker 3 — oscillation across table rows → history appears
       assert.match(prompt, /PARAMETER HISTORY melting temperature \(forward\): tried→got: \[74\.35°C, 55\.10°C\]; expected 58-72°C/);
       assert.match(prompt, /interpolate\/bisect/);
       sse(res, { role: 'assistant', content: '1. STRATEGY: primer C\n2. FILES_MODIFIED: p.txt\n3. COMMANDS_SUCCEEDED: sim, check\n4. COMMANDS_FAILED: none\n5. BLOCKERS: none\n6. REMAINING: none' });
     } else {
-      sse(res, { role: 'assistant', content: 'melting temperature (forward): measured=65 expected=58-72 [PASS]\nACK' });
+      sse(res, { role: 'assistant', content: 'melting temperature (forward): measured=65 expected=58-72 [PASS]\nACK\nVERDICT: PASS' });
     }
   };
 
@@ -734,94 +738,73 @@ test('goal ledger harvests markdown-table FAIL rows into PARAMETER HISTORY', asy
   assert.strictEqual(prompts.length, 8);
 });
 
-test('goal salvage triggers when deadline is near', async () => {
-  const prompts = [];
-  // Deadline 30s from now — after planner + precheck, budget should be in SALVAGE
-  const dl = Math.floor(Date.now() / 1000) + 30;
+// Low-budget helper: a fake clock (tests/fake-time.cjs) that jumps to `leftS` seconds before a 1000s deadline, so the
+// salvage / fast-lane paths run inside the deadline (a past deadline now ends the loop before anything starts).
+const lowBudget = () => {
+  const file = `/tmp/mi-test-lowbudget-${process.pid}-${Math.random().toString(36).slice(2)}`;
+  writeFileSync(file, '0');
+  const dl = Math.floor(Date.now() / 1000) + 1000;
+  return { dl, env: { NODE_OPTIONS: `--require ${join(__dirname, 'fake-time.cjs')}`, MI_FAKE_NOW_OFFSET_FILE: file }, jump: leftS => writeFileSync(file, String((dl - leftS) * 1000 - Date.now())), done: () => rmSync(file, { force: true }) };
+};
+const latestEvents = t0 => {
+  const f = readdirSync('/tmp').filter(f => /^mi-goal-\d+\.jsonl$/.test(f)).map(f => `/tmp/${f}`).filter(p => statSync(p).mtimeMs >= t0).sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs)[0];
+  return f ? readFileSync(f, 'utf8').trim().split('\n').map(l => JSON.parse(l)) : [];
+};
+const PLAN_NONE = 'EXIT_CRITERIA\n- done\nARTIFACTS: none\nVERIFIER_SHAPE_CONTRACT\n- checked\nVERIFICATION_PLAN\n- run\nCURRENT_STATE\n- empty';
+const WORK = 'did work\nSTRATEGY: attempt\nFILES_MODIFIED: x\nCOMMANDS_SUCCEEDED: y\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none';
+const kind = p => /you are the planner/.test(p) ? 'planner' : /you are a judge for a goal loop/.test(p) ? 'judge' : /FINAL SALVAGE/.test(p) ? 'salvage' : /SINGLE-BLOCKER FAST LANE/.test(p) ? 'fastlane' : /BLIND SKEPTICAL RECHECK/.test(p) ? 'recheck' : /you are worker/.test(p) ? 'worker' : 'other';
+
+test('goal salvage near the deadline is bounded by the time left and its judge is not started', async () => {
+  // 40s left after planning: too little for a verdict (median valid verdict 163s), so the pre-work judge and the post-salvage
+  // judge are skipped mechanically; salvage runs, capped at the time actually left (no 30s floor, no 90s judge bank).
+  const prompts = [], lb = lowBudget(), t0 = Date.now();
   requestHandler = (req, res, body) => {
     const prompt = body.messages.at(-1).content;
     prompts.push(prompt);
-    if (prompts.length === 1) {
-      // Planner
-      sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- file exists\nVERIFIER_SHAPE_CONTRACT\n- /app/out.txt\nVERIFICATION_PLAN\n- check file\nCURRENT_STATE\n- missing' });
-    } else if (prompts.length === 2) {
-      // Pre-check judge → NACK
-      sse(res, { role: 'assistant', content: 'file missing [FAIL]\nNACK' });
-    } else if (prompts.length === 3) {
-      // Should be salvage prompt (budget < 60s) with bounded pass timeout
-      assert.match(prompt, /FINAL SALVAGE/);
-      assert.match(prompt, /write output artifacts/);
-      assert.match(prompt, /this pass capped at/); // SALVAGE timeout is mechanically bounded when deadline is set
-      sse(res, { role: 'assistant', content: 'wrote /app/out.txt' });
-    } else {
-      // Judge after salvage
-      sse(res, { role: 'assistant', content: 'file exists [PASS]\nACK' });
-    }
+    if (kind(prompt) === 'planner') { lb.jump(40); sse(res, { role: 'assistant', content: PLAN_NONE }); }
+    else sse(res, { role: 'assistant', content: kind(prompt) === 'judge' ? 'file exists [PASS]\nACK\nVERDICT: PASS' : 'wrote /app/out.txt' });
   };
-
-  const result = await runMi(['-g', 'create output', '-c', 'check output', '-d', String(dl)]);
-  assert.strictEqual(result.status, 0);
-  assert.strictEqual(prompts.length, 4);
-  assert.match(result.stdout, /salvage/);
+  try {
+    const result = await runMi(['-g', 'create output', '-c', 'check output', '-d', String(lb.dl)], lb.env);
+    assert.strictEqual(result.status, 0);
+  } finally { lb.done(); }
+  assert.deepStrictEqual(prompts.map(kind), ['planner', 'salvage']);
+  assert.match(prompts[1], /write output artifacts/);
+  const cap = +prompts[1].match(/this pass capped at (\d+)s/)[1];
+  assert.ok(cap > 0 && cap <= 35, `salvage cap ${cap}s must fit in the 40s left`);
+  const ev = latestEvents(t0);
+  assert.strictEqual(ev.filter(e => e.type === 'judge_skipped' && e.reason === 'deadline').length, 2, 'pre-work and post-salvage judges skipped');
+  assert.ok(ev.some(e => e.type === 'salvage'));
 });
 
-test('goal with past deadline triggers immediate salvage', async () => {
+test('goal with a past deadline starts nothing', async () => {
   const prompts = [];
-  // Deadline in the past
-  const dl = Math.floor(Date.now() / 1000) - 100;
-  requestHandler = (req, res, body) => {
-    const prompt = body.messages.at(-1).content;
-    prompts.push(prompt);
-    if (prompts.length === 1) {
-      // Planner
-      sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- done\nVERIFIER_SHAPE_CONTRACT\n- checked\nVERIFICATION_PLAN\n- run\nCURRENT_STATE\n- empty' });
-    } else if (prompts.length === 2) {
-      // Pre-check judge → NACK with TWO failing criteria (multi-FAIL → not fast lane, stays salvage)
-      sse(res, { role: 'assistant', content: 'not ready [FAIL]\nalso broken [FAIL]\nNACK' });
-    } else if (prompts.length === 3) {
-      // Should be salvage (budget is 0, past deadline)
-      assert.match(prompt, /FINAL SALVAGE/);
-      sse(res, { role: 'assistant', content: 'salvaged something' });
-    } else {
-      // Judge after salvage → NACK (doesn't matter for test)
-      sse(res, { role: 'assistant', content: 'incomplete [FAIL]\nNACK' });
-    }
-  };
-
-  const result = await runMi(['-g', 'past deadline', '-c', 'check', '-d', String(dl)]);
-  // Should exit (NACK after salvage breaks the loop)
+  requestHandler = (req, res, body) => { prompts.push(body.messages.at(-1).content); sse(res, { role: 'assistant', content: 'x [FAIL]\nNACK\nVERDICT: FAIL' }); };
+  const result = await runMi(['-g', 'past deadline', '-c', 'check', '-d', String(Math.floor(Date.now() / 1000) - 100)]);
   assert.strictEqual(result.status, 0);
-  assert.strictEqual(prompts.length, 4);
+  assert.strictEqual(prompts.length, 0, 'no planner, worker, salvage or judge after the deadline');
+  assert.match(result.stdout, /deadline has passed/);
 });
 
 test('goal single-blocker fast lane: low budget + one FAIL → surgical brief', async () => {
-  const prompts = [];
-  const dl = Math.floor(Date.now() / 1000) - 100; // past deadline → budget fraction 0 < 0.3
+  const prompts = [], lb = lowBudget();
   requestHandler = (req, res, body) => {
     const prompt = body.messages.at(-1).content;
     prompts.push(prompt);
-    if (prompts.length === 1) {
-      sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- constant right\nVERIFIER_SHAPE_CONTRACT\n- check R\nVERIFICATION_PLAN\n- run\nCURRENT_STATE\n- off' });
-    } else if (prompts.length === 2) {
-      // Pre-check judge → NACK with exactly ONE failing criterion
-      sse(res, { role: 'assistant', content: 'R integration constant: measured=0.5 expected=1.0 [FAIL]\nNACK' });
-    } else if (prompts.length === 3) {
-      // Worker should get the SURGICAL brief, not salvage/strategy scaffolding
-      assert.match(prompt, /SINGLE-BLOCKER FAST LANE/);
-      assert.match(prompt, /fix ONLY this criterion/);
-      assert.match(prompt, /R integration constant: measured=0.5 expected=1.0 \[FAIL\]/);
-      assert.doesNotMatch(prompt, /FINAL SALVAGE/);
-      assert.doesNotMatch(prompt, /failed strategies/);
-      assert.doesNotMatch(prompt, /BLOCKED/);
-      sse(res, { role: 'assistant', content: 'fixed the constant\nSTRATEGY: one-line fix\nFILES_MODIFIED: r.py\nCOMMANDS_SUCCEEDED: check\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
-    } else {
-      sse(res, { role: 'assistant', content: 'R integration constant: measured=1.0 expected=1.0 [PASS]\nACK' });
-    }
+    if (prompts.length === 1) { lb.jump(100); sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- constant right\nVERIFIER_SHAPE_CONTRACT\n- check R\nVERIFICATION_PLAN\n- run\nCURRENT_STATE\n- off' }); } // 10% budget left
+    else if (prompts.length === 2) sse(res, { role: 'assistant', content: 'R integration constant: measured=0.5 expected=1.0 [FAIL]\nNACK\nVERDICT: FAIL' }); // pre-check: exactly ONE failing criterion
+    else if (prompts.length === 3) sse(res, { role: 'assistant', content: 'fixed the constant\nSTRATEGY: one-line fix\nFILES_MODIFIED: r.py\nCOMMANDS_SUCCEEDED: check\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
+    else sse(res, { role: 'assistant', content: 'R integration constant: measured=1.0 expected=1.0 [PASS]\nACK\nVERDICT: PASS' });
   };
-  const result = await runMi(['-g', 'fix sampler', '-c', 'check R', '-d', String(dl)]);
-  assert.strictEqual(result.status, 0);
+  try {
+    const result = await runMi(['-g', 'fix sampler', '-c', 'check R', '-d', String(lb.dl)], lb.env);
+    assert.strictEqual(result.status, 0);
+  } finally { lb.done(); }
   // planner + precheck + surgical worker + judge(ACK); recheck skipped (budget < 180s)
-  assert.strictEqual(prompts.length, 4);
+  assert.deepStrictEqual(prompts.map(kind), ['planner', 'judge', 'fastlane', 'judge']);
+  assert.match(prompts[2], /fix ONLY this criterion/);
+  assert.match(prompts[2], /R integration constant: measured=0.5 expected=1.0 \[FAIL\]/);
+  assert.doesNotMatch(prompts[2], /FINAL SALVAGE|failed strategies|BLOCKED/);
 });
 
 test('goal fast lane suppressed: high budget one FAIL → normal worker prompt', async () => {
@@ -833,14 +816,14 @@ test('goal fast lane suppressed: high budget one FAIL → normal worker prompt',
     if (prompts.length === 1) {
       sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- ok\nVERIFIER_SHAPE_CONTRACT\n- check\nVERIFICATION_PLAN\n- run\nCURRENT_STATE\n- off' });
     } else if (prompts.length === 2) {
-      sse(res, { role: 'assistant', content: 'one thing: measured=2 expected=3 [FAIL]\nNACK' });
+      sse(res, { role: 'assistant', content: 'one thing: measured=2 expected=3 [FAIL]\nNACK\nVERDICT: FAIL' });
     } else if (prompts.length === 3) {
       // High budget → normal worker scaffolding, NOT the fast lane
       assert.match(prompt, /you are worker/);
       assert.doesNotMatch(prompt, /SINGLE-BLOCKER FAST LANE/);
       sse(res, { role: 'assistant', content: 'did it\nSTRATEGY: normal\nFILES_MODIFIED: x\nCOMMANDS_SUCCEEDED: y\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
     } else {
-      sse(res, { role: 'assistant', content: 'one thing: measured=3 expected=3 [PASS]\nACK' });
+      sse(res, { role: 'assistant', content: 'one thing: measured=3 expected=3 [PASS]\nACK\nVERDICT: PASS' });
     }
   };
   const result = await runMi(['-g', 'fix it', '-c', 'check', '-d', String(dl)]);
@@ -860,7 +843,7 @@ test('goal DECISION lines from plan are echoed verbatim into worker prompts', as
       assert.match(prompt, /\[ASSUMED — verify both branches/);
       sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- count right\nARTIFACTS: none\nAMBIGUITIES\n- DECISION: which fields to tokenize → text field only BECAUSE "count tokens in the text column" [DERIVED]\nDECISION: tokenizer variant → cl100k_base [ASSUMED — verify both branches before final answer]\nVERIFIER_SHAPE_CONTRACT\n- check count\nVERIFICATION_PLAN\n- run\nCURRENT_STATE\n- empty' });
     } else if (prompts.length === 2) {
-      sse(res, { role: 'assistant', content: 'count wrong [FAIL]\nNACK' });
+      sse(res, { role: 'assistant', content: 'count wrong [FAIL]\nNACK\nVERDICT: FAIL' });
     } else if (prompts.length === 3) {
       // Worker prompt carries the DECISIONS block with both lines verbatim (bullet prefix stripped)
       assert.match(prompt, /DECISIONS \(interpretation forks already resolved/);
@@ -868,7 +851,7 @@ test('goal DECISION lines from plan are echoed verbatim into worker prompts', as
       assert.match(prompt, /DECISION: tokenizer variant → cl100k_base \[ASSUMED — verify both branches before final answer\]/);
       sse(res, { role: 'assistant', content: 'counted\nSTRATEGY: text field\nFILES_MODIFIED: out.txt\nCOMMANDS_SUCCEEDED: count\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
     } else {
-      sse(res, { role: 'assistant', content: 'count: measured=42 expected=42 [PASS]\nACK' });
+      sse(res, { role: 'assistant', content: 'count: measured=42 expected=42 [PASS]\nACK\nVERDICT: PASS' });
     }
   };
   const result = await runMi(['-g', 'count tokens', '-c', 'check count']);
@@ -883,12 +866,12 @@ test('goal without DECISION lines emits no DECISIONS block', async () => {
     if (prompts.length === 1) {
       sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- done\nAMBIGUITIES: none\nVERIFIER_SHAPE_CONTRACT\n- checked\nVERIFICATION_PLAN\n- run\nCURRENT_STATE\n- empty' });
     } else if (prompts.length === 2) {
-      sse(res, { role: 'assistant', content: 'not done [FAIL]\nNACK' });
+      sse(res, { role: 'assistant', content: 'not done [FAIL]\nNACK\nVERDICT: FAIL' });
     } else if (prompts.length === 3) {
       assert.doesNotMatch(prompt, /DECISIONS \(interpretation forks/);
       sse(res, { role: 'assistant', content: 'done\nSTRATEGY: direct\nFILES_MODIFIED: x\nCOMMANDS_SUCCEEDED: y\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
     } else {
-      sse(res, { role: 'assistant', content: 'done: measured=1 expected=1 [PASS]\nACK' });
+      sse(res, { role: 'assistant', content: 'done: measured=1 expected=1 [PASS]\nACK\nVERDICT: PASS' });
     }
   };
   const result = await runMi(['-g', 'simple task', '-c', 'check it']);
@@ -896,48 +879,37 @@ test('goal without DECISION lines emits no DECISIONS block', async () => {
 });
 
 test('goal DECISIONS block echoed into fast-lane surgical brief', async () => {
-  const prompts = [];
-  const dl = Math.floor(Date.now() / 1000) - 100; // past deadline → fast lane on single FAIL
+  const prompts = [], lb = lowBudget();
   requestHandler = (req, res, body) => {
     const prompt = body.messages.at(-1).content;
     prompts.push(prompt);
-    if (prompts.length === 1) {
-      sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- ok\nAMBIGUITIES\nDECISION: edge orientation → A->B BECAUSE "A causes B" [DERIVED]\nVERIFIER_SHAPE_CONTRACT\n- check\nVERIFICATION_PLAN\n- run\nCURRENT_STATE\n- off' });
-    } else if (prompts.length === 2) {
-      sse(res, { role: 'assistant', content: 'edge: measured=B->A expected=A->B [FAIL]\nNACK' });
-    } else if (prompts.length === 3) {
-      assert.match(prompt, /SINGLE-BLOCKER FAST LANE/);
-      assert.match(prompt, /DECISION: edge orientation → A->B BECAUSE "A causes B" \[DERIVED\]/);
-      sse(res, { role: 'assistant', content: 'flipped edge\nSTRATEGY: fix\nFILES_MODIFIED: g\nCOMMANDS_SUCCEEDED: c\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
-    } else {
-      sse(res, { role: 'assistant', content: 'edge: measured=A->B expected=A->B [PASS]\nACK' });
-    }
+    if (prompts.length === 1) { lb.jump(100); sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- ok\nAMBIGUITIES\nDECISION: edge orientation → A->B BECAUSE "A causes B" [DERIVED]\nVERIFIER_SHAPE_CONTRACT\n- check\nVERIFICATION_PLAN\n- run\nCURRENT_STATE\n- off' }); }
+    else if (prompts.length === 2) sse(res, { role: 'assistant', content: 'edge: measured=B->A expected=A->B [FAIL]\nNACK\nVERDICT: FAIL' });
+    else if (prompts.length === 3) sse(res, { role: 'assistant', content: 'flipped edge\nSTRATEGY: fix\nFILES_MODIFIED: g\nCOMMANDS_SUCCEEDED: c\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
+    else sse(res, { role: 'assistant', content: 'edge: measured=A->B expected=A->B [PASS]\nACK\nVERDICT: PASS' });
   };
-  const result = await runMi(['-g', 'orient edges', '-c', 'check edges', '-d', String(dl)]);
-  assert.strictEqual(result.status, 0);
+  try {
+    const result = await runMi(['-g', 'orient edges', '-c', 'check edges', '-d', String(lb.dl)], lb.env);
+    assert.strictEqual(result.status, 0);
+  } finally { lb.done(); }
+  assert.strictEqual(kind(prompts[2]), 'fastlane');
+  assert.match(prompts[2], /DECISION: edge orientation → A->B BECAUSE "A causes B" \[DERIVED\]/);
 });
 
 test('goal DECISIONS block echoed into salvage brief', async () => {
-  const prompts = [];
-  const dl = Math.floor(Date.now() / 1000) - 100; // past deadline, multi-FAIL → salvage
+  const prompts = [], lb = lowBudget();
   requestHandler = (req, res, body) => {
     const prompt = body.messages.at(-1).content;
     prompts.push(prompt);
-    if (prompts.length === 1) {
-      sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- done\nAMBIGUITIES\nDECISION: prompt usage → use model prompts BECAUSE "model config declares query prompts" [DERIVED]\nVERIFIER_SHAPE_CONTRACT\n- checked\nVERIFICATION_PLAN\n- run\nCURRENT_STATE\n- empty' });
-    } else if (prompts.length === 2) {
-      sse(res, { role: 'assistant', content: 'not ready [FAIL]\nalso broken [FAIL]\nNACK' });
-    } else if (prompts.length === 3) {
-      assert.match(prompt, /FINAL SALVAGE/);
-      assert.match(prompt, /DECISION: prompt usage → use model prompts BECAUSE "model config declares query prompts" \[DERIVED\]/);
-      sse(res, { role: 'assistant', content: 'salvaged' });
-    } else {
-      sse(res, { role: 'assistant', content: 'incomplete [FAIL]\nNACK' });
-    }
+    if (prompts.length === 1) { lb.jump(40); sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- done\nAMBIGUITIES\nDECISION: prompt usage → use model prompts BECAUSE "model config declares query prompts" [DERIVED]\nVERIFIER_SHAPE_CONTRACT\n- checked\nVERIFICATION_PLAN\n- run\nCURRENT_STATE\n- empty' }); }
+    else sse(res, { role: 'assistant', content: 'salvaged' });
   };
-  const result = await runMi(['-g', 'encode corpus', '-c', 'check', '-d', String(dl)]);
-  assert.strictEqual(result.status, 0);
-  assert.strictEqual(prompts.length, 4);
+  try {
+    const result = await runMi(['-g', 'encode corpus', '-c', 'check', '-d', String(lb.dl)], lb.env);
+    assert.strictEqual(result.status, 0);
+  } finally { lb.done(); }
+  assert.deepStrictEqual(prompts.map(kind), ['planner', 'salvage']);
+  assert.match(prompts[1], /DECISION: prompt usage → use model prompts BECAUSE "model config declares query prompts" \[DERIVED\]/);
 });
 
 test('goal budget phase shows in console output', async () => {
@@ -948,11 +920,11 @@ test('goal budget phase shows in console output', async () => {
     if (calls === 1) {
       sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- done\nVERIFIER_SHAPE_CONTRACT\n- ok\nVERIFICATION_PLAN\n- check\nCURRENT_STATE\n- ready' });
     } else if (calls === 2) {
-      sse(res, { role: 'assistant', content: 'not ready [FAIL]\nNACK' });
+      sse(res, { role: 'assistant', content: 'not ready [FAIL]\nNACK\nVERDICT: FAIL' });
     } else if (calls === 3) {
       sse(res, { role: 'assistant', content: 'did work\nSTRATEGY: fixed it\nFILES_MODIFIED: x\nCOMMANDS_SUCCEEDED: y\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
     } else {
-      sse(res, { role: 'assistant', content: 'all good [PASS]\nACK' });
+      sse(res, { role: 'assistant', content: 'all good [PASS]\nACK\nVERDICT: PASS' });
     }
   };
 
@@ -969,17 +941,17 @@ test('goal strategy escalation after 2+ failures', async () => {
     if (prompts.length === 1) {
       sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- pass\nVERIFIER_SHAPE_CONTRACT\n- tests\nVERIFICATION_PLAN\n- run\nCURRENT_STATE\n- failing' });
     } else if (prompts.length === 2) {
-      sse(res, { role: 'assistant', content: 'fail [FAIL]\nNACK' });
+      sse(res, { role: 'assistant', content: 'fail [FAIL]\nNACK\nVERDICT: FAIL' });
     } else if (prompts.length === 3) {
       // Worker 1
       sse(res, { role: 'assistant', content: 'attempt 1\nSTRATEGY: patched config\nFILES_MODIFIED: config.json\nCOMMANDS_SUCCEEDED: none\nCOMMANDS_FAILED: test\nBLOCKERS: config wrong\nREMAINING: fix config' });
     } else if (prompts.length === 4) {
-      sse(res, { role: 'assistant', content: 'still broken [FAIL]\nNACK' });
+      sse(res, { role: 'assistant', content: 'still broken [FAIL]\nNACK\nVERDICT: FAIL' });
     } else if (prompts.length === 5) {
       // Worker 2
       sse(res, { role: 'assistant', content: 'attempt 2\nSTRATEGY: rewrote config parser\nFILES_MODIFIED: parser.js\nCOMMANDS_SUCCEEDED: none\nCOMMANDS_FAILED: test\nBLOCKERS: parser bug\nREMAINING: fix parser' });
     } else if (prompts.length === 6) {
-      sse(res, { role: 'assistant', content: 'still broken [FAIL]\nNACK' });
+      sse(res, { role: 'assistant', content: 'still broken [FAIL]\nNACK\nVERDICT: FAIL' });
     } else if (prompts.length === 7) {
       // Worker 3 — should have escalated language (2+ prior strategies)
       assert.match(prompt, /abandon this solution family/);
@@ -987,7 +959,7 @@ test('goal strategy escalation after 2+ failures', async () => {
       assert.match(prompt, /rewrote config parser/);
       sse(res, { role: 'assistant', content: 'complete rewrite\nSTRATEGY: new architecture\nFILES_MODIFIED: all\nCOMMANDS_SUCCEEDED: test\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
     } else {
-      sse(res, { role: 'assistant', content: 'pass [PASS]\nACK' });
+      sse(res, { role: 'assistant', content: 'pass [PASS]\nACK\nVERDICT: PASS' });
     }
   };
 
@@ -1034,7 +1006,7 @@ test('goal pivot mandate fires once past 30% budget with missing artifact', asyn
       writeFileSync(artifact, 'built');
       sse(res, { role: 'assistant', content: 'built it\nSTRATEGY: opam build\nFILES_MODIFIED: out\nCOMMANDS_SUCCEEDED: make\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
     } else {
-      sse(res, { role: 'assistant', content: 'built: measured=yes expected=yes [PASS]\nACK' });
+      sse(res, { role: 'assistant', content: 'built: measured=yes expected=yes [PASS]\nACK\nVERDICT: PASS' });
     }
   };
   try {
@@ -1069,7 +1041,7 @@ test('goal pivot precedence: 30% pivot replaces escalation, escalation fires lat
       writeFileSync(artifact, 'built');
       sse(res, { role: 'assistant', content: 'built\nSTRATEGY: opam build\nFILES_MODIFIED: out\nCOMMANDS_SUCCEEDED: make\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
     } else {
-      sse(res, { role: 'assistant', content: 'built: measured=yes expected=yes [PASS]\nACK' });
+      sse(res, { role: 'assistant', content: 'built: measured=yes expected=yes [PASS]\nACK\nVERDICT: PASS' });
     }
   };
   try {
@@ -1091,7 +1063,7 @@ test('goal pivot suppressed: no deadline, artifact exists, or live jobs', async 
       assert.doesNotMatch(prompt, /PIVOT MANDATE/);
       writeFileSync(artifactA, 'done');
       sse(res, { role: 'assistant', content: 'done\nSTRATEGY: direct\nFILES_MODIFIED: out\nCOMMANDS_SUCCEEDED: make\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
-    } else sse(res, { role: 'assistant', content: 'done: measured=1 expected=1 [PASS]\nACK' });
+    } else sse(res, { role: 'assistant', content: 'done: measured=1 expected=1 [PASS]\nACK\nVERDICT: PASS' });
   };
   try {
     assert.strictEqual((await runMi(['-g', 'build', '-c', 'check'])).status, 0);
@@ -1108,11 +1080,11 @@ test('goal pivot suppressed: no deadline, artifact exists, or live jobs', async 
     const prompt = body.messages.at(-1).content;
     prompts.push(prompt);
     if (prompts.length === 1) { writeFileSync(offsetFileB, '450000'); sse(res, { role: 'assistant', content: LADDER_PLAN(artifactB) }); }
-    else if (prompts.length === 2) sse(res, { role: 'assistant', content: 'wrong [FAIL]\nbroken [FAIL]\nNACK' }); // real precheck judge (artifact exists)
+    else if (prompts.length === 2) sse(res, { role: 'assistant', content: 'wrong [FAIL]\nbroken [FAIL]\nNACK\nVERDICT: FAIL' }); // real precheck judge (artifact exists)
     else if (prompts.length === 3) {
       assert.doesNotMatch(prompt, /PIVOT MANDATE/);
       sse(res, { role: 'assistant', content: 'fixed\nSTRATEGY: repair\nFILES_MODIFIED: out\nCOMMANDS_SUCCEEDED: make\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
-    } else sse(res, { role: 'assistant', content: 'ok: measured=1 expected=1 [PASS]\nACK' });
+    } else sse(res, { role: 'assistant', content: 'ok: measured=1 expected=1 [PASS]\nACK\nVERDICT: PASS' });
   };
   try {
     assert.strictEqual((await runMi(['-g', 'build', '-c', 'check', '-d', String(dlB)], fakeTimeEnv(offsetFileB))).status, 0);
@@ -1138,7 +1110,7 @@ test('goal pivot suppressed: no deadline, artifact exists, or live jobs', async 
       writeFileSync(artifactC, 'built');
       rmSync(jobsFile, { force: true }); // job "finishes" so monitor exits fast
       sse(res, { role: 'assistant', content: 'built\nSTRATEGY: wait\nFILES_MODIFIED: out\nCOMMANDS_SUCCEEDED: make\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
-    } else sse(res, { role: 'assistant', content: 'built: measured=1 expected=1 [PASS]\nACK' });
+    } else sse(res, { role: 'assistant', content: 'built: measured=1 expected=1 [PASS]\nACK\nVERDICT: PASS' });
   };
   try {
     const r = await runMi(['-g', 'build', '-c', 'check', '-d', String(dlC)], { ...fakeTimeEnv(offsetFileC), MI_SESSION_ID: sid, MI_JOB_POLL_MS: '50' });
@@ -2909,6 +2881,52 @@ test('error .code preserved on HTTP error enables compaction', async () => {
   assert.match(result.stdout, /recovered after compaction/);
 });
 
+test('goal does not treat task text about funds/balances as API credit exhaustion', async () => {
+  // cobol-modernization (TB 2.1): planner output quoting the task's "insufficient funds" / balance checks tripped
+  // isFatal and aborted the goal loop at planning (91s, no worker ever ran).
+  const prompts = [];
+  requestHandler = (req, res, body) => {
+    const prompt = body.messages.at(-1).content;
+    prompts.push(prompt);
+    if (/you are the planner for a goal loop/.test(prompt)) sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- balances correct\nCURRENT_STATE\n- Transaction failed: insufficient funds; balance 0000000880 below amount; payment rejected' });
+    else if (/you are a judge for a goal loop/.test(prompt)) sse(res, { role: 'assistant', content: 'ok [PASS]\nACK\nVERDICT: PASS' });
+    else sse(res, { role: 'assistant', content: 'done\nSTRATEGY: s\nFILES_MODIFIED: x\nCOMMANDS_SUCCEEDED: y\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
+  };
+  const result = await runMi(['-g', 'fix the ledger', '-c', 'check', '-d', String(Math.floor(Date.now() / 1000) + 600)]);
+  assert.strictEqual(result.status, 0);
+  assert.ok(prompts.some(p => /you are worker 1/.test(p)), 'worker ran (no false fatal abort)');
+  assert.doesNotMatch(result.stdout, /API credit exhaustion/);
+});
+
+test('empty completion (no text, no tool calls) is retried instead of ending the turn', async () => {
+  // A reasoning model at max effort can spend its whole output budget thinking and return no answer
+  // (probe: DeepSeek V4.1 Flash, 131072 reasoning tokens, 0 content, 821s). That must not read as "done".
+  let calls = 0;
+  requestHandler = (req, res) => {
+    calls++;
+    if (calls === 1) sse(res, { role: 'assistant', content: '' });
+    else sse(res, { role: 'assistant', content: 'real answer' });
+  };
+  const result = await runMi(['-p', 'hi']);
+  assert.strictEqual(result.status, 0);
+  assert.strictEqual(calls, 2);
+  assert.match(result.stdout, /real answer/);
+});
+
+test('request that exceeds MI_REQUEST_TIMEOUT is aborted and retried', async () => {
+  // Runaway reasoning streams for many minutes; the per-request timeout (default 600s) cuts it and retries.
+  let calls = 0;
+  requestHandler = (req, res) => {
+    calls++;
+    if (calls === 1) { res.writeHead(200, { 'Content-Type': 'text/event-stream' }); res.write(': thinking\n\n'); setTimeout(() => { try { res.end(); } catch {} }, 4000); return; }
+    sse(res, { role: 'assistant', content: 'after retry' });
+  };
+  const result = await runMi(['-p', 'hi'], { MI_REQUEST_TIMEOUT: '1' });
+  assert.strictEqual(result.status, 0);
+  assert.ok(calls >= 2, `expected a retry, got ${calls} call(s)`);
+  assert.match(result.stdout, /after retry/);
+});
+
 test('MI_API_PARAMS with invalid JSON gives clean error', async () => {
   const result = await runMi(['-p', 'hello'], { MI_API_PARAMS: '{bad json' });
   assert.notStrictEqual(result.status, 0, 'Should exit with error');
@@ -2924,7 +2942,21 @@ import { tmpdir } from 'node:os';
 test('Harbor adapter routes tasks through goal mode with the eval prompts', async () => {
   const adapter = readFileSync(join(__dirname, '../bench/mi_agent.py'), 'utf8');
   assert.match(adapter, /class MiAgent\(BaseInstalledAgent\)/);
-  assert.match(adapter, /index\.mjs -g "\$1" -c "\$MI_GOAL_CHECK"/);
+  // same-job A/B of two mi checkouts under one adapter: kwargs.checkout + a separately named class
+  assert.match(adapter, /class MiBaselineAgent\(MiAgent\):[\s\S]*return "mi-baseline"/);
+  // goal comes from a file via launch.mjs: no process argv carries task text (kv-store-grpc self-kill, exit 143)
+  assert.match(adapter, /readFileSync\(process\.env\.MI_GOAL_FILE, 'utf8'\), '-c', process\.env\.MI_GOAL_CHECK/);
+  assert.match(adapter, /"\$NODE" \/opt\/mi\/launch\.mjs < \/dev\/null/);
+  assert.match(adapter, /bench-run\.sh \/opt\/mi\/task\.md"/);
+  assert.doesNotMatch(adapter, /bench-run\.sh \{shlex/);
+  assert.match(adapter, /cp \/tmp\/mi-goal-\*\.md \/tmp\/mi-goal-\*\.jsonl \/tmp\/mi-goal-\*\.session\.json "\$LOG\/"/); // logs + the worker's conversation
+  // goal logs are copied periodically during the run (Harbor kills skip the EXIT trap: 7 of 64 trials lost them), and on EXIT
+  assert.match(adapter, /\( while sleep 20; do synclogs; done \) < \/dev\/null > \/dev\/null 2>&1 &\nSYNC=\$!/);
+  assert.match(adapter, /trap 'kill \$SYNC 2>\/dev\/null; synclogs' EXIT/);
+  assert.ok(adapter.indexOf('SYNC=$!') < adapter.indexOf('"$NODE" /opt/mi/launch.mjs'), 'log copier starts before mi');
+  const wrapper = adapter.match(/WRAPPER = r"""([\s\S]*?)"""/)[1], wfile = join(tmpdir(), `mi-wrapper-${process.pid}.sh`);
+  writeFileSync(wfile, wrapper);
+  try { execFileSync('bash', ['-n', wfile]); } finally { rmSync(wfile, { force: true }); } // the wrapper must stay valid bash
   assert.match(adapter, /"MI_GOAL_CHECK": TERMINAL_BENCH_CHECK/);
   assert.match(adapter, /hidden external verifier/);
   assert.match(adapter, /never NACK for margin/);
@@ -2934,6 +2966,9 @@ test('Harbor adapter routes tasks through goal mode with the eval prompts', asyn
   // services left running for the verifier must not keep the wrapper waiting on a log pipe
   assert.match(adapter, /< \/dev\/null \\\n\s+> >\(exec > "\$LOG\/mi-output\.txt" 2>\/dev\/null; stamp\)/);
   assert.doesNotMatch(adapter, /\| stamp/);
+  // an API that refuses every call must fail the agent run, not read as a task miss
+  assert.match(adapter, /requires more credits\|insufficient_quota/);
+  assert.match(adapter, /CODE=3/);
 });
 
 test('Harbor adapter derives the goal budget from the trial agent timeout', async () => {
@@ -2947,7 +2982,7 @@ test('Harbor adapter derives the goal budget from the trial agent timeout', asyn
 test('Harbor adapter ships the checkout and puts node on PATH only when it brings its own', async () => {
   const adapter = readFileSync(join(__dirname, '../bench/mi_agent.py'), 'utf8');
   assert.match(adapter, /PACKAGE_PATHS = \("index\.mjs", "package\.json", "README\.md", "tools", "skills"\)/);
-  assert.match(adapter, /upload_dir\(self\._staged_checkout\(\), "\/opt\/mi"\)/);
+  assert.match(adapter, /upload_dir\(self\._staged_checkout\(self\._repo\(\)\), "\/opt\/mi"\)/);
   assert.match(adapter, /\[ "\$NODE" = \/opt\/mi-node\/bin\/node \] && export PATH="\/opt\/mi-node\/bin:\$PATH"/);
 });
 
@@ -2984,6 +3019,7 @@ test('bench/compare.py pools Harbor trials per task and calls a single-run flip 
   assert.deepStrictEqual(ab.not_compared, ['only-a']);
   assert.strictEqual(ab.delta, 1);
   assert.match(ab.verdict, /^NOISE/);
+  assert.deepStrictEqual(ab.mcnemar, { a_only: 0, b_only: 1, p: 1 }); // k=1 per side: paired exact test on discordant tasks
   const fisher = execFileSync('python3', ['-c', `import sys; sys.path.insert(0, ${JSON.stringify(dirname(script))}); import compare as c; print(round(c.fisher_exact_two_sided(3,0,0,3), 6), round(c.fisher_exact_two_sided(5,0,0,5), 6))`], { encoding: 'utf8' });
   assert.strictEqual(fisher.trim(), '0.1 0.007937');
   rmSync(root, { recursive: true, force: true });
@@ -2996,11 +3032,11 @@ test('goal 402 credit exhaustion aborts immediately with fatal event', async () 
     if (prompts.length === 1) {
       sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- done\nVERIFIER_SHAPE_CONTRACT\n- check\nVERIFICATION_PLAN\n- verify\nCURRENT_STATE\n- not started' });
     } else if (prompts.length === 2) {
-      sse(res, { role: 'assistant', content: 'not done [FAIL]\nNACK' });
+      sse(res, { role: 'assistant', content: 'not done [FAIL]\nNACK\nVERDICT: FAIL' });
     } else if (prompts.length === 3) {
       sse(res, { role: 'assistant', content: 'Error: This request requires more credits, or fewer max_tokens. You requested up to 65536 tokens, but can only afford 3858.' });
     } else {
-      sse(res, { role: 'assistant', content: 'should not reach [PASS]\nACK' });
+      sse(res, { role: 'assistant', content: 'should not reach [PASS]\nACK\nVERDICT: PASS' });
     }
   };
 
@@ -3021,13 +3057,13 @@ test('goal pivot mandate arms after 2 identical NACKs', async () => {
       sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- done\nVERIFIER_SHAPE_CONTRACT\n- check\nVERIFICATION_PLAN\n- verify\nCURRENT_STATE\n- not started' });
     } else if (prompts.length === 2) {
       // Precheck judge → NACK
-      sse(res, { role: 'assistant', content: 'error: port 8080 still in use [FAIL]\nNACK' });
+      sse(res, { role: 'assistant', content: 'error: port 8080 still in use [FAIL]\nNACK\nVERDICT: FAIL' });
     } else if (prompts.length <= 5 && prompts.length % 2 === 1) {
       // Workers 1-2 (positions 3, 5)
       sse(res, { role: 'assistant', content: `attempt\nSTRATEGY: tried something\nFILES_MODIFIED: none\nCOMMANDS_SUCCEEDED: none\nCOMMANDS_FAILED: start\nBLOCKERS: port\nREMAINING: fix port` });
     } else if (prompts.length <= 6 && prompts.length % 2 === 0) {
       // Judges 1-2 (positions 4, 6) → same NACK
-      sse(res, { role: 'assistant', content: 'error: port 8080 still in use [FAIL]\nNACK' });
+      sse(res, { role: 'assistant', content: 'error: port 8080 still in use [FAIL]\nNACK\nVERDICT: FAIL' });
     } else if (prompts.length === 7) {
       // Worker 3: pivot mandate armed after 2 identical blocker sigs
       assert.match(prompt, /PIVOT MANDATE/i);
@@ -3035,7 +3071,7 @@ test('goal pivot mandate arms after 2 identical NACKs', async () => {
       sse(res, { role: 'assistant', content: 'fixed\nSTRATEGY: new approach\nFILES_MODIFIED: config\nCOMMANDS_SUCCEEDED: start\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
     } else {
       // Judge 3 → ACK
-      sse(res, { role: 'assistant', content: 'done [PASS]\nACK' });
+      sse(res, { role: 'assistant', content: 'done [PASS]\nACK\nVERDICT: PASS' });
     }
   };
   const result = await runMi(['-g', 'start server', '-c', 'check port']);
@@ -3051,7 +3087,7 @@ test('goal spawn error skips judge call', async () => {
     if (prompts.length === 1) {
       sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- done\nVERIFIER_SHAPE_CONTRACT\n- check\nVERIFICATION_PLAN\n- verify\nCURRENT_STATE\n- not started' });
     } else if (prompts.length === 2) {
-      sse(res, { role: 'assistant', content: 'not done [FAIL]\nNACK' });
+      sse(res, { role: 'assistant', content: 'not done [FAIL]\nNACK\nVERDICT: FAIL' });
     } else if (prompts.length === 3) {
       // Worker 1 returns spawn error
       sse(res, { role: 'assistant', content: '[spawn error: ENOMEM]' });
@@ -3060,7 +3096,7 @@ test('goal spawn error skips judge call', async () => {
       assert.match(prompts[3], /worker 2/i);
       sse(res, { role: 'assistant', content: 'fixed\nSTRATEGY: worked\nFILES_MODIFIED: f\nCOMMANDS_SUCCEEDED: ok\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
     } else {
-      sse(res, { role: 'assistant', content: 'done [PASS]\nACK' });
+      sse(res, { role: 'assistant', content: 'done [PASS]\nACK\nVERDICT: PASS' });
     }
   };
   const result = await runMi(['-g', 'build', '-c', 'check']);
@@ -3082,7 +3118,7 @@ test('goal forced salvage after 5 identical blockers in deadline mode', async ()
       sse(res, { role: 'assistant', content: 'wrote best artifact\nSTRATEGY: salvage\nFILES_MODIFIED: out.txt' });
     } else if (prompts.length % 2 === 0) {
       // All judges → same NACK
-      sse(res, { role: 'assistant', content: 'missing output.json [FAIL]\nNACK' });
+      sse(res, { role: 'assistant', content: 'missing output.json [FAIL]\nNACK\nVERDICT: FAIL' });
     } else {
       // Workers
       sse(res, { role: 'assistant', content: `attempt\nSTRATEGY: tried\nFILES_MODIFIED: none\nCOMMANDS_SUCCEEDED: none\nCOMMANDS_FAILED: gen\nBLOCKERS: missing data\nREMAINING: gen` });
@@ -3096,165 +3132,196 @@ test('goal forced salvage after 5 identical blockers in deadline mode', async ()
   assert.ok(sawSalvage, 'forced salvage should have triggered after 5 identical blockers');
 });
 
-test('goal first iteration capped to 1/3 budget with partition hint', async () => {
+test('goal worker 1 states its time cap and gets DRAFT FIRST for missing artifacts from the start', async () => {
+  // K1 (2026-10-02 analysis): the best answer often never reached the artifact path (count-dataset-tokens r1 printed 79586 at
+  // t=273s, the file still held the placeholder at the cap), so every pass is told to persist its best candidate at once.
   const prompts = [];
   requestHandler = (req, res, body) => {
     const prompt = body.messages.at(-1).content;
     prompts.push(prompt);
-    if (prompts.length === 1) {
-      sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- done\nVERIFIER_SHAPE_CONTRACT\n- checked\nVERIFICATION_PLAN\n- inspect\nCURRENT_STATE\n- empty' });
-    } else if (prompts.length === 2) {
-      // Pre-check judge → NACK
-      sse(res, { role: 'assistant', content: 'not done [FAIL]\nNACK' });
-    } else if (prompts.length === 3) {
-      // Worker 1 — should have time partition hint
-      assert.match(prompt, /you are worker 1/);
-      assert.match(prompt, /budget is partitioned to guarantee retries/);
-      assert.match(prompt, /capped at ~\d+min/);
-      sse(res, { role: 'assistant', content: 'did work\nSTRATEGY: attempt 1\nFILES_MODIFIED: x\nCOMMANDS_SUCCEEDED: y\nCOMMANDS_FAILED: z\nBLOCKERS: b\nREMAINING: r' });
-    } else if (prompts.length === 4) {
-      // Judge 1 → NACK
-      sse(res, { role: 'assistant', content: 'still broken [FAIL]\nNACK' });
-    } else if (prompts.length === 5) {
-      // Worker 2 — should NOT have partition hint (only applies to iteration 1)
-      assert.match(prompt, /you are worker 2/);
-      assert.doesNotMatch(prompt, /budget is partitioned to guarantee retries/);
-      sse(res, { role: 'assistant', content: 'fixed\nSTRATEGY: attempt 2\nFILES_MODIFIED: x\nCOMMANDS_SUCCEEDED: all\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
+    if (/you are the planner for a goal loop/.test(prompt)) {
+      sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- done\nARTIFACTS: /tmp/mi-test-never-written-artifact.txt\nVERIFIER_SHAPE_CONTRACT\n- ok\nVERIFICATION_PLAN\n- inspect\nCURRENT_STATE\n- empty' });
+    } else if (/you are a judge for a goal loop/.test(prompt)) {
+      sse(res, { role: 'assistant', content: 'all good [PASS]\nACK\nVERDICT: PASS' });
     } else {
-      // Judge 2 → ACK
-      sse(res, { role: 'assistant', content: 'all good [PASS]\nACK' });
+      sse(res, { role: 'assistant', content: 'wrote it\nSTRATEGY: s\nFILES_MODIFIED: x\nCOMMANDS_SUCCEEDED: y\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
     }
   };
-
+  rmSync('/tmp/mi-test-never-written-artifact.txt', { force: true });
   const deadline = Math.floor(Date.now() / 1000) + 900; // 15 min budget
-  const result = await runMi(['-g', 'partition test', '-c', 'check it', '-d', String(deadline)]);
+  const result = await runMi(['-g', 'make the artifact', '-c', 'check it', '-d', String(deadline)]);
   assert.strictEqual(result.status, 0);
-  // 1 planner + 1 precheck + 1 worker1 + 1 judge1(NACK) + 1 worker2 + 1 judge2(ACK) + 1 skeptical(ACK) = 7
-  assert.strictEqual(prompts.length, 7);
+  const w1 = prompts.find(p => /you are worker 1\//.test(p));
+  assert.ok(w1, 'worker 1 prompt seen');
+  assert.match(w1, /DRAFT FIRST: required artifact\(s\) not yet written in this run \(missing, or unchanged since it started\): \/tmp\/mi-test-never-written-artifact\.txt/);
+  assert.match(w1, /this pass runs until you finish or the time is used \(~\d+min\); you can be stopped at any moment, and what the artifact path\(s\) hold then is what gets graded/);
+  assert.match(w1, /never a placeholder or an empty file/);
+  assert.match(w1, /declared artifacts: \/tmp\/mi-test-never-written-artifact\.txt/);
+  assert.match(w1, /PERSIST ON PASS/);
+  assert.doesNotMatch(w1, /explore freely|one noninteractive bash script/);
 });
 
-test('goal EXPLORE iterations keep full remaining budget (verification-cost cap only bites past EXPLORE)', async () => {
-  // Regression guard for the phase-gated iterFrac: iteration 1 is capped to ~1/3 of usable budget, but a later
-  // EXPLORE iteration must still get the FULL remaining budget (frac 1) — the 50% verification-cost cap applies
-  // only in COMMIT/URGENT, so legitimately-long many-iteration tasks are not truncated while in EXPLORE.
-  const prompts = [];
+test('goal draft gate fires for a declared artifact that exists but was not written in this run', async () => {
+  // mailman r1/r2: the declared /etc/mailman3/mailman.cfg already existed, so the existence-only gate never fired
+  // and the single worker spent ~1,500s on read-only commands.
+  const art = `/tmp/mi-test-stale-artifact-${process.pid}.txt`, prompts = [];
+  writeFileSync(art, 'pre-existing');
+  utimesSync(art, new Date(Date.now() - 3600e3), new Date(Date.now() - 3600e3));
+  let judges = 0;
   requestHandler = (req, res, body) => {
     const prompt = body.messages.at(-1).content;
     prompts.push(prompt);
-    if (prompts.length === 1) {
-      sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- done\nARTIFACTS: none\nVERIFIER_SHAPE_CONTRACT\n- ok\nVERIFICATION_PLAN\n- inspect\nCURRENT_STATE\n- empty' });
-    } else if (prompts.length === 2) {
-      sse(res, { role: 'assistant', content: 'not done [FAIL]\nNACK' }); // precheck NACK
-    } else if (prompts.length === 3) {
-      sse(res, { role: 'assistant', content: 'did work\nSTRATEGY: attempt 1\nFILES_MODIFIED: x\nCOMMANDS_SUCCEEDED: y\nCOMMANDS_FAILED: z\nBLOCKERS: b\nREMAINING: r' });
-    } else if (prompts.length === 4) {
-      sse(res, { role: 'assistant', content: 'still broken [FAIL]\nNACK' }); // judge 1 NACK
-    } else if (prompts.length === 5) {
-      sse(res, { role: 'assistant', content: 'did more\nSTRATEGY: attempt 2\nFILES_MODIFIED: x\nCOMMANDS_SUCCEEDED: y\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
-    } else {
-      sse(res, { role: 'assistant', content: 'all good [PASS]\nACK' }); // judge 2 ACK
-    }
+    if (kind(prompt) === 'planner') sse(res, { role: 'assistant', content: `EXIT_CRITERIA\n- done\nARTIFACTS: ${art}\nVERIFIER_SHAPE_CONTRACT\n- ok\nVERIFICATION_PLAN\n- inspect\nCURRENT_STATE\n- exists` });
+    else if (kind(prompt) === 'judge') sse(res, { role: 'assistant', content: ++judges === 1 ? 'config: measured=old expected=new [FAIL]\nNACK\nVERDICT: FAIL' : 'config: measured=new expected=new [PASS]\nACK\nVERDICT: PASS' });
+    else if (kind(prompt) === 'worker') { if (/you are worker 1\//.test(prompt)) writeFileSync(art, 'written by worker 1'); sse(res, { role: 'assistant', content: WORK }); }
+    else sse(res, { role: 'assistant', content: 'element: measured=new required=new [PASS]\nACK\nVERDICT: PASS' });
   };
-  const deadline = Math.floor(Date.now() / 1000) + 900; // 15 min budget → stays in EXPLORE across instant mocks
-  const t0 = Date.now();
-  const result = await runMi(['-g', 'long task', '-c', 'check it', '-d', String(deadline)]);
-  assert.strictEqual(result.status, 0);
-  // newest mi-goal event log written during this run (tool result isn't echoed to stdout)
-  const events = readdirSync('/tmp').filter(f => /^mi-goal-\d+\.jsonl$/.test(f)).map(f => `/tmp/${f}`).filter(p => statSync(p).mtimeMs >= t0).sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs)[0];
-  assert.ok(events && existsSync(events), 'event log present');
-  const iters = readFileSync(events, 'utf8').trim().split('\n').map(l => JSON.parse(l)).filter(e => e.type === 'iteration');
-  assert.strictEqual(iters.length, 2);
-  // iteration 1 is partitioned to ~1/3; iteration 2 (EXPLORE) keeps the full budget → ratio ~3, well above 2.
-  // If EXPLORE were wrongly capped to 0.5 the ratio would collapse to ~1.5.
-  assert.ok(iters[1].iter_timeout_ms > iters[0].iter_timeout_ms * 2, `EXPLORE iter2 (${iters[1].iter_timeout_ms}) not full vs iter1 (${iters[0].iter_timeout_ms})`);
-});
-
-test('goal COMMIT/URGENT iterations cap the verification cost at 50% of remaining budget', async () => {
-  // Regression guard for the 0.5 side of the phase-gated iterFrac: past EXPLORE, a later iteration's
-  // per-iteration worker timeout must be bounded to ~half of (budget-120)*1000. Reaching COMMIT in the
-  // instant-mock harness requires advancing the loop clock: fake-time preloads a Date.now offset that we
-  // bump on the iteration-1 judge response so iteration 2's phase computes with ~45% of budget elapsed
-  // (r/totalS < 0.5) without tripping the 60s SALVAGE floor. NB: the fake-time jump inflates the measured
-  // iteration-1 duration, so `ema` grows and the loop reports URGENT rather than COMMIT — both share the same
-  // 0.5 iterFrac, which is exactly the branch under test.
-  const prompts = [];
-  const offsetFile = `/tmp/mi-test-commitcap-off-${process.pid}`;
-  writeFileSync(offsetFile, '0');
-  requestHandler = (req, res, body) => {
-    const prompt = body.messages.at(-1).content;
-    prompts.push(prompt);
-    if (prompts.length === 1) {
-      sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- done\nARTIFACTS: none\nVERIFIER_SHAPE_CONTRACT\n- ok\nVERIFICATION_PLAN\n- inspect\nCURRENT_STATE\n- empty' });
-    } else if (prompts.length === 2) {
-      sse(res, { role: 'assistant', content: 'not done [FAIL]\nNACK' }); // precheck NACK (EXPLORE, offset 0)
-    } else if (prompts.length === 3) {
-      sse(res, { role: 'assistant', content: 'did work\nSTRATEGY: attempt 1\nFILES_MODIFIED: x\nCOMMANDS_SUCCEEDED: y\nCOMMANDS_FAILED: z\nBLOCKERS: b\nREMAINING: r' });
-    } else if (prompts.length === 4) {
-      // judge 1 NACK — advance clock to 550s elapsed of ~1000s so iteration 2 lands in COMMIT (0.45 < 0.5)
-      writeFileSync(offsetFile, '550000');
-      sse(res, { role: 'assistant', content: 'still broken [FAIL]\nNACK' });
-    } else if (prompts.length === 5) {
-      sse(res, { role: 'assistant', content: 'did more\nSTRATEGY: attempt 2\nFILES_MODIFIED: x\nCOMMANDS_SUCCEEDED: y\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
-    } else {
-      sse(res, { role: 'assistant', content: 'all good [PASS]\nACK' }); // judge 2 ACK (+ skeptical recheck)
-    }
-  };
-  const deadline = Math.floor(Date.now() / 1000) + 1000; // totalS ~1000s
   const t0 = Date.now();
   try {
-    const result = await runMi(['-g', 'long task', '-c', 'check it', '-d', String(deadline)], fakeTimeEnv(offsetFile));
+    const result = await runMi(['-g', 'configure it', '-c', 'check it', '-d', String(Math.floor(Date.now() / 1000) + 900)]);
     assert.strictEqual(result.status, 0);
-    assert.match(result.stdout, /left, (COMMIT|URGENT)/); // iteration 2 ran past EXPLORE (0.5 cap branch)
-    const events = readdirSync('/tmp').filter(f => /^mi-goal-\d+\.jsonl$/.test(f)).map(f => `/tmp/${f}`).filter(p => statSync(p).mtimeMs >= t0).sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs)[0];
-    assert.ok(events && existsSync(events), 'event log present');
-    const iters = readFileSync(events, 'utf8').trim().split('\n').map(l => JSON.parse(l)).filter(e => e.type === 'iteration');
-    assert.strictEqual(iters.length, 2);
-    // iteration 2 (COMMIT) is capped at 0.5 * (budget-120)*1000 — distinct from the EXPLORE-full case above.
-    const b2 = iters[1].budget_remaining_s, expected = 0.5 * (b2 - 120) * 1000;
-    assert.ok(Math.abs(iters[1].iter_timeout_ms - expected) < 4000, `COMMIT iter2 cap ${iters[1].iter_timeout_ms} not ~half of (${b2}-120)*1000 = ${expected}`);
-    // and it must be strictly below iteration 1's cap (EXPLORE-full frac would have kept it far higher).
-    assert.ok(iters[1].iter_timeout_ms < iters[0].iter_timeout_ms, `COMMIT iter2 (${iters[1].iter_timeout_ms}) not below iter1 (${iters[0].iter_timeout_ms})`);
-  } finally { rmSync(offsetFile, { force: true }); }
+  } finally { rmSync(art, { force: true }); }
+  const workers = prompts.filter(p => kind(p) === 'worker');
+  assert.ok(workers.length >= 2, `expected 2 worker passes, got ${workers.length}`);
+  assert.match(workers[0], new RegExp(`DRAFT FIRST: required artifact\\(s\\) not yet written in this run \\(missing, or unchanged since it started\\): ${art}`));
+  assert.doesNotMatch(workers[1], /DRAFT FIRST/, 'artifact written during the run: no gate on pass 2');
+  assert.strictEqual(prompts.filter(p => kind(p) === 'judge').length, 2, 'existing artifact: the iteration judge is not mechanically skipped');
+  const gates = latestEvents(t0).filter(e => e.type === 'draft_gate');
+  assert.deepStrictEqual(gates.map(g => g.iteration), [1]);
+});
+
+test('goal under a deadline: one worker session — a pass takes the whole remaining budget, the judge runs when the worker stops, the next pass continues the conversation', async () => {
+  // Round 1 (2026-10-04, A/B of a3106b2, 42 trials): 36 of 39 capped passes were cut while the worker was still working, 35 of the 40 LLM
+  // judge calls that followed gave no verdict (median 24% of the budget each), and each later pass was a new process that re-read the same files.
+  const bodies = [], lb = lowBudget(), t0 = Date.now();
+  let judges = 0;
+  requestHandler = (req, res, body) => {
+    bodies.push(body);
+    const k = kind(body.messages.at(-1).content);
+    if (k === 'planner') sse(res, { role: 'assistant', content: PLAN_NONE });
+    // 270s left after judge 1 (two FAILs: no fast lane): still a normal pass, not a no-debug SALVAGE
+    else if (k === 'judge') { if (++judges === 1) lb.jump(270); sse(res, { role: 'assistant', content: judges === 1 ? 'a: measured=1 expected=2 [FAIL]\nb: measured=1 expected=2 [FAIL]\nNACK\nVERDICT: FAIL' : 'all good [PASS]\nACK\nVERDICT: PASS' }); }
+    else if (k === 'worker') sse(res, { role: 'assistant', content: WORK });
+    else sse(res, { role: 'assistant', content: 'confirmed [PASS]\nACK\nVERDICT: PASS' });
+  };
+  try {
+    const result = await runMi(['-g', 'long task', '-c', 'check it', '-d', String(lb.dl)], lb.env);
+    assert.strictEqual(result.status, 0);
+  } finally { lb.done(); }
+  const prompts = bodies.map(b => b.messages.at(-1).content);
+  assert.ok(!prompts.slice(0, 2).some(p => kind(p) === 'judge'), 'no pre-work judge on a fresh deadline budget');
+  const ev = latestEvents(t0), passes = ev.filter(e => e.type === 'pass'), iters = ev.filter(e => e.type === 'iteration');
+  assert.strictEqual(passes.length, 2);
+  for (const p of passes) assert.ok(Math.abs(p.iter_timeout_ms - (p.budget_remaining_s - 5) * 1000) <= 1000, `pass ${p.iteration} cap ${p.iter_timeout_ms} of ${p.budget_remaining_s}s left`);
+  assert.deepStrictEqual(passes.map(p => p.resumed), [false, true]);
+  assert.ok(iters[0].judge_timeout_ms >= 180 * 1000, `iteration 1 judge wall ${iters[0].judge_timeout_ms} below the judge window`); // totalS ≈ 1000: min(240, max(180, 150), 300)
+  assert.strictEqual(iters[0].judge_verdict, true);
+  const w = bodies.filter(b => kind(b.messages.at(-1).content) === 'worker');
+  assert.strictEqual(w.length, 2, prompts.map(kind).join(','));
+  assert.deepStrictEqual(w[0].messages.map(m => m.role), ['system', 'user']);
+  // pass 2 is the same conversation: the first brief, the worker's own reply, then the feedback
+  assert.deepStrictEqual(w[1].messages.map(m => m.role), ['system', 'user', 'assistant', 'user']);
+  assert.strictEqual(w[1].messages[1].content, w[0].messages[1].content);
+  assert.strictEqual(w[1].messages[2].content, WORK);
+  const cont = w[1].messages[3].content;
+  assert.match(cont, /you are worker 2\/\d+ of a goal loop — the same worker as before: this conversation continues/);
+  assert.match(cont, /a: measured=1 expected=2 \[FAIL\]/, 'judge feedback reaches the second pass');
+  assert.doesNotMatch(cont, /Task Description:/, 'the brief is not repeated');
+  assert.ok(!prompts.some(p => kind(p) === 'salvage'), 'no salvage while ≥ minPass is left');
+});
+
+test('goal under a deadline: a review without a verdict is followed by one worker re-check, then the loop stops', async () => {
+  // 35 of 40 LLM judge calls in the a3106b2 arm ended in a request timeout; the next pass then got the tail of an unfinished transcript as "feedback"
+  const bodies = [], t0 = Date.now();
+  requestHandler = (req, res, body) => {
+    bodies.push(body);
+    const k = kind(body.messages.at(-1).content);
+    if (k === 'planner') sse(res, { role: 'assistant', content: PLAN_NONE });
+    else if (k === 'judge') sse(res, { role: 'assistant', content: 'looking at the files\n[request timeout: stopped early, work so far is on disk]' });
+    else sse(res, { role: 'assistant', content: WORK });
+  };
+  const result = await runMi(['-g', 'long task', '-c', 'check it', '-d', String(Math.floor(Date.now() / 1000) + 900)]);
+  assert.strictEqual(result.status, 0);
+  const kinds = bodies.map(b => kind(b.messages.at(-1).content));
+  assert.deepStrictEqual(kinds, ['planner', 'worker', 'judge', 'worker'], kinds.join(','));
+  const cont = bodies[3].messages.at(-1).content;
+  assert.match(cont, /the independent review ended without a verdict/);
+  assert.doesNotMatch(cont, /looking at the files/, 'no unfinished judge transcript in the feedback');
+  assert.doesNotMatch(cont, /failed strategies|PIVOT MANDATE/, 'a verdict-less review is not a failed strategy');
+  const ev = latestEvents(t0);
+  assert.deepStrictEqual(ev.filter(e => e.type === 'iteration').map(e => e.judge_verdict), [false, false]);
+  assert.ok(ev.some(e => e.type === 'self_checked'));
+  assert.deepStrictEqual([ev.at(-1).type, ev.at(-1).status], ['complete', 'NACK']);
+});
+
+test('goal ends inside the deadline: no judge after a pass that leaves too little time, no salvage under 15s', async () => {
+  // K6: 26 of 64 trials ended in AgentTimeoutError; on 900s tasks the judge (2 × 54s) and salvage (30s floor + 2 × 45s judge)
+  // ran past the 840s deadline to t≈899s. Now a judge needs ≥60s left, salvage is capped by the time left, and nothing starts under 15s.
+  for (const [left, expected] of [[40, ['planner', 'worker', 'salvage']], [10, ['planner', 'worker']]]) {
+    const prompts = [], lb = lowBudget(), t0 = Date.now();
+    requestHandler = (req, res, body) => {
+      const prompt = body.messages.at(-1).content;
+      prompts.push(prompt);
+      const k = kind(prompt);
+      if (k === 'planner') sse(res, { role: 'assistant', content: PLAN_NONE });
+      else if (k === 'worker') { lb.jump(left); sse(res, { role: 'assistant', content: WORK }); }
+      else sse(res, { role: 'assistant', content: k === 'judge' ? 'ok [PASS]\nACK\nVERDICT: PASS' : 'salvaged' });
+    };
+    try {
+      const result = await runMi(['-g', 'long task', '-c', 'check it', '-d', String(lb.dl)], lb.env);
+      assert.strictEqual(result.status, 0);
+    } finally { lb.done(); }
+    assert.deepStrictEqual(prompts.map(kind), expected, `left=${left}s`);
+    const ev = latestEvents(t0);
+    assert.ok(ev.some(e => e.type === 'judge_skipped' && e.reason === 'deadline'), `left=${left}s: judge skipped`);
+    if (left === 40) assert.ok(+prompts[2].match(/this pass capped at (\d+)s/)[1] <= 35);
+    else assert.ok(ev.some(e => e.type === 'deadline_reached'), 'deadline_reached logged');
+    assert.strictEqual(ev.at(-1).type, 'complete');
+  }
+});
+
+test('goal does not retry a judge call that timed out', async () => {
+  // the identical retry after a timeout produced the 2 × ~54s no-verdict pattern (12 of 27 no-verdict judges);
+  // a judge whose model request ran into its wall (MI_PASS_END) now exits cleanly with "[request timeout: …]" — same rule
+  for (const marker of ['[timeout after 5000ms]', '[request timeout: stopped early, work so far is on disk]']) {
+    const prompts = [], t0 = Date.now();
+    requestHandler = (req, res, body) => {
+      const prompt = body.messages.at(-1).content;
+      prompts.push(prompt);
+      const k = kind(prompt);
+      if (k === 'planner') sse(res, { role: 'assistant', content: PLAN_NONE });
+      else if (k === 'judge') sse(res, { role: 'assistant', content: prompts.filter(p => kind(p) === 'judge').length === 1 ? `still checking\n${marker}` : 'ok [PASS]\nACK\nVERDICT: PASS' });
+      else sse(res, { role: 'assistant', content: k === 'worker' ? WORK : 'confirmed [PASS]\nACK\nVERDICT: PASS' });
+    };
+    const result = await runMi(['-g', 'long task', '-c', 'check it', '-d', String(Math.floor(Date.now() / 1000) + 900)]);
+    assert.strictEqual(result.status, 0);
+    assert.deepStrictEqual(prompts.map(kind).slice(0, 4), ['planner', 'worker', 'judge', 'worker'], `${marker}: timed-out judge counted as NACK without a retry`);
+    const inv = latestEvents(t0).filter(e => e.type === 'judge_invalid');
+    assert.deepStrictEqual(inv.map(e => e.retry), [false], marker);
+  }
 });
 
 test('goal fastLane caps at one attempt — SALVAGE runs on second low-budget single-blocker NACK', async () => {
   // Regression: fastLane used to preempt SALVAGE every iteration when budget < 30% and exactly one FAIL.
   // A persistent single blocker would burn all remaining budget on repeated surgical-fix attempts without
   // the final artifact-write salvage pass ever firing. Fix: fastLaneUsed flag caps fastLane at 1 attempt.
-  const prompts = [];
-  const dl = Math.floor(Date.now() / 1000) - 100; // past deadline → budget fraction 0 < 0.3, phase SALVAGE
+  const prompts = [], lb = lowBudget(), t0 = Date.now();
   requestHandler = (req, res, body) => {
     const prompt = body.messages.at(-1).content;
     prompts.push(prompt);
-    if (prompts.length === 1) {
-      sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- ok\nARTIFACTS: none\nVERIFIER_SHAPE_CONTRACT\n- check\nVERIFICATION_PLAN\n- run\nCURRENT_STATE\n- off' });
-    } else if (prompts.length === 2) {
-      sse(res, { role: 'assistant', content: 'criterion: measured=0.5 expected=1.0 [FAIL]\nNACK' }); // precheck single-FAIL
-    } else if (prompts.length === 3) {
-      // iter 1: fastLane surgical brief fires
-      assert.match(prompt, /SINGLE-BLOCKER FAST LANE/);
-      assert.doesNotMatch(prompt, /FINAL SALVAGE/);
-      sse(res, { role: 'assistant', content: 'tried fix\nSTRATEGY: surgical\nFILES_MODIFIED: x\nCOMMANDS_SUCCEEDED: y\nCOMMANDS_FAILED: z\nBLOCKERS: b\nREMAINING: r' });
-    } else if (prompts.length === 4) {
-      // judge after fastLane → same single FAIL (fastLane didn't fix it)
-      sse(res, { role: 'assistant', content: 'criterion: measured=0.5 expected=1.0 [FAIL]\nNACK' });
-    } else if (prompts.length === 5) {
-      // iter 2: fastLaneUsed=true → SALVAGE runs, NOT fastLane
-      assert.match(prompt, /FINAL SALVAGE/);
-      assert.doesNotMatch(prompt, /SINGLE-BLOCKER FAST LANE/);
-      sse(res, { role: 'assistant', content: 'salvaged best-effort artifact' });
-    } else {
-      // judge after salvage → NACK (loop breaks)
-      sse(res, { role: 'assistant', content: 'still broken [FAIL]\nNACK' });
-    }
+    if (prompts.length === 1) { lb.jump(100); sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- ok\nARTIFACTS: none\nVERIFIER_SHAPE_CONTRACT\n- check\nVERIFICATION_PLAN\n- run\nCURRENT_STATE\n- off' }); }
+    else if (prompts.length === 2) sse(res, { role: 'assistant', content: 'criterion: measured=0.5 expected=1.0 [FAIL]\nNACK\nVERDICT: FAIL' }); // precheck single-FAIL
+    else if (prompts.length === 3) sse(res, { role: 'assistant', content: 'tried fix\nSTRATEGY: surgical\nFILES_MODIFIED: x\nCOMMANDS_SUCCEEDED: y\nCOMMANDS_FAILED: z\nBLOCKERS: b\nREMAINING: r' });
+    else if (prompts.length === 4) { lb.jump(40); sse(res, { role: 'assistant', content: 'criterion: measured=0.5 expected=1.0 [FAIL]\nNACK\nVERDICT: FAIL' }); } // same single FAIL; 40s left → SALVAGE phase
+    else sse(res, { role: 'assistant', content: 'salvaged best-effort artifact' });
   };
-  const t0 = Date.now();
-  const result = await runMi(['-g', 'fix one thing', '-c', 'check', '-d', String(dl)]);
-  assert.strictEqual(result.status, 0);
-  assert.strictEqual(prompts.length, 6);
-  const events = readdirSync('/tmp').filter(f => /^mi-goal-\d+\.jsonl$/.test(f)).map(f => `/tmp/${f}`).filter(p => statSync(p).mtimeMs >= t0).sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs)[0];
-  assert.ok(events && existsSync(events), 'event log present');
-  const ev = readFileSync(events, 'utf8').trim().split('\n').map(l => JSON.parse(l));
+  try {
+    const result = await runMi(['-g', 'fix one thing', '-c', 'check', '-d', String(lb.dl)], lb.env);
+    assert.strictEqual(result.status, 0);
+  } finally { lb.done(); }
+  // salvage's judge is not started with 40s left
+  assert.deepStrictEqual(prompts.map(kind), ['planner', 'judge', 'fastlane', 'judge', 'salvage']);
+  const ev = latestEvents(t0);
   assert.ok(ev.some(e => e.type === 'fast_lane'), 'fast_lane event fired on iter 1');
   assert.ok(ev.some(e => e.type === 'salvage'), 'salvage event fired on iter 2');
 });
@@ -3272,27 +3339,27 @@ test('goal blockerSig normalizes criterion name — same criterion different val
     if (prompts.length === 1) {
       sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- ok\nARTIFACTS: none\nVERIFIER_SHAPE_CONTRACT\n- check\nVERIFICATION_PLAN\n- run\nCURRENT_STATE\n- off' });
     } else if (prompts.length === 2) {
-      sse(res, { role: 'assistant', content: 'Tm difference: measured=5.44 expected=5.0 [FAIL]\nNACK' }); // precheck
+      sse(res, { role: 'assistant', content: 'Tm difference: measured=5.44 expected=5.0 [FAIL]\nNACK\nVERDICT: FAIL' }); // precheck
     } else if (prompts.length === 3) {
       sse(res, { role: 'assistant', content: 'iter1\nSTRATEGY: approach A\nFILES_MODIFIED: x\nCOMMANDS_SUCCEEDED: y\nCOMMANDS_FAILED: z\nBLOCKERS: b\nREMAINING: r' });
     } else if (prompts.length === 4) {
       // iter 1 judge: same criterion, value 5.44 → sig "tm difference"
-      sse(res, { role: 'assistant', content: 'Tm difference: measured=5.44 expected=5.0 [FAIL]\nNACK' });
+      sse(res, { role: 'assistant', content: 'Tm difference: measured=5.44 expected=5.0 [FAIL]\nNACK\nVERDICT: FAIL' });
     } else if (prompts.length === 5) {
       sse(res, { role: 'assistant', content: 'iter2\nSTRATEGY: approach B\nFILES_MODIFIED: x\nCOMMANDS_SUCCEEDED: y\nCOMMANDS_FAILED: z\nBLOCKERS: b\nREMAINING: r' });
     } else if (prompts.length === 6) {
       // iter 2 judge: same criterion, DIFFERENT value 5.443790 → old sig would differ, new sig same "tm difference"
-      sse(res, { role: 'assistant', content: 'Tm difference: measured=5.443790 expected=5.0 [FAIL]\nNACK' });
+      sse(res, { role: 'assistant', content: 'Tm difference: measured=5.443790 expected=5.0 [FAIL]\nNACK\nVERDICT: FAIL' });
     } else if (prompts.length === 7) {
       // iter 3 worker: pivot should be armed — PIVOT MANDATE in the prompt
       assert.match(prompt, /PIVOT MANDATE/);
       assert.match(prompt, /tm difference/);
       sse(res, { role: 'assistant', content: 'iter3 pivoted\nSTRATEGY: approach C\nFILES_MODIFIED: x\nCOMMANDS_SUCCEEDED: y\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
     } else if (prompts.length === 8) {
-      sse(res, { role: 'assistant', content: 'Tm difference: measured=4.0 expected=5.0 [PASS]\nACK' });
+      sse(res, { role: 'assistant', content: 'Tm difference: measured=4.0 expected=5.0 [PASS]\nACK\nVERDICT: PASS' });
     } else {
       // skeptical recheck → ACK
-      sse(res, { role: 'assistant', content: 'Tm difference: measured=4.0 expected=5.0 [PASS]\nACK' });
+      sse(res, { role: 'assistant', content: 'Tm difference: measured=4.0 expected=5.0 [PASS]\nACK\nVERDICT: PASS' });
     }
   };
   const t0 = Date.now();
@@ -3304,47 +3371,32 @@ test('goal blockerSig normalizes criterion name — same criterion different val
   assert.ok(ev.some(e => e.type === 'pivot_armed'), 'pivot_armed event fired on iter 3 (normalized sig)');
 });
 
-test('goal garbled recheck output keeps primary ACK', async () => {
+test('goal: a blind recheck that ends without an exact verdict line is not a pass — the primary PASS does not stand on its own', async () => {
   const prompts = [];
   requestHandler = (req, res, body) => {
-    const prompt = body.messages.at(-1).content;
+    const prompt = body.messages.at(-1).content, k = kind(prompt), judges = prompts.filter(p => kind(p) === 'judge').length;
     prompts.push(prompt);
-    if (prompts.length === 1) {
-      sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- done\nARTIFACTS: none\nVERIFIER_SHAPE_CONTRACT\n- ok\nVERIFICATION_PLAN\n- inspect\nCURRENT_STATE\n- empty' });
-    } else if (prompts.length === 2) {
-      sse(res, { role: 'assistant', content: 'not done [FAIL]\nNACK' });
-    } else if (prompts.length === 3) {
-      sse(res, { role: 'assistant', content: 'did work\nSTRATEGY: built it\nFILES_MODIFIED: x\nCOMMANDS_SUCCEEDED: y\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
-    } else if (prompts.length === 4) {
-      sse(res, { role: 'assistant', content: 'criterion: measured=ok expected=ok [PASS]\nACK' });
-    } else {
-      // Skeptical recheck returns garbled refusal — no ACK/NACK token, no evidence
-      assert.match(prompt, /BLIND SKEPTICAL RECHECK/);
-      sse(res, { role: 'assistant', content: 'I am sorry, I cannot help with verifying this request.' });
-    }
+    if (k === 'planner') sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- done\nARTIFACTS: none\nVERIFIER_SHAPE_CONTRACT\n- ok\nVERIFICATION_PLAN\n- inspect\nCURRENT_STATE\n- empty' });
+    else if (k === 'judge') sse(res, { role: 'assistant', content: judges === 0 ? 'not done [FAIL]\nNACK\nVERDICT: FAIL' : 'criterion: measured=ok expected=ok [PASS]\nACK\nVERDICT: PASS' });
+    else if (k === 'recheck') sse(res, { role: 'assistant', content: 'I am sorry, I cannot help with verifying this request.' });
+    else sse(res, { role: 'assistant', content: WORK });
   };
-  const result = await runMi(['-g', 'build it', '-c', 'check it']);
+  const t0 = Date.now(), result = await runMi(['-g', 'build it', '-c', 'check it'], { MI_GOAL_MAX: '1' });
   assert.strictEqual(result.status, 0);
-  // invalid recheck output must not flip the primary ACK into a NACK loop: no worker 2, no recheck-NACK marker
-  assert.strictEqual(prompts.length, 5);
-  assert.doesNotMatch(result.stdout, /✗ skeptical recheck/);
+  assert.deepStrictEqual(prompts.map(kind), ['planner', 'judge', 'worker', 'judge', 'recheck']);
+  assert.match(result.stdout, /✗ skeptical recheck \(no verdict\)/);
+  const ev = latestEvents(t0);
+  assert.ok(ev.some(e => e.type === 'recheck_invalid'));
+  assert.deepStrictEqual(ev.filter(e => e.type === 'complete').map(e => e.status), ['NACK'], 'the run does not complete as ACK');
 });
 
-test('goal verdict parses front-loaded ACK followed by long rationale', async () => {
-  let calls = 0;
-  const rationale = 'the artifact was inspected in depth and every criterion was measured against the stated contract. '.repeat(7); // >600 chars after the ACK token
-  requestHandler = (req, res, body) => {
-    calls++;
-    if (calls === 1) {
-      sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- done\nARTIFACTS: none\nVERIFIER_SHAPE_CONTRACT\n- ok\nVERIFICATION_PLAN\n- inspect\nCURRENT_STATE\n- clean' });
-    } else {
-      sse(res, { role: 'assistant', content: `criterion: measured=1 expected=1 [PASS]\n**ACK**\n${rationale}` });
-    }
-  };
-  const result = await runMi(['-g', 'verdict test', '-c', 'check it']);
-  assert.strictEqual(result.status, 0);
-  // precheck ACK despite the token sitting >500 chars from the end — goal already met, no worker spawned
-  assert.strictEqual(calls, 2);
+test('goal verdict: only an exact last line counts — a verdict followed by more text is no verdict; rationale first, verdict last is a pass', async () => {
+  const rationale = 'the artifact was inspected in depth and every criterion was measured against the stated contract. '.repeat(7);
+  const run = async judgeOut => { let calls = 0; requestHandler = (req, res) => { calls++; sse(res, { role: 'assistant', content: calls === 1 ? 'EXIT_CRITERIA\n- done\nARTIFACTS: none\nVERIFIER_SHAPE_CONTRACT\n- ok\nVERIFICATION_PLAN\n- inspect\nCURRENT_STATE\n- clean' : judgeOut }); }; const r = await runMi(['-g', 'verdict test', '-c', 'check it'], { MI_GOAL_MAX: '0' }); return { calls, out: r.stdout }; };
+  const front = await run(`criterion: measured=1 expected=1 [PASS]\nVERDICT: PASS\n${rationale}`);
+  assert.strictEqual(front.calls, 3, 'planner, review, and the one retry a reply without a verdict gets — not met');
+  const last = await run(`criterion: measured=1 expected=1 [PASS]\n${rationale}\nVERDICT: PASS`);
+  assert.strictEqual(last.calls, 2, 'planner and one review: met');
 });
 
 test('goal garbled judge output triggers exactly one retry then counts as NACK', async () => {
@@ -3363,9 +3415,9 @@ test('goal garbled judge output triggers exactly one retry then counts as NACK',
       sse(res, { role: 'assistant', content: 'did work\nSTRATEGY: built it\nFILES_MODIFIED: x\nCOMMANDS_SUCCEEDED: y\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
     } else if (prompts.length === 5) {
       assert.match(prompt, /you are a judge for a goal loop/);
-      sse(res, { role: 'assistant', content: 'criterion: measured=ok expected=ok [PASS]\nACK' });
+      sse(res, { role: 'assistant', content: 'criterion: measured=ok expected=ok [PASS]\nACK\nVERDICT: PASS' });
     } else {
-      sse(res, { role: 'assistant', content: 'element: measured=ok required=ok [PASS]\nACK' });
+      sse(res, { role: 'assistant', content: 'element: measured=ok required=ok [PASS]\nACK\nVERDICT: PASS' });
     }
   };
   const result = await runMi(['-g', 'build it', '-c', 'check it']);
@@ -3383,13 +3435,13 @@ test('goal skips skeptical recheck when budget is under 180s', async () => {
     if (prompts.length === 1) {
       sse(res, { role: 'assistant', content: 'EXIT_CRITERIA\n- done\nARTIFACTS: none\nVERIFIER_SHAPE_CONTRACT\n- ok\nVERIFICATION_PLAN\n- inspect\nCURRENT_STATE\n- empty' });
     } else if (prompts.length === 2) {
-      sse(res, { role: 'assistant', content: 'not done [FAIL]\nNACK' });
+      sse(res, { role: 'assistant', content: 'not done [FAIL]\nNACK\nVERDICT: FAIL' });
     } else if (prompts.length === 3) {
       sse(res, { role: 'assistant', content: 'did work\nSTRATEGY: built it\nFILES_MODIFIED: x\nCOMMANDS_SUCCEEDED: y\nCOMMANDS_FAILED: none\nBLOCKERS: none\nREMAINING: none' });
     } else {
       assert.match(prompt, /you are a judge for a goal loop/);
       assert.doesNotMatch(prompt, /BLIND SKEPTICAL RECHECK/);
-      sse(res, { role: 'assistant', content: 'criterion: measured=ok expected=ok [PASS]\nACK' });
+      sse(res, { role: 'assistant', content: 'criterion: measured=ok expected=ok [PASS]\nACK\nVERDICT: PASS' });
     }
   };
   const result = await runMi(['-g', 'build it', '-c', 'check it', '-d', String(dl)]);
@@ -3471,4 +3523,992 @@ test('non-retryable SSE stream error still throws immediately', async () => {
   const result = await runMi(['-p', 'trigger non-retryable']);
   assert.notStrictEqual(result.status, 0);
   assert.match(result.stderr, /Unauthorized/);
+});
+
+// ── K2 (2026-10-02 analysis): request timeouts ─────────────────────────
+// circuit-fibsqrt r1/r2, regex-chess r1/r2, feal-linear-cryptanalysis r2: a 600s request timed out, the identical request was
+// resent (`⟡ retry 1 (23)`, `retry 2` ~600s later) and the third timeout crashed the worker (`DOMException [TimeoutError]`,
+// regex-chess r1 at 691/1293/1897s), discarding its conversation.
+const hang = (res) => { res.writeHead(200, { 'Content-Type': 'text/event-stream' }); res.write(': thinking\n\n'); const t = setTimeout(() => { try { res.end(); } catch {} }, 30000); res.on('close', () => clearTimeout(t)); };
+
+test('a timed-out request is resent with a smaller-steps nudge, not identically', async () => {
+  const bodies = [];
+  requestHandler = (req, res, body) => { bodies.push(body); if (bodies.length === 1) hang(res); else sse(res, { role: 'assistant', content: 'after nudge' }); };
+  const result = await runMi(['-p', 'write a big program'], { MI_REQUEST_TIMEOUT: '1' });
+  assert.strictEqual(result.status, 0);
+  assert.strictEqual(bodies.length, 2);
+  assert.notDeepStrictEqual(bodies[1].messages, bodies[0].messages, 'retry must not be the identical request');
+  const nudge = bodies[1].messages.at(-1);
+  assert.strictEqual(nudge.role, 'user');
+  assert.match(nudge.content, /request time limit/);
+  assert.match(nudge.content, /write long code to files in parts/);
+  assert.match(result.stdout, /after nudge/);
+});
+
+test('request timeouts that exhaust the retries end the turn cleanly instead of crashing', async () => {
+  let calls = 0;
+  requestHandler = (req, res) => { calls++; hang(res); };
+  const result = await runMi(['-p', 'think forever'], { MI_REQUEST_TIMEOUT: '1' });
+  assert.strictEqual(calls, 3);
+  assert.strictEqual(result.status, 0, result.stderr);
+  assert.doesNotMatch(result.stderr, /DOMException|triggerUncaughtException/);
+  assert.match(result.stdout, /\[request timeout: stopped early, work so far is on disk\]/);
+});
+
+test('request timeout is bounded by MI_PASS_END and is not retried near the end of the pass', async () => {
+  let calls = 0;
+  requestHandler = (req, res) => { calls++; hang(res); };
+  const t = Date.now();
+  const result = await runMi(['-p', 'long turn'], { MI_REQUEST_TIMEOUT: '600', MI_PASS_END: String(Date.now() / 1000 + 18) });
+  const took = Date.now() - t;
+  assert.strictEqual(result.status, 0, result.stderr);
+  assert.strictEqual(calls, 1, 'no retry with < 45s left in the pass');
+  assert.ok(took < 12000, `request should abort ~15s before the pass end, took ${took}ms`);
+  assert.match(result.stdout, /\[request timeout:/);
+});
+
+test('delegate passes MI_PASS_END (earliest of the inherited end and its own timeout) to the child', async () => {
+  const probe = `/tmp/mi-test-passend-${process.pid}.mjs`;
+  writeFileSync(probe, 'console.log("PASS_END=" + (process.env.MI_PASS_END ?? "unset"));');
+  const saved = { path: process.env.MI_PATH, end: process.env.MI_PASS_END };
+  global.spawn = spawn;
+  const delegate = (await import('../tools/delegate.mjs')).default;
+  const read = out => out.match(/PASS_END=(\S+)/)[1];
+  let own, nested, none;
+  try {
+    process.env.MI_PATH = probe; delete process.env.MI_PASS_END;
+    none = read(await delegate.handler({ prompt: 'x' }));
+    const now = Date.now() / 1000;
+    own = +read(await delegate.handler({ prompt: 'x', timeout: 60000 }));
+    process.env.MI_PASS_END = String(now + 20);
+    nested = +read(await delegate.handler({ prompt: 'x', timeout: 60000 }));
+    own -= now; nested -= now;
+  } finally {
+    process.env.MI_PATH = saved.path ?? ''; if (saved.end === undefined) delete process.env.MI_PASS_END; else process.env.MI_PASS_END = saved.end;
+    rmSync(probe, { force: true });
+  }
+  assert.strictEqual(none, 'unset');
+  assert.ok(own > 58 && own <= 61, `own timeout end ${own}`);
+  assert.ok(nested > 19 && nested <= 20.5, `nested keeps the earlier end ${nested}`);
+});
+
+// ── turn grace (2026-10-02 A/B in-flight check): pass 1 of all 6 fixed-arm trials on write-compressor and model-extraction-relu-logits
+// ended at 277s of a 292s cap by "[request timeout: stopped early]" in the middle of one long reasoning request (silent 150-275s),
+// so everything that request produced was lost. A non-last pass now stops at its cap only between model turns. ──
+test('after MI_PASS_SOFT a running turn finishes and its tool calls run, then no new request starts', async () => {
+  let calls = 0;
+  requestHandler = (req, res) => { calls++; setTimeout(() => sse(res, { role: 'assistant', tool_calls: [{ id: 'c1', type: 'function', function: { name: 'bash', arguments: JSON.stringify({ command: 'echo soft-turn-ran' }) } }] }), 1500); };
+  const result = await runMi(['-p', 'long turn'], { MI_PASS_SOFT: String(Date.now() / 1000 + 0.5), MI_PASS_END: String(Date.now() / 1000 + 120) });
+  assert.strictEqual(result.status, 0, result.stderr);
+  assert.strictEqual(calls, 1, 'no request after the soft end');
+  assert.match(result.stdout, /soft-turn-ran/, 'the tool call of the turn that crossed the soft end still ran');
+  assert.match(result.stdout, /\[pass time up: stopped at a turn boundary, work so far is on disk\]/);
+});
+
+test('delegate grace: child killed at timeout + grace, MI_PASS_END at the kill time, MI_PASS_SOFT at the cap', async () => {
+  const probe = `/tmp/mi-test-passsoft-${process.pid}.mjs`;
+  writeFileSync(probe, 'console.log("END=" + (process.env.MI_PASS_END ?? "unset") + " SOFT=" + (process.env.MI_PASS_SOFT ?? "unset"));');
+  const saved = { path: process.env.MI_PATH, end: process.env.MI_PASS_END, soft: process.env.MI_PASS_SOFT };
+  global.spawn = spawn;
+  const delegate = (await import('../tools/delegate.mjs')).default;
+  let withGrace, noGrace, now;
+  try {
+    process.env.MI_PATH = probe; delete process.env.MI_PASS_END; delete process.env.MI_PASS_SOFT;
+    now = Date.now() / 1000;
+    withGrace = await delegate.handler({ prompt: 'x', timeout: 60000, grace: 30000 });
+    noGrace = await delegate.handler({ prompt: 'x', timeout: 60000 });
+  } finally {
+    process.env.MI_PATH = saved.path ?? '';
+    for (const [k, v] of [['MI_PASS_END', saved.end], ['MI_PASS_SOFT', saved.soft]]) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
+    rmSync(probe, { force: true });
+  }
+  const [, end, soft] = withGrace.match(/END=(\S+) SOFT=(\S+)/);
+  assert.ok(+end - now > 89 && +end - now <= 91, `hard end ${+end - now}`);
+  assert.ok(+soft - now > 59 && +soft - now <= 61, `soft end ${+soft - now}`);
+  assert.match(noGrace, /SOFT=unset/);
+  // the kill timer itself uses timeout + grace
+  const slow = `/tmp/mi-test-slow-${process.pid}.mjs`;
+  writeFileSync(slow, 'setTimeout(() => console.log("finished"), 1500);');
+  try { process.env.MI_PATH = slow; assert.match(await delegate.handler({ prompt: 'x', timeout: 500, grace: 3000 }), /finished/); assert.match(await delegate.handler({ prompt: 'x', timeout: 500 }), /\[timeout after 500ms\]/); }
+  finally { process.env.MI_PATH = saved.path ?? ''; rmSync(slow, { force: true }); }
+});
+
+test('goal: an empty (0-byte) declared artifact still counts as missing, so no LLM judge runs on it', async () => {
+  // write-compressor (A/B, fixed arm): the draft gate produced `printf '' > /app/data.comp`; the existence-only skip let a judge spend 228s on it
+  const art = `/tmp/mi-test-empty-artifact-${process.pid}.txt`, prompts = [], t0 = Date.now();
+  rmSync(art, { force: true });
+  requestHandler = (req, res, body) => {
+    const prompt = body.messages.at(-1).content;
+    prompts.push(prompt);
+    const k = kind(prompt);
+    if (k === 'planner') sse(res, { role: 'assistant', content: `EXIT_CRITERIA\n- done\nARTIFACTS: ${art}\nVERIFIER_SHAPE_CONTRACT\n- ok\nVERIFICATION_PLAN\n- inspect\nCURRENT_STATE\n- missing` });
+    else if (k === 'worker') { writeFileSync(art, /you are worker 1\//.test(prompt) ? '' : 'content'); sse(res, { role: 'assistant', content: WORK }); }
+    else sse(res, { role: 'assistant', content: 'file: measured=content expected=content [PASS]\nACK\nVERDICT: PASS' });
+  };
+  try {
+    const result = await runMi(['-g', 'write the file', '-c', 'check it', '-d', String(Math.floor(Date.now() / 1000) + 900)]);
+    assert.strictEqual(result.status, 0);
+  } finally { rmSync(art, { force: true }); }
+  const ks = prompts.map(kind);
+  assert.deepStrictEqual(ks.slice(0, 3), ['planner', 'worker', 'worker'], ks.join(','));
+  assert.strictEqual(ks.filter(k => k === 'judge').length, 1, 'one judge, after the artifact has content');
+  const skips = latestEvents(t0).filter(e => e.type === 'judge_skipped' && e.reason === 'no declared artifact exists yet');
+  assert.strictEqual(skips.length, 2, 'precheck + iteration 1 (empty file) skipped');
+});
+
+// ── K3: preservation (sanitize-git-repo r1/r2 `git gc --prune=now` lost original commit d6987af; compile-compcert r1
+// `dpkg -i --force-downgrade` broke apt so the verifier's `apt-get install curl` failed) ──
+// ── K7: planner artifact paths with markdown/punctuation (`/app/answer.txt**`, `/app/dclm;`, `/app/interp.py)`) never existed ──
+test('goal: preservation rule in worker, environment check in judge, ORIGINAL_HEADS in planner; artifact paths are cleaned', async () => {
+  const a = `/tmp/mi-test-art-a-${process.pid}.txt`, b = `/tmp/mi-test-art-b-${process.pid}`;
+  writeFileSync(a, 'a'); writeFileSync(b, 'b');
+  const prompts = [], t0 = Date.now();
+  requestHandler = (req, res, body) => {
+    const prompt = body.messages.at(-1).content;
+    prompts.push(prompt);
+    const k = kind(prompt);
+    if (k === 'planner') sse(res, { role: 'assistant', content: `EXIT_CRITERIA\n- done\n**ARTIFACTS:** **${a}**, \`${b}\`; (${a})\nVERIFIER_SHAPE_CONTRACT\n- ok\nVERIFICATION_PLAN\n- inspect\nCURRENT_STATE\n- exists` });
+    else if (k === 'judge') sse(res, { role: 'assistant', content: 'all: measured=ok expected=ok [PASS]\nACK\nVERDICT: PASS' });
+    else if (k === 'worker') { writeFileSync(a, 'new a'); writeFileSync(b, 'new b'); sse(res, { role: 'assistant', content: WORK }); }
+    else sse(res, { role: 'assistant', content: 'element: measured=ok required=ok [PASS]\nACK\nVERDICT: PASS' });
+  };
+  try {
+    const result = await runMi(['-g', 'sanitize the repo', '-c', 'check it', '-d', String(Math.floor(Date.now() / 1000) + 900)]);
+    assert.strictEqual(result.status, 0);
+  } finally { rmSync(a, { force: true }); rmSync(b, { force: true }); }
+  const planner = prompts.find(p => kind(p) === 'planner'), worker = prompts.find(p => kind(p) === 'worker'), judge = prompts.find(p => kind(p) === 'judge');
+  assert.match(planner, /ORIGINAL_HEADS/);
+  assert.match(worker, /PRESERVE: unless the goal explicitly requires it, never rewrite or prune git history\/objects/);
+  assert.match(worker, /dpkg --force-\*/);
+  assert.match(judge, /6h\. environment intact/);
+  assert.match(judge, /apt-get check/);
+  assert.match(judge, /git cat-file -e <sha>/);
+  assert.ok(worker.includes(`declared artifacts: ${a}, ${b}\n`), worker.match(/declared artifacts: .*/)?.[0]);
+  const ev = latestEvents(t0);
+  assert.ok(!ev.some(e => e.type === 'judge_skipped' && e.reason !== 'deadline'), 'cleaned paths exist, so the judge is not mechanically skipped');
+  assert.ok(judge, 'judge ran');
+});
+
+// ── Round 1 (2026-10-04): one worker session. MI_SESSION keeps a piped mi's conversation in a file and continues it on the next call ──
+test('MI_SESSION: a piped run saves its conversation and the next piped run continues it', async () => {
+  const file = `/tmp/mi-test-session-${process.pid}.json`, bodies = [];
+  rmSync(file, { force: true });
+  requestHandler = (req, res, body) => {
+    bodies.push(body);
+    if (bodies.length === 1) sse(res, { role: 'assistant', tool_calls: [{ id: 'c1', type: 'function', function: { name: 'bash', arguments: JSON.stringify({ command: 'echo from-first-run' }) } }] });
+    else sse(res, { role: 'assistant', content: bodies.length === 2 ? 'first done' : 'second done' });
+  };
+  let saved;
+  try {
+    const first = await runMi([], { MI_SESSION: file }, 'first task');
+    assert.strictEqual(first.status, 0, first.stderr);
+    saved = JSON.parse(readFileSync(file, 'utf8'));
+    const second = await runMi([], { MI_SESSION: file }, 'now the feedback');
+    assert.strictEqual(second.status, 0, second.stderr);
+  } finally { rmSync(file, { force: true }); }
+  assert.deepStrictEqual(saved.map(m => m.role), ['system', 'user', 'assistant', 'tool', 'assistant']);
+  assert.strictEqual(saved.at(-1).content, 'first done');
+  assert.strictEqual(bodies.length, 3);
+  const resumed = bodies[2].messages;
+  assert.deepStrictEqual(resumed.map(m => m.role), ['system', 'user', 'assistant', 'tool', 'assistant', 'user']);
+  assert.strictEqual(resumed[1].content, 'first task');
+  assert.match(resumed[3].content, /from-first-run/);
+  assert.strictEqual(resumed.at(-1).content, 'now the feedback');
+});
+
+test('MI_SESSION: an unreadable session file starts a fresh conversation; without MI_SESSION nothing is written', async () => {
+  const file = `/tmp/mi-test-session-bad-${process.pid}.json`, bodies = [];
+  writeFileSync(file, '[{"role":"system","content":"cut off mid-wri');
+  requestHandler = (req, res, body) => { bodies.push(body); sse(res, { role: 'assistant', content: 'ok' }); };
+  let after;
+  try {
+    const r = await runMi([], { MI_SESSION: file }, 'task');
+    assert.strictEqual(r.status, 0, r.stderr);
+    after = JSON.parse(readFileSync(file, 'utf8'));
+    rmSync(file, { force: true });
+    const plain = await runMi([], {}, 'task');
+    assert.strictEqual(plain.status, 0);
+  } finally { /* removed below */ }
+  assert.deepStrictEqual(bodies[0].messages.map(m => m.role), ['system', 'user']);
+  assert.deepStrictEqual(after.map(m => m.role), ['system', 'user', 'assistant']);
+  assert.ok(!existsSync(file), 'no session file without MI_SESSION');
+});
+
+test('delegate: MI_SESSION is not inherited by a child, only passed when the caller names it', async () => {
+  const probe = `/tmp/mi-test-sessenv-${process.pid}.mjs`;
+  writeFileSync(probe, 'console.log("SESSION=[" + (process.env.MI_SESSION ?? "unset") + "]");');
+  const saved = { path: process.env.MI_PATH, sess: process.env.MI_SESSION };
+  global.spawn = spawn;
+  const delegate = (await import('../tools/delegate.mjs')).default;
+  let inherited, named;
+  try {
+    process.env.MI_PATH = probe; process.env.MI_SESSION = '/tmp/parent-session.json';
+    inherited = await delegate.handler({ prompt: 'x' });
+    named = await delegate.handler({ prompt: 'x', env: { MI_SESSION: '/tmp/child-session.json' } });
+  } finally {
+    process.env.MI_PATH = saved.path ?? '';
+    if (saved.sess === undefined) delete process.env.MI_SESSION; else process.env.MI_SESSION = saved.sess;
+    rmSync(probe, { force: true });
+  }
+  assert.match(inherited, /SESSION=\[\]/, 'a nested delegate must not load or overwrite its parent\'s conversation');
+  assert.match(named, /SESSION=\[\/tmp\/child-session\.json\]/);
+});
+
+test('goal: the salvage pass continues the worker conversation instead of starting from nothing', async () => {
+  // a3106b2 arm: every salvage/short last pass (35–80s, a fresh process) ended in a request timeout with nothing written
+  const art = `/tmp/mi-test-salvage-art-${process.pid}.txt`, bodies = [], lb = lowBudget(), t0 = Date.now();
+  rmSync(art, { force: true });
+  requestHandler = (req, res, body) => {
+    bodies.push(body);
+    const k = kind(body.messages.at(-1).content);
+    if (k === 'planner') sse(res, { role: 'assistant', content: `EXIT_CRITERIA\n- done\nARTIFACTS: ${art}\nVERIFIER_SHAPE_CONTRACT\n- ok\nVERIFICATION_PLAN\n- inspect\nCURRENT_STATE\n- missing` });
+    else if (k === 'worker') { lb.jump(50); sse(res, { role: 'assistant', content: 'found the answer 42, not written yet' }); }
+    else sse(res, { role: 'assistant', content: 'wrote it' });
+  };
+  try {
+    const result = await runMi(['-g', 'long task', '-c', 'check it', '-d', String(lb.dl)], lb.env);
+    assert.strictEqual(result.status, 0);
+  } finally { lb.done(); rmSync(art, { force: true }); }
+  const kinds = bodies.map(b => kind(b.messages.at(-1).content));
+  assert.deepStrictEqual(kinds, ['planner', 'worker', 'salvage'], kinds.join(','));
+  const pass = latestEvents(t0).find(e => e.type === 'pass');
+  assert.ok(Math.abs(pass.iter_timeout_ms - (pass.budget_remaining_s - 100) * 1000) <= 1000, `no artifact yet: the pass keeps minPass (10% of ~1000s) back for salvage, cap ${pass.iter_timeout_ms} of ${pass.budget_remaining_s}s`);
+  const sal = bodies[2].messages;
+  assert.deepStrictEqual(sal.map(m => m.role), ['system', 'user', 'assistant', 'user']);
+  assert.strictEqual(sal[2].content, 'found the answer 42, not written yet');
+});
+
+test('a second context overflow in the same run is compacted again after a successful request in between', async () => {
+  // one worker session now lasts the whole budget, so it can outgrow the context more than once
+  let streams = 0, compactions = 0;
+  const overflow = res => { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: { code: 'context_length_exceeded', message: 'maximum context length is 8192 tokens' } })); };
+  requestHandler = (req, res, body) => {
+    if (!body.stream) { compactions++; res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ choices: [{ message: { content: 'GOAL: test\nDONE: some\nSTATE: clean\nNEXT: go on\nCONSTRAINTS: none' } }] })); }
+    streams++;
+    if (streams === 1 || streams === 3) return overflow(res);
+    if (streams === 2) return sse(res, { role: 'assistant', tool_calls: [{ id: 'c1', type: 'function', function: { name: 'bash', arguments: JSON.stringify({ command: 'echo step' }) } }] });
+    sse(res, { role: 'assistant', content: 'finished after two compactions' });
+  };
+  const result = await runMi(['-p', 'long job']);
+  assert.strictEqual(result.status, 0, result.stderr);
+  assert.strictEqual(compactions, 2);
+  assert.match(result.stdout, /finished after two compactions/);
+});
+
+// ── Round 1 (2026-10-04): providers drop earlier reasoning from the history, so a tool-calling turn keeps the end of it as notes ──
+test('reasoning of a tool-calling turn is kept in the history as notes; a final answer is left as it is', async () => {
+  const bodies = [];
+  requestHandler = (req, res, body) => {
+    bodies.push(body);
+    res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+    const d = delta => res.write(`data: ${JSON.stringify({ choices: [{ delta }] })}\n\n`);
+    d({ reasoning: 'the format is LZ77; ' }); d({ reasoning: 'next: count the bytes' });
+    if (bodies.length === 1) d({ tool_calls: [{ index: 0, id: 'c1', type: 'function', function: { name: 'bash', arguments: JSON.stringify({ command: 'echo hi' }) } }] });
+    else d({ content: 'done' });
+    res.end('data: [DONE]\n\n');
+  };
+  const r = await runMi(['-p', 'go']);
+  assert.strictEqual(r.status, 0, r.stderr);
+  assert.strictEqual(bodies.length, 2);
+  const turn = bodies[1].messages.find(m => m.role === 'assistant');
+  // 2026-10-09: the notes go back in the reasoning fields, not in the visible content (in the content they made the model write its next tool call inside its reasoning)
+  assert.strictEqual(turn.reasoning, 'the format is LZ77; next: count the bytes', 'complete, in the field it arrived in');
+  assert.ok(!('reasoning_content' in turn), 'not duplicated into a field the server did not use');
+  assert.ok(!/LZ77/.test(turn.content || ''), 'not in the content');
+  assert.ok(!r.stdout.includes('my notes'), 'notes are not printed');
+  assert.match(r.stdout, /done/);
+});
+
+test('a request cut off by the time limit leaves the end of its reasoning in the history for the retry', async () => {
+  const bodies = [];
+  requestHandler = (req, res, body) => {
+    bodies.push(body);
+    res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+    if (bodies.length === 1) return void res.write(`data: ${JSON.stringify({ choices: [{ delta: { reasoning: 'half-built encoder: tokens parsed, range coder next' } }] })}\n\n`); // never finishes
+    res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: 'done' } }] })}\n\n`); res.end('data: [DONE]\n\n');
+  };
+  const r = await runMi(['-p', 'go'], { MI_REQUEST_TIMEOUT: '1' });
+  assert.strictEqual(r.status, 0, r.stderr);
+  assert.strictEqual(bodies.length, 2);
+  const users = bodies[1].messages.filter(m => m.role === 'user').map(m => m.content);
+  assert.ok(users.some(c => /cut off by the request time limit[\s\S]*half-built encoder: tokens parsed, range coder next/.test(c)), users.join(' | '));
+  assert.match(r.stdout, /done/);
+});
+
+// ── Review 2026-10-06 (adversarial review of bench/tb2-reference at 160a177): one block of tests per finding ──
+const runMiIn = (cwd, args, env = {}, input = '') => new Promise(resolve => {
+  const child = spawn('node', [INDEX_PATH, ...args], { cwd, env: { ...process.env, OPENAI_BASE_URL: serverUrl, OPENAI_API_KEY: 'test-key', MI_HOME: '/tmp/.mi-test-no-home', http_proxy: '', https_proxy: '', HTTP_PROXY: '', HTTPS_PROXY: '', ...env } });
+  let stdout = '', stderr = ''; child.stdout.on('data', d => stdout += d); child.stderr.on('data', d => stderr += d);
+  child.on('close', status => resolve({ status, stdout, stderr })); child.stdin.end(input);
+});
+// goal.handler with delegate.handler replaced by a script: fn(prompt, opts, kind) -> transcript
+const withDelegate = async (fn, body) => {
+  const delegate = (await import('../tools/delegate.mjs')).default, goal = (await import('../tools/goal.mjs')).default, saved = delegate.handler, calls = [];
+  delegate.handler = async opts => { const k = kind(opts.prompt); calls.push({ kind: k, prompt: opts.prompt, env: opts.env }); return fn(opts.prompt, opts, k, calls); };
+  try { return await body(goal, calls); } finally { delegate.handler = saved; }
+};
+
+test('review 1: no goal-loop prompt tells the agent to look for verifier files, and each forbids fetching a grader\'s tests or solutions', async () => {
+  const prompts = await withDelegate((p, o, k) => k === 'planner' ? 'ARTIFACTS: none\nAMBIGUITIES: none' : k === 'worker' ? WORK : 'x: measured=1 expected=1 [PASS]\nACK\nVERDICT: PASS',
+    async (goal, calls) => { await goal.handler({ goal: 'make it work', check: 'ACK if it works', max: 1, deadline: Math.floor(Date.now() / 1000) + 900 }); return calls; });
+  const byKind = k => prompts.filter(c => c.kind === k).map(c => c.prompt);
+  for (const k of ['planner', 'worker', 'judge', 'recheck']) {
+    assert.ok(byKind(k).length, `${k} ran`);
+    for (const p of byKind(k)) {
+      assert.doesNotMatch(p, /verify\*\.py|grade\*\.py|ls \/tests|find \/ |cd \/ && python3 -m pytest tests|test\/verifier files/, `${k} prompt seeks verifier files`);
+      assert.match(p, /never search for, download or read a grader's own files/, `${k} prompt carries the rule`);
+    }
+  }
+  assert.doesNotMatch(byKind('planner')[0], /exact values, grading criteria/);
+});
+
+test('review 1: MI_DENY refuses a tool call that names a denied path or source and leaves other calls alone', async () => {
+  const src = readFileSync(join(__dirname, '../bench/mi_agent.py'), 'utf8');
+  const deny = [...src.match(/BENCH_DENY = \(([\s\S]*?)\n\)/)[1].matchAll(/r"([^"]*)"/g)].map(m => m[1]).join('');
+  assert.match(src, /"MI_DENY": BENCH_DENY/);
+  const marker = `/tmp/mi-test-deny-${process.pid}`, cmds = [
+    `cat /tests/test_outputs.py; touch ${marker}.a`, `git clone https://github.com/laude-institute/terminal-bench-2.git /tmp/tb2; touch ${marker}.b`,
+    `echo x\ncat /solution/solve.sh; touch ${marker}.c`, `curl -s https://raw.githubusercontent.com/harbor-framework/terminal-bench-2-1/main/x; touch ${marker}.d`,
+    `ls /logs/verifier; touch ${marker}.e`, `ls ./tests /app/tests /app/test_outputs.py 2>/dev/null; touch ${marker}.ok`];
+  const bodies = [];
+  requestHandler = (req, res, body) => {
+    bodies.push(body);
+    if (bodies.length === 1) sse(res, { role: 'assistant', tool_calls: cmds.map((command, i) => ({ id: `c${i}`, type: 'function', function: { name: 'bash', arguments: JSON.stringify({ command }) } })) });
+    else sse(res, { role: 'assistant', content: 'done' });
+  };
+  let made;
+  try { const r = await runMi(['-p', 'go'], { MI_DENY: deny }); assert.strictEqual(r.status, 0, r.stderr); made = ['a', 'b', 'c', 'd', 'e', 'ok'].filter(x => existsSync(`${marker}.${x}`)); }
+  finally { for (const x of ['a', 'b', 'c', 'd', 'e', 'ok']) rmSync(`${marker}.${x}`, { force: true }); }
+  assert.deepStrictEqual(made, ['ok'], 'only the call that names no denied path ran');
+  const results = bodies[1].messages.filter(m => m.role === 'tool').map(m => m.content);
+  assert.strictEqual(results.length, 6);
+  for (const r of results.slice(0, 5)) assert.match(r, /blocked by policy \(MI_DENY\)/);
+  assert.doesNotMatch(results[5], /blocked by policy/);
+});
+
+test('review 1: the Harbor adapter\'s prompts no longer point at /tests and tell the agent not to fetch the benchmark\'s files', () => {
+  const src = readFileSync(join(__dirname, '../bench/mi_agent.py'), 'utf8');
+  const block = name => src.match(new RegExp(`${name} = \\(([\\s\\S]*?)\\n\\)`))[1];
+  for (const name of ['TERMINAL_BENCH_CHECK', 'EVAL_SYSTEM_PROMPT']) {
+    assert.doesNotMatch(block(name), /if \/tests\/ exists|visible \/tests\/|pytest tests\//, name);
+    assert.match(block(name), /Never look for, download or read (the|this) benchmark's own tests/, name);
+  }
+});
+
+test('review 2: a saved session is mode 0600 whatever the umask or an older file\'s mode, and a goal run keeps its session in a private directory it removes', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'mi-test-rev2-')), file = join(dir, 's.json');
+  requestHandler = (req, res) => sse(res, { role: 'assistant', content: 'ok' });
+  let mode, mode2;
+  try {
+    assert.strictEqual((await runMi([], { MI_SESSION: file }, 'task')).status, 0);
+    mode = statSync(file).mode & 0o777;
+    rmSync(file); writeFileSync(file, '[]', { mode: 0o644 });
+    assert.strictEqual((await runMi([], { MI_SESSION: file }, 'task')).status, 0);
+    mode2 = statSync(file).mode & 0o777;
+    assert.deepStrictEqual(readdirSync(dir), ['s.json'], 'no partial file left behind');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+  assert.strictEqual(mode.toString(8), '600');
+  assert.strictEqual(mode2.toString(8), '600');
+  const seen = {};
+  const out = await withDelegate((p, o, k) => {
+    if (k === 'worker') { seen.path = o.env?.MI_SESSION; seen.dirMode = statSync(dirname(seen.path)).mode & 0o777; writeFileSync(seen.path, '[{"role":"system","content":"s"},{"role":"user","content":"secret"}]', { mode: 0o600 }); return WORK; }
+    return k === 'planner' ? 'ARTIFACTS: none\nAMBIGUITIES: none' : 'x: measured=1 expected=1 [FAIL]\nNACK\nVERDICT: FAIL';
+  }, goal => goal.handler({ goal: 'do it', check: 'check it', max: 1 }));
+  assert.match(out, /goal not achieved/);
+  assert.ok(seen.path, 'the worker was given a session file');
+  assert.doesNotMatch(seen.path, /^\/tmp\/mi-goal-\d+\.session\.json$/, 'not a predictable timestamped path');
+  assert.strictEqual(seen.dirMode.toString(8), '700');
+  assert.ok(!existsSync(seen.path) && !existsSync(dirname(seen.path)), 'session directory removed when the goal run ended');
+});
+
+test('review 3: a resumed session runs under the current system message (cwd, policy), and -p continues and keeps the saved conversation', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'mi-test-rev3-')), a = join(dir, 'a'), b = join(dir, 'b'), file = join(dir, 's.json'), bodies = [];
+  mkdirSync(a); mkdirSync(b);
+  requestHandler = (req, res, body) => { bodies.push(body); sse(res, { role: 'assistant', content: `reply ${bodies.length}` }); };
+  let saved;
+  try {
+    assert.strictEqual((await runMiIn(a, [], { MI_SESSION: file, SYSTEM_PROMPT: 'OLD POLICY' }, 'first task')).status, 0);
+    assert.strictEqual((await runMiIn(b, [], { MI_SESSION: file, SYSTEM_PROMPT: 'NEW POLICY' }, 'second task')).status, 0);
+    assert.strictEqual((await runMiIn(b, ['-p', 'one-shot question'], { MI_SESSION: file, SYSTEM_PROMPT: 'NEW POLICY' })).status, 0);
+    saved = JSON.parse(readFileSync(file, 'utf8'));
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+  const sys2 = bodies[1].messages[0].content;
+  assert.match(sys2, /NEW POLICY/); assert.doesNotMatch(sys2, /OLD POLICY/);
+  assert.ok(sys2.includes(`CWD: ${b}`) && !sys2.includes(`CWD: ${a}`), 'current cwd, not the saved one');
+  assert.deepStrictEqual(bodies[1].messages.map(m => m.role), ['system', 'user', 'assistant', 'user']);
+  assert.deepStrictEqual(bodies[2].messages.filter(m => m.role === 'user').map(m => m.content), ['first task', 'second task', 'one-shot question'], '-p continues the session');
+  assert.deepStrictEqual(saved.filter(m => m.role === 'user').map(m => m.content), ['first task', 'second task', 'one-shot question'], '-p did not erase it');
+  assert.deepStrictEqual(saved.at(-1), { role: 'assistant', content: 'reply 3' });
+});
+
+test('review 4: a legitimately empty artifact reaches the judge — at once when the goal asks for an empty file, otherwise after one pass', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'mi-test-rev4-'));
+  let art = join(dir, 'blank.txt');
+  const script = (p, o, k) => k === 'planner' ? `ARTIFACTS: ${art}\nAMBIGUITIES: none` : k === 'worker' ? (writeFileSync(art, ''), WORK) : 'file: measured=0 bytes expected=0 bytes [PASS]\nACK\nVERDICT: PASS';
+  let asked, unasked, kinds;
+  try {
+    asked = await withDelegate(script, goal => goal.handler({ goal: `Create an empty file ${art}, exactly 0 bytes.`, check: 'ACK if this file exists and is empty.', max: 1 }));
+    art = join(dir, 'failing.txt');
+    unasked = await withDelegate(script, async (goal, calls) => { const r = await goal.handler({ goal: `Write the names of the failing checks to ${art}.`, check: 'ACK if the file lists exactly the failing checks.', max: 2 }); kinds = calls.map(c => c.kind); return r; });
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+  assert.match(asked, /^goal achieved in 1 iteration/);
+  assert.doesNotMatch(asked, /still missing/);
+  assert.match(unasked, /^goal achieved in 2 iterations/, unasked.slice(0, 200));
+  assert.deepStrictEqual(kinds.filter(k => k !== 'recheck'), ['planner', 'worker', 'worker', 'judge'], 'held back once, then reviewed as it is');
+});
+
+test('review 4: an artifact name ending in _ or . is kept as written; a sentence period after a real name still resolves to the file', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'mi-test-rev4b-')), under = join(dir, 'result_'), dotted = join(dir, 'notes.'), plainFile = join(dir, 'out.txt');
+  const seen = [];
+  const script = arts => (p, o, k) => { if (k === 'worker') seen.push(p.match(/declared artifacts: ([^\n]*)/)?.[1]); return k === 'planner' ? `ARTIFACTS: ${arts}\nAMBIGUITIES: none` : k === 'worker' ? WORK : 'file: measured=ok expected=ok [PASS]\nACK\nVERDICT: PASS'; };
+  let r1, r2;
+  try {
+    writeFileSync(under, 'x'); writeFileSync(dotted, 'x'); writeFileSync(plainFile, 'x');
+    r1 = await withDelegate(script(`\`${under}\`, ${dotted}`), goal => goal.handler({ goal: 'write both', check: 'check', max: 1 }));
+    r2 = await withDelegate(script(`**${plainFile}**.`), goal => goal.handler({ goal: 'write it', check: 'check', max: 1 }));
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+  assert.match(r1, /^goal already met/, r1.slice(0, 200));
+  assert.match(r2, /^goal already met/, r2.slice(0, 200));
+  const names = await withDelegate((p, o, k) => k === 'planner' ? `ARTIFACTS: ${under}, ${dotted}\nAMBIGUITIES: none` : WORK, async (goal, calls) => { await goal.handler({ goal: 'write both', check: 'check', max: 1 }); return calls.find(c => c.kind === 'worker').prompt.match(/declared artifacts: ([^\n]*)/)[1]; });
+  assert.strictEqual(names, `${under}, ${dotted}`);
+});
+
+test('review 5 (rule since review #4): a review is a pass only when its last line is exactly VERDICT: PASS and it was not cut off', async () => {
+  const pre = judgeOut => withDelegate((p, o, k) => k === 'planner' ? 'ARTIFACTS: none\nAMBIGUITIES: none' : k === 'worker' ? WORK : judgeOut, goal => goal.handler({ goal: 'Review actual artifact.', check: 'ACK only if it is correct.', max: 0 }));
+  const ok = 'a: measured=1 expected=1 [PASS]\n';
+  const notMet = {
+    'ACK without the verdict line': ok + 'ACK',
+    'bold ACK': ok + '**ACK** — every criterion measured',
+    'legacy verdict wording': ok + 'Final verdict: ACK',
+    'lower case': ok + 'verdict: pass', 'markdown around the line': ok + '**VERDICT: PASS**', 'trailing punctuation': ok + 'VERDICT: PASS.',
+    'quoted': ok + '> VERDICT: PASS', 'text after it on the line': ok + 'VERDICT: PASS (all good)', 'text before it on the line': ok + 'so the VERDICT: PASS',
+    'verdict then more text': ok + 'VERDICT: PASS\none more note',
+    'cut off after the verdict': ok + 'VERDICT: PASS\n[request timeout: stopped early, work so far is on disk]',
+    'cut off by the wall': ok + 'VERDICT: PASS\n[timeout after 180000ms]',
+    'explicit FAIL': ok + 'VERDICT: FAIL', 'both, FAIL last': ok + 'VERDICT: PASS\nVERDICT: FAIL',
+    'canonical [FAIL] line then PASS': 'size: measured=3000 expected<=2500 [FAIL]\nVERDICT: PASS',
+    'hypothetical sentence': ok + 'once this is fixed the verdict will be VERDICT: PASS',
+    'empty reply': '',
+    'reviewer transcript (review 1)': '\u001b[90m⟡ bash({"command":"printf \'criterion: measured=old expected=new [FAIL]\\\\nNACK\\\\n\'"})\u001b[0m\ncriterion: measured=old expected=new [FAIL]\nNACK\nIf remediation succeeds the later verdict should be ACK.\n[timeout after 180000ms]',
+  };
+  for (const [name, out] of Object.entries(notMet)) assert.doesNotMatch(await pre(out), /^goal already met/, name);
+  // every failing-review shape from the review #2-#4 probes ends in ACK, so none is a pass whatever its table looks like
+  for (const body of ['| criterion | measured | expected | status |\n| constraint | 0 | 1 | FAIL |', '| name | measured | expected | status |\n| semantic validation | ERROR | PASS | FAIL |', '| criterion | result | expected | status |\n|---|---|---|---|\n| line count | 0 | 1 | FAIL |', '| status | 500 | 200 | FAIL |', 'name | measured | expected | status\n--- | --- | --- | ---\nline count | 0 | 1 | FAIL', '<table><tr><td>line count</td><td>0</td><td>1</td><td>FAIL</td></tr></table>', 'name\tmeasured\texpected\tstatus\nline count\t0\t1\tFAIL'])
+    assert.doesNotMatch(await pre(`${ok}${body}\nACK`), /^goal already met/, body);
+  for (const out of [ok + 'VERDICT: PASS', ok + 'ACK\nVERDICT: PASS', ok + 'VERDICT: PASS\n\n', ok + '  VERDICT: PASS  ', '\u001b[90m' + ok + '\u001b[0mVERDICT: PASS\r\n', ok + 'earlier draft said VERDICT: FAIL, after re-measuring:\nVERDICT: PASS'])
+    assert.match(await pre(out), /^goal already met/, JSON.stringify(out));
+});
+
+// ── Review #2, 2026-10-06 (release review of bench/tb2-reference at 25852cc): one block per deciding finding ──
+test('review2 1: the egress shim sends named HTTP/TLS to the proxy and refuses everything else — no direct path during the agent phase', () => {
+  const py = `
+import os, sys, json
+os.environ["MI_EGRESS_PROXY"] = "10.9.9.9:8080"
+sys.path.insert(0, "bench/egress")
+import shim, struct
+shim.proxy_ips.add("10.9.9.9")
+def hello(name):
+    n = name.encode(); ext = struct.pack("!HH", 0, len(n) + 5) + struct.pack("!HBH", len(n) + 3, 0, len(n)) + n
+    body = b"\\x03\\x03" + b"\\0" * 32 + b"\\0" + struct.pack("!H", 2) + b"\\x13\\x01" + b"\\x01\\0" + struct.pack("!H", len(ext)) + ext
+    hs = b"\\x01" + struct.pack("!I", len(body))[1:] + body
+    return b"\\x16\\x03\\x01" + struct.pack("!H", len(hs)) + hs
+d = lambda kind, host, ip, port=443, off=False: shim.decide(kind, host, ip, port, off)
+print(json.dumps({
+  "sni": shim.sniff(hello("raw.githubusercontent.com")),
+  "host": shim.sniff(b"GET /a HTTP/1.1\\r\\nHost: MI-Fixture:80\\r\\n\\r\\n"),
+  "connect": shim.sniff(b"CONNECT github.com:443 HTTP/1.1\\r\\n\\r\\n"),
+  "none": shim.sniff(b"SSH-2.0-x\\r\\n"),
+  "tls_named": d("tls", "pypi.org", "151.101.0.223"),
+  "http_named": d("http", "some-relay.example", "93.184.216.34", 80),
+  "http_named_private": d("http", "review-relay", "172.20.0.7", 80),
+  "tls_without_name": d("tls", "", "185.199.108.133"),
+  "http_without_host": d("http", "", "93.184.216.34", 80),
+  "ssh": d("", "", "140.82.112.5", 22),
+  "raw_tcp_public": d("", "", "93.184.216.34", 9000),
+  "raw_tcp_private": d("", "", "172.20.0.7", 9000),
+  "the_proxy_itself": d("http", "x", "10.9.9.9", 8080),
+  "after_agent_phase": d("", "", "140.82.112.5", 22, True),
+}))`;
+  const r = JSON.parse(execFileSync('python3', ['-c', py], { cwd: join(__dirname, '..'), encoding: 'utf8' }));
+  assert.deepStrictEqual(r, { sni: ['tls', 'raw.githubusercontent.com'], host: ['http', 'mi-fixture'], connect: ['http', 'github.com'], none: ['', ''],
+    tls_named: 'via-proxy', http_named: 'via-proxy', http_named_private: 'via-proxy', tls_without_name: 'refused', http_without_host: 'refused',
+    ssh: 'refused', raw_tcp_public: 'refused', raw_tcp_private: 'refused', the_proxy_itself: 'direct', after_agent_phase: 'direct' });
+  const shim = readFileSync(join(__dirname, '../bench/egress/shim.py'), 'utf8');
+  assert.match(shim, /CONNECT \{host\}:\{port\}/, 'the proxy is asked for the NAME, so it connects to the real host');
+});
+
+test('review2 1: the egress overlay gives the task container no way around the shim, and the clean-run agent config requires it', () => {
+  const read = p => readFileSync(join(__dirname, '..', p), 'utf8');
+  const compose = read('bench/egress/compose.yaml'), main = compose.slice(compose.indexOf('\n  main:'));
+  assert.match(main, /network_mode: "service:mi-egress"/);
+  assert.match(main, /cap_drop: \[NET_RAW\]/);
+  assert.doesNotMatch(main, /cap_add|privileged/);
+  assert.match(read('bench/egress/shim.py'), /meta nfproto ipv4 meta l4proto tcp redirect to/);
+  assert.match(read('bench/egress/filter.py'), /host is not on the allowlist/);
+  assert.match(read('bench/egress/shim.py'), /udp dport != 53 reject/);
+  assert.match(read('bench/configs/agent-mi-deepseek-v4.1-flash-egress.yaml'), /egress: true/);
+  assert.match(read('bench/configs/egress.yaml'), /bench\/egress\/compose\.yaml/);
+  const adapter = read('bench/mi_agent.py');
+  assert.match(adapter, /elif self\.options\.egress:\s+raise RuntimeError/);
+  assert.match(adapter, /finally:\s+self\._egress_finish\(environment\)/);
+});
+
+test('review2 2: the judge prompt does not let passing project tests end a review, and both review prompts end with the exact-verdict rule', async () => {
+  const calls = await withDelegate((p, o, k) => k === 'planner' ? 'ARTIFACTS: none\nAMBIGUITIES: none' : k === 'worker' ? WORK : 'a: measured=1 expected=1 [PASS]\nVERDICT: PASS', async (goal, calls) => { await goal.handler({ goal: 'make it work', check: 'ACK if it works', max: 1, deadline: Math.floor(Date.now() / 1000) + 900 }); return calls; });
+  const judge = calls.find(c => c.kind === 'judge').prompt, recheck = calls.find(c => c.kind === 'recheck').prompt;
+  assert.doesNotMatch(judge, /if all tests pass, ACK/);
+  assert.match(judge, /never a reason to ACK by themselves/);
+  for (const p of [judge, recheck]) assert.match(p, /the LAST line of your reply must be exactly one of these two lines[\s\S]*\nVERDICT: PASS\nVERDICT: FAIL\n[\s\S]*counts as a failed review\.$/);
+});
+
+test('review2 3: reviews get a pristine copy of the working directory taken before the worker ran, with a literal change-set check; it is removed with the run', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'mi-test-rev2-3-')), file = join(dir, 'input.txt'), seen = {};
+  writeFileSync(file, 'Middle of the large hall\n');
+  requestHandler = (req, res, body) => {
+    const prompt = body.messages.at(-1).content, k = kind(prompt);
+    if (k === 'planner') return sse(res, { role: 'assistant', content: 'ARTIFACTS: none\nAMBIGUITIES: none' });
+    if (k === 'worker') { seen.worker = prompt; writeFileSync(file, 'Hub of the big hall\n'); return sse(res, { role: 'assistant', content: WORK }); }
+    if (k === 'judge' || k === 'recheck') {
+      seen[k] = prompt; const p = prompt.match(/pristine copy under (\S+\/pristine)/)?.[1];
+      if (p) { seen.dir = p; try { seen.pristine = readFileSync(join(p, 'input.txt'), 'utf8'); seen.mode = (statSync(dirname(p)).mode & 0o777).toString(8); } catch (e) { seen.pristine = String(e); } }
+      return sse(res, { role: 'assistant', content: 'change: Middle -> Hub allowed=no [FAIL]\nNACK\nVERDICT: FAIL' });
+    }
+    sse(res, { role: 'assistant', content: 'ok' });
+  };
+  let r;
+  try { r = await runMiIn(dir, ['-g', 'shorten input.txt using only the listed synonyms', '-c', 'check it'], { MI_GOAL_MAX: '1' }); }
+  finally { rmSync(dir, { recursive: true, force: true }); }
+  assert.strictEqual(r.status, 0, r.stderr);
+  assert.ok(seen.judge, 'the judge ran after the worker');
+  assert.match(seen.judge, /CHANGE-SET CHECK/);
+  assert.match(seen.judge, /EVERY changed token/);
+  assert.match(seen.judge, /exact case and punctuation, no lowercasing/);
+  assert.strictEqual(seen.pristine, 'Middle of the large hall\n', 'the copy holds the file as it was before the worker edited it');
+  assert.strictEqual(seen.mode, '700');
+  assert.match(seen.worker, /ALLOWED EDITS: \S+\/pristine is a read-only copy/);
+  assert.ok(!existsSync(seen.dir), 'removed when the goal run ended');
+  assert.doesNotMatch(r.stdout, /goal achieved/);
+});
+
+// ── Review #3, 2026-10-07 (release review of bench/tb2-reference at 9046cd8): the two defects, fixed by kind ──
+test('review3 1 (design since review #4): the egress policy is a default-deny host allowlist; GitHub only for named repositories outside the benchmark\'s organisations', () => {
+  const py = `
+import os, sys, json
+os.environ["MI_EGRESS_DENY"] = r"terminal[-_. ]?bench|laude-institute|harbor-framework|(?<![a-z])tbench(?![a-z])"
+os.environ["MI_EGRESS_MODEL_HOSTS"] = r"(^|\\.)openrouter\\.ai$"
+sys.path.insert(0, "bench/egress")
+import filter as f
+def v(host, path="/", header=None, sni=None, body=""):
+    return f.request_verdict(host, host if header is None else header, host if sni is None else sni, path, body) is None
+print(json.dumps({
+  # default deny
+  "unlisted_host": v("example.com"), "relay_host": v("review-relay", "/http://mi-fixture/ordinary/file"), "reader_service": v("r.jina.ai", "/https://example.com"),
+  "github_cdn_mirror": v("cdn.jsdelivr.net", "/gh/git/git/README.md"), "gist": v("gist.githubusercontent.com", "/u/abcdef/raw"),
+  "address_literal": v("140.82.112.5", "/git/git"), "address_literal_v6": v("[2606:50c0::1]", "/x"),
+  "lookalike_suffix": v("evilpypi.org"), "lookalike_prefix": v("pypi.org.evil.example"), "subdomain_of_exact": v("x.pypi.org"),
+  # names must agree: an allowed name cannot be attached to another target
+  "host_header_differs": v("pypi.org", "/simple/six/", header="review-relay"), "sni_differs": v("pypi.org", "/simple/six/", sni="example.org"),
+  "allowed_header_on_unlisted_connect": v("review-relay", "/x", header="pypi.org"),
+  # listed hosts
+  "pypi": v("pypi.org", "/simple/six/"), "pypi_upper_dot": v("PyPI.org.", "/simple/six/", header="pypi.org", sni="pypi.org"), "host_header_with_port": v("pypi.org", "/simple/six/", header="pypi.org:443"),
+  "apt": v("archive.ubuntu.com", "/ubuntu/dists/noble/InRelease"), "hf": v("huggingface.co", "/api/models/gpt2"), "hf_cdn_suffix": v("us.aws.cdn.hf.co", "/repos/ab/cd"),
+  "rcsb_suffix": v("data.rcsb.org", "/rest/v1/core/entry/1ABC"), "model_api": v("openrouter.ai", "/api/v1/chat/completions", body='{"messages":[{"content":"git clone terminal-bench was blocked"}]}'),
+  "model_web_plugin": v("openrouter.ai", "/api/v1/chat/completions", body='{"model":"x","plugins":[{"id":"web"}]}'),
+  "model_online": v("openrouter.ai", "/api/v1/chat/completions", body='{"model":"deepseek/x:online"}'),
+  # review 5: the model API request is judged as parsed JSON, whole, whatever its size, order, escapes or repeated keys
+  **{"model_" + k: v("openrouter.ai", "/api/v1/chat/completions", body=b) for k, b in {
+    "web_search_options": '{"model":"x","web_search_options":{"search_context_size":"high"}}', "web_search_options_empty": '{"model":"x","web_search_options":{}}',
+    "web_plugin_second": '{"model":"x","plugins":[{"id":"response-healing"},{"id":"web"}]}', "web_plugin_escaped": '{"model":"x","plugins":[{"id":"w\\\\u0065b"}]}',
+    "web_plugin_escaped_key": '{"model":"x","plu\\\\u0067ins":[{"id":"web"}]}', "web_plugin_options_first": '{"plugins":[{"engine":{"a":{}},"id":"web"}]}',
+    "web_plugin_after_300kb": json.dumps({"messages": [{"role": "user", "content": "x" * 300000}], "plugins": [{"id": "web"}]}),
+    "web_plugin_after_8mb_bytes": json.dumps({"messages": [{"role": "user", "content": "x" * 8000000}], "plugins": [{"id": "web"}]}).encode(),
+    "web_plugin_key_twice_first": '{"plugins":[{"id":"web"}],"plugins":[]}', "web_plugin_key_twice_last": '{"plugins":[],"plugins":[{"id":"web"}]}',
+    "web_plugin_id_twice": '{"plugins":[{"id":"response-healing","id":"web"}]}', "web_plugin_case": '{"plugins":[{"id":" Web "}]}',
+    "plugins_not_a_list": '{"plugins":{"id":"web"}}', "plugins_string": '{"plugins":"web"}', "plugins_number": '{"plugins":7}', "plugin_without_id": '{"plugins":[{"engine":"exa"}]}',
+    "online_in_models": '{"models":["a/b","c/d:online"]}', "online_upper": '{"model":"a/b:ONLINE"}', "online_model_key_twice": '{"model":"a/b:online","model":"a/b"}',
+    "server_tool": '{"tools":[{"type":"function","function":{"name":"bash"}},{"type":"openrouter:web_search"}]}', "server_tool_preview": '{"tools":[{"type":"web_search_preview"}]}',
+    "tool_without_type": '{"tools":[{"name":"web_search"}]}', "tool_type_twice": '{"tools":[{"type":"function","type":"openrouter:web_search"}]}',
+    "remote_image": '{"messages":[{"role":"user","content":[{"type":"image_url","image_url":{"url":"https://example.com/a.png"}}]}]}',
+    "remote_file": '{"messages":[{"role":"user","content":[{"type":"file","file":{"file_data":" HTTP://example.com/a.pdf"}}]}]}',
+    "utf16": '{"plugins":[{"id":"web"}]}'.encode("utf-16"), "utf8_bom": b"\\xef\\xbb\\xbf" + b'{"plugins":[{"id":"web"}]}', "not_utf8": b'{"model":"\\xff"}',
+    "trailing_comma": '{"plugins":[{"id":"web"},],}', "comment": '{"plugins":[{"id":/**/"web"}]}', "not_json": "plugins=web", "json_array": '[{"plugins":[{"id":"web"}]}]',
+    "nested_too_deep": '{"a":' + "[" * 100000 + "]" * 100000 + ',"plugins":[{"id":"web"}]}',
+    "nested_deep_content_part": '{"messages":[{"role":"user","content":[{"type":"x","a":' + "[" * 2000 + '"https://example.com/a"' + "]" * 2000 + '}]}]}',
+    # allowed: what mi sends, and text that only mentions the words
+    "ok_mi_request": json.dumps({"model": "deepseek/x", "stream": True, "messages": [{"role": "system", "content": 'see https://example.com "plugins":[{"id":"web"}] x:online'}, {"role": "user", "content": [{"type": "text", "text": "https://example.com"}, {"type": "image_url", "image_url": {"url": "data:image/png;base64,AAAA"}}]}, {"role": "assistant", "content": "", "tool_calls": [{"id": "c1", "type": "function", "function": {"name": "bash", "arguments": '{"command":"curl https://example.com"}'}}]}, {"role": "tool", "tool_call_id": "c1", "content": "https://example.com"}], "tools": [{"type": "function", "function": {"name": "bash", "parameters": {"type": "object", "properties": {"web_search": {"type": "string"}, "plugins": {"type": "array"}}}}}]}),
+    "ok_8mb_bytes": json.dumps({"model": "x", "messages": [{"role": "user", "content": "x" * 8000000}]}).encode(), "ok_plugins_null_tools_empty": '{"model":"x","plugins":null,"tools":[],"web_search_options":null}',
+    "ok_other_plugin": '{"model":"x","plugins":[{"id":"response-healing"}]}', "ok_empty_body": "", "ok_blank_body": b" \\n",
+  }.items()},
+  "body_on_other_host_not_read": v("pypi.org", "/simple/six/", body='{"plugins":[{"id":"web"}]}'),
+  # a benchmark name on a listed host
+  "pypi_benchmark_package": v("pypi.org", "/simple/terminal-bench/"), "hf_benchmark_dataset": v("huggingface.co", "/datasets/x/Terminal_Bench-2"), "hf_encoded": v("huggingface.co", "/datasets/x/%74erminal-bench"),
+  # GitHub: named repositories only
+  "gh_repo": v("github.com", "/AbsInt/CompCert/archive/refs/tags/v3.13.tar.gz"), "gh_git_protocol": v("github.com", "/git/git.git/info/refs?service=git-upload-pack"),
+  "gh_raw": v("raw.githubusercontent.com", "/git/git/master/README.md"), "gh_codeload": v("codeload.github.com", "/ocaml/opam/tar.gz/refs/tags/2.1.5"),
+  "gh_api_repo": v("api.github.com", "/repos/git/git/contents/README.md?ref=master"), "gh_release_asset": v("release-assets.githubusercontent.com", "/github-production-release-asset/1/abc?sig=x"),
+  "gh_benchmark_org": v("github.com", "/harbor-framework/terminal-bench-2"), "gh_benchmark_org_other_repo": v("github.com", "/laude-institute/anything"),
+  "gh_raw_benchmark": v("raw.githubusercontent.com", "/harbor-framework/x/main/y"), "gh_api_benchmark": v("api.github.com", "/repos/laude-institute/x/readme"),
+  "gh_api_by_id": v("api.github.com", "/repositories/1063848495/readme"), "gh_api_user_id": v("api.github.com", "/user/9/repos"), "gh_api_org_id": v("api.github.com", "/organizations/9/repos"),
+  "gh_api_numeric_names": v("api.github.com", "/repos/12/34/readme"), "gh_api_graphql": v("api.github.com", "/graphql"), "gh_api_search": v("api.github.com", "/search/repositories?q=x"),
+  "gh_api_users": v("api.github.com", "/users/git"), "gh_api_dot_segments": v("api.github.com", "/repos/git/../repositories/8"), "gh_api_encoded": v("api.github.com", "/%72epositories/8"),
+  "gh_api_double_slash": v("api.github.com", "//repositories/8"), "gh_api_root": v("api.github.com", "/"),
+  "gh_search": v("github.com", "/search?q=x"), "gh_org_listing": v("github.com", "/orgs/git/repositories"), "gh_user_page": v("github.com", "/git"), "gh_topics": v("github.com", "/topics/benchmark"),
+  "gh_raw_one_segment": v("raw.githubusercontent.com", "/git"),
+}))`;
+  const r = JSON.parse(execFileSync('python3', ['-c', py], { cwd: join(__dirname, '..'), encoding: 'utf8' }));
+  const allowed = Object.keys(r).filter(k => r[k]).sort();
+  assert.deepStrictEqual(allowed, ['apt', 'gh_api_repo', 'gh_codeload', 'gh_git_protocol', 'gh_raw', 'gh_release_asset', 'gh_repo', 'hf', 'hf_cdn_suffix', 'host_header_with_port', 'model_api', 'pypi', 'pypi_upper_dot', 'rcsb_suffix',
+    'model_ok_mi_request', 'model_ok_8mb_bytes', 'model_ok_plugins_null_tools_empty', 'model_ok_other_plugin', 'model_ok_empty_body', 'model_ok_blank_body', 'body_on_other_host_not_read'].sort());
+  assert.strictEqual(Object.keys(r).filter(k => k.startsWith('model_')).length, 43, 'every model API case was judged');
+  // a request body over mitmproxy's stream_large_bodies limit is forwarded before request() sees it: the option must stay off
+  assert.doesNotMatch(readFileSync(join(__dirname, '..', 'bench/egress/entrypoint.sh'), 'utf8'), /stream_large_bodies/);
+  assert.match(readFileSync(join(__dirname, '..', 'bench/egress/filter.py'), 'utf8'), /def running\(\)[\s\S]{0,300}ctx\.options\.stream_large_bodies = None/);
+  // mitmproxy forwards a request whose hook raised: request() refuses what the policy cannot judge
+  const hook = `
+import os, sys, json
+from types import SimpleNamespace as NS
+os.environ["MI_EGRESS_DENY"] = "tbench"; os.environ["MI_EGRESS_MODEL_HOSTS"] = "openrouter"
+sys.path.insert(0, "bench/egress")
+import filter as f
+f.http = NS(Response=NS(make=lambda status, body, headers: NS(status_code=status, body=body.decode())))
+f.log = lambda **kw: None
+def boom(*a, **k): raise RuntimeError("synthetic")
+def run(get_content):
+    flow = NS(request=NS(host="openrouter.ai", host_header="openrouter.ai", path="/api/v1/chat/completions", method="POST", get_content=get_content), client_conn=NS(sni="openrouter.ai"), response=None)
+    f.request(flow); return flow.response and [flow.response.status_code, flow.response.body.strip()]
+out = {"ordinary": run(lambda strict=False: b'{"model":"x","messages":[]}'), "body_unreadable": run(boom)}
+f.request_verdict = boom
+out["verdict_raises"] = run(lambda strict=False: b"{}")
+print(json.dumps(out))`;
+  const h = JSON.parse(execFileSync('python3', ['-c', hook], { cwd: join(__dirname, '..'), encoding: 'utf8' }));
+  assert.strictEqual(h.ordinary, null);
+  for (const k of ['body_unreadable', 'verdict_raises']) { assert.strictEqual(h[k][0], 403, k); assert.match(h[k][1], /could not judge the request \(RuntimeError\)/); }
+});
+
+test('review3 2: failed criteria in a NACK review still reach the worker as feedback — itemising them is best effort and never decides the verdict', async () => {
+  const review = 'a: measured=1 expected=1 [PASS]\n| name | measured | expected | status |\n|---|---|---|---|\n| line count | 0 | 1 | FAIL |\nNACK\nVERDICT: FAIL';
+  const calls = await withDelegate((p, o, k, calls) => k === 'planner' ? 'ARTIFACTS: none\nAMBIGUITIES: none' : k === 'worker' ? WORK : review, async (goal, calls) => { await goal.handler({ goal: 'line count must be 1', check: 'check', max: 1 }); return calls; });
+  const worker = calls.find(c => c.kind === 'worker').prompt;
+  assert.match(worker, /\| line count \| 0 \| 1 \| FAIL \|/);
+});
+
+// ── 2026-10-09: what mi lost to mini-SWE-agent on the same model (caffe-cifar-10, dna-assembly, extract-elf) ──
+test('a reply with reasoning but no tool call and no answer keeps the run alive: its reasoning is fed back and the model is asked to act', async () => {
+  const bodies = [];
+  requestHandler = (req, res, body) => {
+    bodies.push(body);
+    res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+    const d = (delta, finish_reason = null) => res.write(`data: ${JSON.stringify({ choices: [{ delta, finish_reason }] })}\n\n`);
+    if (bodies.length <= 2) { d({ reasoning: `design ${bodies.length}: primers chosen, next write the fasta file` }); d({}, 'stop'); }
+    else if (bodies.length === 3) d({ tool_calls: [{ index: 0, id: 'c1', type: 'function', function: { name: 'bash', arguments: JSON.stringify({ command: 'echo wrote' }) } }] });
+    else d({ content: 'done' });
+    res.end('data: [DONE]\n\n');
+  };
+  const r = await runMi(['-p', 'go']);
+  assert.strictEqual(r.status, 0, r.stderr);
+  assert.strictEqual(bodies.length, 4);
+  const fed = bodies[2].messages.filter(m => m.role === 'user').map(m => m.content);
+  assert.deepStrictEqual(bodies[2].messages.map(m => m.role), ['system', 'user'], 'the harness notes join the task message: no user message follows a user message');
+  assert.match(fed[0], /^go\n\n\[harness\] your last reply ended without a tool call and without an answer[\s\S]*design 1: primers chosen, next write the fasta file[\s\S]*act now[\s\S]*\n\n\[harness\][\s\S]*design 2: primers chosen/);
+  assert.match(r.stderr, /empty reply 1 \(finish=stop, reasoning \d+ chars\)/);
+  assert.match(r.stdout, /done/);
+});
+
+test('a model that never acts stops the run cleanly instead of crashing it', async () => {
+  let calls = 0;
+  requestHandler = (req, res) => { calls++; res.writeHead(200, { 'Content-Type': 'text/event-stream' }); res.end(`data: ${JSON.stringify({ choices: [{ delta: { reasoning: 'thinking' }, finish_reason: 'stop' }] })}\n\ndata: [DONE]\n\n`); };
+  const r = await runMi(['-p', 'go']);
+  assert.strictEqual(r.status, 0, r.stderr);
+  assert.strictEqual(calls, 5, 'four asks to act after the first empty reply, then stop');
+  assert.match(r.stdout, /\[no action: the model kept replying without a tool call or an answer; stopped/);
+  assert.doesNotMatch(r.stderr, /empty completion \(no text, no tool calls\)\n\s+at /, 'no uncaught error');
+});
+
+test('goal: MI_GOAL_PLAN=0 skips the planner; under a deadline the worker gets a request cap of 15% of the budget (120-300s)', async () => {
+  const run = async (env, extra = {}) => withDelegate((p, o, k) => k === 'worker' ? WORK : k === 'planner' ? 'ARTIFACTS: none\nAMBIGUITIES: none' : 'a: measured=0 expected=1 [FAIL]\nVERDICT: FAIL', async (goal, calls) => {
+    const saved = { plan: process.env.MI_GOAL_PLAN, cap: process.env.MI_REQUEST_TIMEOUT };
+    Object.assign(process.env, env); if (!('MI_REQUEST_TIMEOUT' in env)) delete process.env.MI_REQUEST_TIMEOUT;
+    try { await goal.handler({ goal: 'make it work', check: 'check', max: 1, ...extra }); } finally { for (const [k, v] of [['MI_GOAL_PLAN', saved.plan], ['MI_REQUEST_TIMEOUT', saved.cap]]) v === undefined ? delete process.env[k] : process.env[k] = v; }
+    return calls;
+  });
+  const dl = s => ({ deadline: Math.floor(Date.now() / 1000) + s });
+  const noPlan = await run({ MI_GOAL_PLAN: '0' }, dl(900));
+  assert.ok(!noPlan.some(c => c.kind === 'planner'), 'no planner call');
+  const worker = noPlan.find(c => c.kind === 'worker');
+  assert.doesNotMatch(worker.prompt, /planner's notes/);
+  assert.strictEqual(worker.env.MI_REQUEST_TIMEOUT, '135', '15% of 900s');
+  assert.match(noPlan.find(c => c.kind === 'judge').prompt, /no planner ran: derive every criterion from the goal text/);
+  const withPlan = await run({ MI_GOAL_PLAN: '1' }, dl(3600));
+  assert.strictEqual(withPlan[0].kind, 'planner');
+  assert.strictEqual(withPlan.find(c => c.kind === 'worker').env.MI_REQUEST_TIMEOUT, '300', 'capped at 300s');
+  assert.strictEqual((await run({ MI_GOAL_PLAN: '1' }, dl(300))).find(c => c.kind === 'worker').env.MI_REQUEST_TIMEOUT, '120', 'at least 120s');
+  assert.strictEqual((await run({ MI_GOAL_PLAN: '1', MI_REQUEST_TIMEOUT: '600' }, dl(900))).find(c => c.kind === 'worker').env.MI_REQUEST_TIMEOUT, undefined, 'an explicit setting is left alone');
+  assert.strictEqual((await run({ MI_GOAL_PLAN: '1' })).find(c => c.kind === 'worker').env.MI_REQUEST_TIMEOUT, undefined, 'no cap without a deadline');
+});
+
+test('a tool call the model wrote inside its reasoning (DeepSeek call syntax) is recovered and run instead of counting as an empty reply', async () => {
+  const bodies = [], marker = `/tmp/mi-test-dsml-${process.pid}`;
+  const dsml = cmds => 'I have the design. Let me write it now.\n\n<｜DSML｜ calls>\n' + cmds.map(c => `<｜DSML｜ invoke name="bash">\n<｜DSML｜ parameter name="command" string="true">${c}</｜DSML｜ parameter>\n<｜DSML｜ parameter name="timeout" string="false">120000</｜DSML｜ parameter>\n</｜DSML｜ invoke>\n`).join('') + '</｜DSML｜ calls>';
+  requestHandler = (req, res, body) => {
+    bodies.push(body);
+    res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+    const d = (delta, finish_reason = null) => res.write(`data: ${JSON.stringify({ choices: [{ delta, finish_reason }] })}\n\n`);
+    if (bodies.length === 1) { const text = 'an earlier draft: <｜DSML｜ calls>\n<｜DSML｜ invoke name="bash">\n<｜DSML｜ parameter name="command" string="true">touch ' + marker + '.draft</｜DSML｜ parameter>\n</｜DSML｜ invoke>\n</｜DSML｜ calls> no, better:\n' + dsml([`printf 'a<b && "q"\\n' > ${marker}.1`, `touch ${marker}.2`]); for (let i = 0; i < text.length; i += 37) d({ reasoning: text.slice(i, i + 37) }); d({}, 'stop'); }
+    else d({ content: 'done' });
+    res.end('data: [DONE]\n\n');
+  };
+  let made, first;
+  try { const r = await runMi(['-p', 'go']); assert.strictEqual(r.status, 0, r.stderr); assert.match(r.stderr, /recovered 2 tool call\(s\) written inside the reasoning/); made = ['draft', '1', '2'].filter(x => existsSync(`${marker}.${x}`)); first = existsSync(`${marker}.1`) ? readFileSync(`${marker}.1`, 'utf8') : null; }
+  finally { for (const x of ['draft', '1', '2']) rmSync(`${marker}.${x}`, { force: true }); }
+  assert.deepStrictEqual(made, ['1', '2'], 'only the final call block ran, not the draft earlier in the reasoning');
+  assert.strictEqual(first, 'a<b && "q"\n');
+  assert.strictEqual(bodies.length, 2, 'no extra round trip');
+  const turn = bodies[1].messages.find(m => m.role === 'assistant');
+  assert.strictEqual(turn.tool_calls.length, 2);
+  assert.deepStrictEqual(JSON.parse(turn.tool_calls[0].function.arguments).timeout, 120000);
+  assert.ok(!turn.reasoning.includes(`touch ${marker}.2`) && turn.reasoning.trimEnd().endsWith('no, better:\nI have the design. Let me write it now.'), 'the executed call block is not repeated in the reasoning sent back');
+  assert.strictEqual(bodies[1].messages.filter(m => m.role === 'tool').length, 2);
+});
+
+// ── 2026-10-11: model API contracts (docs/api-contracts.md). One test per clause that was violated. ──
+const chunks = (res, list, { sep = '\n\n', prefix = 'data: ', done = true, tail = true } = {}) => { res.writeHead(200, { 'Content-Type': 'text/event-stream' }); const all = list.map(c => prefix + JSON.stringify(c)); if (done) all.push(prefix + '[DONE]'); res.end(all.join(sep) + (tail ? sep : '')); };
+const ch = (delta, finish_reason = null, extra = {}) => ({ choices: [{ index: 0, delta, finish_reason }], ...extra });
+const callDelta = (cmd, o = {}) => ({ tool_calls: [{ index: 0, id: 'c1', type: 'function', function: { name: 'bash', arguments: JSON.stringify({ command: cmd }) }, ...o }] });
+
+test('contract (DeepSeek, llama.cpp): reasoning streamed as reasoning_content is sent back complete in reasoning_content on every later request', async () => {
+  const bodies = [], long = 'step '.repeat(1500);
+  requestHandler = (req, res, body) => { bodies.push(body); if (bodies.length === 1) chunks(res, [ch({ reasoning_content: long }), ch({ reasoning_content: 'therefore run it' }), ch(callDelta('echo one')), ch({}, 'tool_calls')]); else if (bodies.length === 2) chunks(res, [ch({ reasoning_content: 'second thought' }), ch(callDelta('echo two')), ch({}, 'tool_calls')]); else chunks(res, [ch({ reasoning_content: 'final thought' }), ch({ content: 'done' }), ch({}, 'stop')]); };
+  const r = await runMi(['-p', 'go']);
+  assert.strictEqual(r.status, 0, r.stderr);
+  const a = bodies[2].messages.filter(m => m.role === 'assistant');
+  assert.strictEqual(a[0].reasoning_content, long + 'therefore run it', 'complete and unmodified, not a tail');
+  assert.strictEqual(a[1].reasoning_content, 'second thought');
+  assert.ok(!('reasoning' in a[0]) && !('reasoning_details' in a[0]));
+});
+
+test('contract (OpenRouter): reasoning_details are merged by index and sent back as the same sequence, signatures and encrypted blocks intact', async () => {
+  const bodies = [];
+  requestHandler = (req, res, body) => { bodies.push(body); if (bodies.length === 1) chunks(res, [
+    ch({ reasoning: 'I should ', reasoning_details: [{ type: 'reasoning.text', text: 'I should ', format: 'anthropic-claude-v1', index: 0 }] }),
+    ch({ reasoning: 'list files', reasoning_details: [{ type: 'reasoning.text', text: 'list files', index: 0 }] }),
+    ch({ reasoning_details: [{ type: 'reasoning.text', signature: 'SIG123', index: 0 }] }),
+    ch({ reasoning_details: [{ type: 'reasoning.encrypted', data: 'ENC', id: 'rs_1', format: 'anthropic-claude-v1', index: 1 }] }),
+    ch({ reasoning_details: [{ type: 'reasoning.encrypted', data: 'RYPTED', index: 1 }] }),
+    ch(callDelta('echo hi')), ch({}, 'tool_calls')]); else chunks(res, [ch({ content: 'done' }), ch({}, 'stop')]); };
+  const r = await runMi(['-p', 'go']);
+  assert.strictEqual(r.status, 0, r.stderr);
+  const a = bodies[1].messages.find(m => m.role === 'assistant');
+  assert.deepStrictEqual(a.reasoning_details, [{ type: 'reasoning.text', text: 'I should list files', format: 'anthropic-claude-v1', index: 0, signature: 'SIG123' }, { type: 'reasoning.encrypted', data: 'ENCRYPTED', id: 'rs_1', format: 'anthropic-claude-v1', index: 1 }]);
+  assert.ok(!('reasoning' in a) && !('reasoning_content' in a), 'the details are the one copy sent back');
+});
+
+test('contract (OpenRouter): reasoning_details without an index — blocks with their own id or signature stay separate, pieces of one block are joined', async () => {
+  const bodies = [], a = { type: 'reasoning.text', id: 'thought-a', text: 'first block', signature: 'sig-a', format: 'anthropic-claude-v1' }, b = { type: 'reasoning.text', id: 'thought-b', text: 'second block', signature: 'sig-b', format: 'anthropic-claude-v1' };
+  const sent = async first => { bodies.length = 0; requestHandler = (req, res, body) => { bodies.push(body); if (bodies.length === 1) chunks(res, [...first, ch(callDelta('echo hi')), ch({}, 'tool_calls')]); else chunks(res, [ch({ content: 'done' }), ch({}, 'stop')]); }; const r = await runMi(['-p', 'go']); assert.strictEqual(r.status, 0, r.stderr); return bodies[1].messages.find(m => m.role === 'assistant').reasoning_details; };
+  assert.deepStrictEqual(await sent([ch({ reasoning_details: [a, b] })]), [a, b], 'two complete blocks in one chunk');
+  assert.deepStrictEqual(await sent([ch({ reasoning_details: [a] }), ch({ reasoning_details: [b] })]), [a, b], 'two complete blocks in two chunks');
+  const noId = ({ id, ...x }) => x;
+  assert.deepStrictEqual(await sent([ch({ reasoning_details: [noId(a), noId(b)] })]), [noId(a), noId(b)], 'no ids: the signatures tell the blocks apart');
+  assert.deepStrictEqual(await sent([ch({ reasoning_details: [{ type: 'reasoning.text', id: 'thought-a', text: 'first ', format: 'anthropic-claude-v1' }] }), ch({ reasoning_details: [{ type: 'reasoning.text', text: 'block' }] }), ch({ reasoning_details: [{ type: 'reasoning.text', id: 'thought-a', signature: 'sig-a' }] }), ch({ reasoning_details: [{ type: 'reasoning.text', text: 'second ' }] }), ch({ reasoning_details: [{ type: 'reasoning.text', text: 'block', signature: 'sig-b' }] }), ch({ reasoning_details: [{ type: 'reasoning.encrypted', data: 'ENC', id: 'rs_1' }] }), ch({ reasoning_details: [{ type: 'reasoning.encrypted', data: 'RYPTED' }] }), ch({ reasoning_details: [{ type: 'reasoning.encrypted', data: 'OTHER', id: 'rs_2' }] })]),
+    [{ type: 'reasoning.text', id: 'thought-a', text: 'first block', format: 'anthropic-claude-v1', signature: 'sig-a' }, { type: 'reasoning.text', text: 'second block', signature: 'sig-b' }, { type: 'reasoning.encrypted', data: 'ENCRYPTED', id: 'rs_1' }, { type: 'reasoning.encrypted', data: 'OTHER', id: 'rs_2' }], 'streamed pieces: text after a signature and a new id start a block');
+});
+
+test('contract (SSE): an event with several data lines is one payload; events packed in one block without the blank line are still read', async () => {
+  let n = 0;
+  requestHandler = (req, res) => { n++; res.writeHead(200, { 'Content-Type': 'text/event-stream' }); if (n === 1) res.end('event: message\ndata: {"choices": [\ndata: {"index":0,"delta":' + JSON.stringify(callDelta('echo multi')) + ',\r\ndata:"finish_reason":"tool_calls"}]}\n\ndata: [DONE]\n\n'); else res.end('data: ' + JSON.stringify(ch({ content: 'packed ' })) + '\ndata: ' + JSON.stringify(ch({ content: 'events' }, 'stop')) + '\ndata: [DONE]\n\n'); };
+  const r = await runMi(['-p', 'go']);
+  assert.strictEqual(r.status, 0, r.stderr);
+  assert.match(r.stdout, /echo multi/);
+  assert.match(r.stdout, /packed events/);
+  assert.strictEqual(n, 2);
+});
+
+test('contract (SSE): CRLF line endings, "data:" without a space, comment lines and a last event without a blank line are all read', async () => {
+  let n = 0;
+  requestHandler = (req, res) => { n++; res.writeHead(200, { 'Content-Type': 'text/event-stream' }); if (n === 1) res.end(': keep-alive\r\n\r\ndata:' + JSON.stringify(ch(callDelta('echo crlf'))) + '\r\n\r\ndata:' + JSON.stringify(ch({}, 'tool_calls')) + '\r\n\r\ndata:[DONE]\r\n\r\n'); else res.end('data: ' + JSON.stringify(ch({ content: 'no trailing blank line' }, 'stop'))); };
+  const r = await runMi(['-p', 'go']);
+  assert.strictEqual(r.status, 0, r.stderr);
+  assert.match(r.stdout, /echo crlf/);
+  assert.match(r.stdout, /no trailing blank line/);
+  assert.strictEqual(n, 2);
+});
+
+test('contract (tool calls): a call without an id gets one that its result names; chunks without an index are joined; empty arguments become {}; unparsable arguments are not sent back', async () => {
+  const bodies = [];
+  requestHandler = (req, res, body) => { bodies.push(body); if (bodies.length === 1) chunks(res, [
+    ch({ tool_calls: [{ type: 'function', function: { name: 'bash', arguments: '{"command":' } }] }), ch({ tool_calls: [{ function: { arguments: '"echo joined"}' } }] }),
+    ch({ tool_calls: [{ id: 'given', type: 'function', function: { name: 'skill', arguments: '' } }] }),
+    ch({ tool_calls: [{ id: 'bad', type: 'function', function: { name: 'bash', arguments: '{"command": "echo tru' } }] }), ch({}, 'tool_calls')]); else chunks(res, [ch({ content: 'done' }), ch({}, 'stop')]); };
+  const r = await runMi(['-p', 'go']);
+  assert.strictEqual(r.status, 0, r.stderr);
+  const a = bodies[1].messages.find(m => m.role === 'assistant'), results = bodies[1].messages.filter(m => m.role === 'tool');
+  assert.strictEqual(a.tool_calls.length, 3);
+  assert.match(a.tool_calls[0].id, /^call_/);
+  assert.deepStrictEqual(JSON.parse(a.tool_calls[0].function.arguments), { command: 'echo joined' });
+  assert.strictEqual(a.tool_calls[1].function.arguments, '{}');
+  assert.strictEqual(a.tool_calls[2].function.arguments, '{}', 'the unparsable text is replaced in the history');
+  assert.deepStrictEqual(results.map(m => m.tool_call_id), a.tool_calls.map(c => c.id), 'one result per call, same ids, same order');
+  assert.match(results[0].content, /joined/);
+  assert.match(results[2].content, /malformed JSON in tool arguments: \{"command": "echo tru/);
+});
+
+test('contract (tool calls): a tool that throws still gets its result message, so the next request is well formed', async () => {
+  const home = mkdtempSync(join(tmpdir(), 'mi-test-throw-')), bodies = [];
+  mkdirSync(join(home, 'tools'));
+  writeFileSync(join(home, 'tools', 'boom.mjs'), "export default { name: 'boom', description: 'always fails', parameters: { type: 'object', properties: {} }, handler: () => { throw new Error('network socket hang up'); } };");
+  requestHandler = (req, res, body) => { bodies.push(body); if (bodies.length === 1) chunks(res, [ch({ tool_calls: [{ index: 0, id: 'b1', type: 'function', function: { name: 'boom', arguments: '{}' } }, { index: 1, id: 'c2', type: 'function', function: { name: 'bash', arguments: '{"command":"echo after"}' } }] }), ch({}, 'tool_calls')]); else chunks(res, [ch({ content: 'done' }), ch({}, 'stop')]); };
+  let r; try { r = await runMi(['-p', 'go'], { MI_HOME: home }); } finally { rmSync(home, { recursive: true, force: true }); }
+  assert.strictEqual(r.status, 0, r.stderr);
+  assert.strictEqual(bodies.length, 2, 'no blind resend of a conversation with an unanswered call');
+  const results = bodies[1].messages.filter(m => m.role === 'tool');
+  assert.deepStrictEqual(results.map(m => m.tool_call_id), ['b1', 'c2']);
+  assert.match(results[0].content, /^Error: tool "boom" failed: network socket hang up/);
+  assert.match(results[1].content, /after/);
+});
+
+test('contract (finish_reason): length continues a cut-off answer and explains cut-off tool arguments; content_filter is an error; a refusal is shown', async () => {
+  let bodies = [];
+  requestHandler = (req, res, body) => { bodies.push(body); if (bodies.length === 1) chunks(res, [ch({ content: 'first half, ' }), ch({}, 'length')]); else chunks(res, [ch({ content: 'second half.' }), ch({}, 'stop')]); };
+  let r = await runMi(['-p', 'go']);
+  assert.strictEqual(r.status, 0, r.stderr);
+  assert.match(r.stdout, /first half, \n?second half\./);
+  assert.match(bodies[1].messages.at(-1).content, /cut off by the output token limit \(finish_reason=length\)\. continue exactly where it stopped/);
+  bodies = [];
+  requestHandler = (req, res, body) => { bodies.push(body); if (bodies.length === 1) chunks(res, [ch({ tool_calls: [{ index: 0, id: 't1', type: 'function', function: { name: 'bash', arguments: '{"command": "cat > f <<EOF\\nlong' } }] }), ch({}, 'length')]); else chunks(res, [ch({ content: 'ok' }), ch({}, 'stop')]); };
+  r = await runMi(['-p', 'go']);
+  assert.match(bodies[1].messages.find(m => m.role === 'tool').content, /cut off by the output token limit before the tool arguments were complete/);
+  requestHandler = (req, res) => chunks(res, [ch({}, 'content_filter')]);
+  r = await runMi(['-p', 'go']);
+  assert.notStrictEqual(r.status, 0);
+  assert.match(r.stderr, /finish_reason=content_filter/);
+  let n = 0;
+  requestHandler = (req, res) => { n++; chunks(res, [ch({ content: 'partial answer' }), ch({}, 'content_filter')]); };
+  r = await runMi(['-p', 'go']);
+  assert.notStrictEqual(r.status, 0, 'a reply cut by the filter is not a completed answer');
+  assert.match(r.stderr, /withheld part of the reply \(finish_reason=content_filter\)/);
+  assert.strictEqual(n, 1);
+  const flag = join(tmpdir(), `mi-filter-${process.pid}`);
+  requestHandler = (req, res) => chunks(res, [ch(callDelta(`touch ${flag}`)), ch({}, 'content_filter')]);
+  r = await runMi(['-p', 'go']);
+  assert.notStrictEqual(r.status, 0);
+  assert.match(r.stderr, /finish_reason=content_filter/);
+  assert.ok(!existsSync(flag), 'a tool call from a filtered reply is not run');
+  requestHandler = (req, res) => chunks(res, [ch({ refusal: 'I cannot help with that.' }), ch({}, 'stop')]);
+  r = await runMi(['-p', 'go']);
+  assert.strictEqual(r.status, 0, r.stderr);
+  assert.match(r.stdout, /I cannot help with that\./);
+});
+
+test('contract (errors): the HTTP status decides retries when the body carries a string code; Retry-After is honoured; 408 is retried', async () => {
+  const seen = [];
+  requestHandler = (req, res) => { seen.push(Date.now()); if (seen.length === 1) { res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '1' }); res.end(JSON.stringify({ error: { message: 'slow down', code: 'rate_limit_exceeded' } })); } else if (seen.length === 2) { res.writeHead(408, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: { message: 'timed out', code: 408 } })); } else chunks(res, [ch({ content: 'ok' }), ch({}, 'stop')]); };
+  const r = await runMi(['-p', 'go']);
+  assert.strictEqual(r.status, 0, r.stderr);
+  assert.strictEqual(seen.length, 3);
+  assert.ok(seen[1] - seen[0] >= 950, `waited ${seen[1] - seen[0]}ms for Retry-After: 1`);
+});
+
+test('contract (errors): Retry-After as an HTTP date is waited for; one in the past or unreadable falls back to the short backoff', async () => {
+  const seen = [];
+  requestHandler = (req, res) => { seen.push(Date.now()); const ra = [new Date(Date.now() + 3000).toUTCString(), new Date(Date.now() - 60000).toUTCString(), 'soon'][seen.length - 1]; if (ra) { res.writeHead(seen.length === 2 ? 503 : 429, { 'Content-Type': 'application/json', 'Retry-After': ra }); res.end(JSON.stringify({ error: { message: 'slow down', code: 'rate_limit_exceeded' } })); } else chunks(res, [ch({ content: 'ok' }), ch({}, 'stop')]); };
+  const r = await runMi(['-p', 'go']);
+  assert.strictEqual(r.status, 0, r.stderr);
+  assert.strictEqual(seen.length, 4);
+  assert.ok(seen[1] - seen[0] >= 1950 && seen[1] - seen[0] < 4500, `waited ${seen[1] - seen[0]}ms for a date 3 s ahead (HTTP dates have whole seconds)`);
+  assert.ok(seen[2] - seen[1] < 1900 && seen[3] - seen[2] < 2900, `past date ${seen[2] - seen[1]}ms, unreadable ${seen[3] - seen[2]}ms`);
+});
+
+test('contract (compaction): the summary request carries MI_API_PARAMS, and a server that rejects chat_template_kwargs gets the plain request', async () => {
+  const bodies = [];
+  requestHandler = (req, res, body) => {
+    bodies.push(body);
+    if (bodies.length === 1) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ error: { message: 'This model maximum context length is 10 tokens', code: 'context_length_exceeded' } })); }
+    if (body.stream === false && body.chat_template_kwargs) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ error: { message: 'Unrecognized request argument supplied: chat_template_kwargs' } })); }
+    if (body.stream === false) { res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ choices: [{ message: { role: 'assistant', content: 'GOAL: go' } }] })); }
+    chunks(res, [ch({ content: 'done' }), ch({}, 'stop')]);
+  };
+  const r = await runMi(['-p', 'go'], { MI_API_PARAMS: JSON.stringify({ provider: { order: ['x/y'], allow_fallbacks: false }, temperature: 0.3 }) });
+  assert.strictEqual(r.status, 0, r.stderr);
+  const compact = bodies.filter(b => b.stream === false);
+  assert.strictEqual(compact.length, 2);
+  assert.ok(compact[0].chat_template_kwargs && !compact[1].chat_template_kwargs);
+  for (const c of compact) assert.deepStrictEqual(c.provider, { order: ['x/y'], allow_fallbacks: false });
+  assert.match(r.stdout, /done/);
+});
+
+const alternates = body => !body.messages.some((m, i) => m.role === 'user' && body.messages[i - 1]?.role === 'user');
+const strict = (res, body, reply) => { if (alternates(body)) return reply(); res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: { message: 'Conversation roles must alternate user/assistant', code: 'invalid_request' } })); }; // a chat template that requires alternating roles
+
+test('contract (roles): a timed-out request never leaves two user messages in a row — the harness note joins the user message already there', async () => {
+  const bodies = [], hang = res => { res.writeHead(200, { 'Content-Type': 'text/event-stream' }); res.write(`data: ${JSON.stringify(ch({ reasoning: 'half a thought' }))}\n\n`); };
+  requestHandler = (req, res, body) => { bodies.push(body); if (bodies.length === 1) return hang(res); strict(res, body, () => chunks(res, [ch({ content: 'done' }, 'stop')])); };
+  let r = await runMi(['-p', 'go'], { MI_REQUEST_TIMEOUT: '1' });
+  assert.strictEqual(r.status, 0, r.stderr);
+  assert.deepStrictEqual(bodies[1].messages.map(m => m.role), ['system', 'user']);
+  assert.match(bodies[1].messages[1].content, /^go\n\n\[harness\] your last reply was cut off by the request time limit[\s\S]*half a thought[\s\S]*reply in smaller steps/);
+  // after a tool result the note is a message of its own, and a second timeout joins it
+  bodies.length = 0;
+  requestHandler = (req, res, body) => { bodies.push(body); if (bodies.length === 1) return chunks(res, [ch(callDelta('echo one')), ch({}, 'tool_calls')]); if (bodies.length < 4) return hang(res); strict(res, body, () => chunks(res, [ch({ content: 'done' }, 'stop')])); };
+  r = await runMi(['-p', 'go'], { MI_REQUEST_TIMEOUT: '1' });
+  assert.strictEqual(r.status, 0, r.stderr);
+  assert.deepStrictEqual(bodies[3].messages.map(m => m.role), ['system', 'user', 'assistant', 'tool', 'user']);
+  assert.strictEqual(bodies[3].messages[4].content.match(/reply in smaller steps/g).length, 2);
+});
+
+test('contract (roles): the next prompt of a continued session, a prompt after -f images and a cut-off continuation keep the roles alternating', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'mi-roles-')), sess = join(dir, 's.json'), img = join(dir, 'a.png'), bodies = [];
+  writeFileSync(sess, JSON.stringify([{ role: 'system', content: 'old' }, { role: 'user', content: 'first task' }, { role: 'assistant', content: '', tool_calls: [{ id: 'c1', type: 'function', function: { name: 'bash', arguments: '{"command":"true"}' } }] }, { role: 'tool', tool_call_id: 'c1', content: '' }, { role: 'user', content: '[harness] your last reply was cut off by the request time limit.' }])); writeFileSync(img, 'png');
+  requestHandler = (req, res, body) => { bodies.push(body); strict(res, body, () => chunks(res, bodies.length === 2 ? [ch({ content: 'half, ' }), ch({}, 'length')] : [ch({ content: 'done' }, 'stop')])); };
+  try {
+    let r = await runMi(['-p', 'judge findings'], { MI_SESSION: sess });
+    assert.strictEqual(r.status, 0, r.stderr);
+    assert.deepStrictEqual(bodies[0].messages.map(m => m.role), ['system', 'user', 'assistant', 'tool', 'user']);
+    assert.match(bodies[0].messages[4].content, /^\[harness\] your last reply was cut off by the request time limit\.\n\njudge findings$/);
+    r = await runMi(['-f', img, '-p', 'what is in the picture']);
+    assert.strictEqual(r.status, 0, r.stderr);
+    assert.deepStrictEqual(bodies[1].messages.map(m => m.role), ['system', 'user']);
+    assert.deepStrictEqual(bodies[1].messages[1].content.map(p => p.type), ['text', 'image_url', 'text']);
+    assert.strictEqual(bodies[1].messages[1].content[2].text, 'what is in the picture');
+    assert.deepStrictEqual(bodies[2].messages.map(m => m.role), ['system', 'user', 'assistant', 'user'], 'a continuation request follows the assistant message');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+// review #6: the three gaps left open at 0ba52af
+test('contract (roles): a continued session with a new -f image — image and prompt are one user message after the saved turns', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'mi-resume-img-')), sess = join(dir, 's.json'), img = join(dir, 'a.png'), bodies = [], saved = [{ role: 'system', content: 'old' }, { role: 'user', content: 'first task' }, { role: 'assistant', content: 'first answer' }], parts = m => m.content.map(p => p.text || p.type);
+  writeFileSync(img, 'png');
+  requestHandler = (req, res, body) => { bodies.push(body); strict(res, body, () => chunks(res, [ch({ content: 'done' }, 'stop')])); };
+  try {
+    writeFileSync(sess, JSON.stringify(saved));
+    let r = await runMi(['-f', img, '-p', 'what is in the picture'], { MI_SESSION: sess });
+    assert.strictEqual(r.status, 0, r.stderr);
+    assert.deepStrictEqual(bodies[0].messages.map(m => m.role), ['system', 'user', 'assistant', 'user']);
+    assert.strictEqual(bodies[0].messages[1].content, 'first task', 'the image is not attached to the old task');
+    assert.deepStrictEqual(parts(bodies[0].messages[3]), ['attached images', 'image_url', 'what is in the picture']);
+    assert.deepStrictEqual(JSON.parse(readFileSync(sess, 'utf8')).map(m => m.role), ['system', 'user', 'assistant', 'user', 'assistant'], 'the saved session alternates too');
+    // a saved session that ends in a user message (a harness note), continued by a piped prompt: everything joins that message
+    writeFileSync(sess, JSON.stringify([...saved, { role: 'user', content: '[harness] your last reply was cut off by the request time limit.' }]));
+    r = await runMi(['-f', img], { MI_SESSION: sess }, 'and this one');
+    assert.strictEqual(r.status, 0, r.stderr);
+    assert.deepStrictEqual(bodies[1].messages.map(m => m.role), ['system', 'user', 'assistant', 'user']);
+    assert.deepStrictEqual(parts(bodies[1].messages[3]), ['[harness] your last reply was cut off by the request time limit.', 'attached images', 'image_url', 'and this one']);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('contract (OpenRouter): reasoning_details without an index or an id — the objects of one delta stay separate blocks and an explicit null id is sent back', async () => {
+  const bodies = [], s = summary => ({ type: 'reasoning.summary', summary, id: null, format: 'openai-responses-v1' });
+  const sent = async first => { bodies.length = 0; requestHandler = (req, res, body) => { bodies.push(body); if (bodies.length === 1) chunks(res, [...first, ch(callDelta('echo hi')), ch({}, 'tool_calls')]); else chunks(res, [ch({ content: 'done' }), ch({}, 'stop')]); }; const r = await runMi(['-p', 'go']); assert.strictEqual(r.status, 0, r.stderr); return bodies[1].messages.find(m => m.role === 'assistant').reasoning_details; };
+  assert.deepStrictEqual(await sent([ch({ reasoning_details: [s('first complete summary'), s('second complete summary')] })]), [s('first complete summary'), s('second complete summary')], 'two anonymous summaries in one delta');
+  assert.deepStrictEqual(await sent([ch({ reasoning_details: [s('first'), s('second ')] }), ch({ reasoning_details: [{ type: 'reasoning.summary', summary: 'continued' }] })]), [s('first'), s('second continued')], 'a piece in a later delta still joins the last block');
+});
+
+test('contract (SSE): a bare CR ends a line like LF and CRLF, also when a line end falls on a chunk boundary', async () => {
+  let n = 0;
+  const pieces = (res, list) => { res.writeHead(200, { 'Content-Type': 'text/event-stream' }); const next = () => list.length ? (res.write(list.shift()), setTimeout(next, 20)) : res.end(); next(); };
+  requestHandler = (req, res) => { n++; if (n === 1) pieces(res, [': keep-alive\r\rdata: ' + JSON.stringify(ch(callDelta('echo bare-cr'), 'tool_calls')) + '\r', '\r', 'data: [DONE]\r\r']); else pieces(res, ['data: {"choices":[\r', '\ndata: {"index":0,"delta":{"content":"split crlf"},"finish_reason":"stop"}]}\r', '\n\r', '\ndata: [DONE]\r\n\r\n']); };
+  const r = await runMi(['-p', 'go']);
+  assert.strictEqual(r.status, 0, r.stderr);
+  assert.match(r.stdout, /echo bare-cr/);
+  assert.match(r.stdout, /split crlf/);
+  assert.strictEqual(n, 2);
 });

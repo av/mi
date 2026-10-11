@@ -4,6 +4,9 @@
   bench/compare.py JOB_DIR [JOB_DIR ...]          per-task pass rates (all trials pooled)
   bench/compare.py --a JOB_DIR... --b JOB_DIR...  A/B: per-task Fisher exact + signal/noise verdict
 
+JOB_DIR@AGENT[/MODEL] keeps only one agent's trials when a job ran several
+(e.g. jobs/x@mi, jobs/x@terminus-2/deepseek-v4.1-flash).
+
 Reads Harbor's own files only: each job's result.json (Harbor's mean and
 pass@k are shown as computed by Harbor) and each trial's result.json
 (task_name, verifier reward, exception). Any directory containing Harbor jobs
@@ -27,15 +30,20 @@ def load(dirs):
     """task -> {"n", "pass", "exc": [..], "providers": set} and the Harbor job summaries."""
     tasks = defaultdict(lambda: {"n": 0, "pass": 0, "exc": [], "providers": set()})
     jobs = []
-    for d in map(Path, dirs):
+    for arg in dirs:
+        d, agent = Path(arg), None
+        if not d.is_dir() and "@" in arg:
+            d, agent = Path(arg.rsplit("@", 1)[0]), arg.rsplit("@", 1)[1]
         if not d.is_dir():
             sys.exit(f"not a directory: {d}")
         for f in sorted(d.rglob("result.json")):
             r = json.loads(f.read_text())
-            if "stats" in r and "n_total_trials" in r:
-                jobs.append((f.parent, r))
+            if "stats" in r and ("n_total_trials" in r or "n_trials" in r["stats"]):
+                jobs.append((f.parent, r, agent))
                 continue
             if "task_name" not in r or not r.get("finished_at"):
+                continue
+            if agent and not selected(r, agent):
                 continue
             rewards = (r.get("verifier_result") or {}).get("rewards") or {}
             t = tasks[r["task_name"].split("/")[-1]]
@@ -51,9 +59,20 @@ def load(dirs):
     return tasks, jobs
 
 
+def selected(r, sel):
+    """AGENT or AGENT/MODEL (model matched on its last path segment or full name)."""
+    info = r.get("agent_info") or {}
+    name, _, model = sel.partition("/")
+    full = (info.get("model_info") or {}).get("name") or ""
+    return info.get("name") == name and (not model or model in (full, full.split("/")[-1]))
+
+
 def harbor_summary(jobs):
-    for path, r in jobs:
+    for path, r, agent in jobs:
         for key, s in (r["stats"].get("evals") or {}).items():
+            name, _, model = (agent or "").partition("/")
+            if agent and not (key.startswith(f"{name}__") and model in key.split("__")[1]):
+                continue
             metrics = ", ".join(f"{k}={v:.3f}" for m in s.get("metrics", []) for k, v in m.items())
             pak = ", ".join(f"pass@{k}={v:.3f}" for k, v in sorted(s.get("pass_at_k", {}).items(), key=lambda x: int(x[0])))
             print(f"{path}: {key}  trials={s['n_trials']} errors={s['n_errors']}  {metrics}  {pak}".rstrip())
@@ -104,6 +123,13 @@ def ab(ta, tb, as_json):
         va, vb = va + smoothed_var(ka, na), vb + smoothed_var(kb, nb)
         rows.append({"task": t, "a": f"{ka}/{na}", "b": f"{kb}/{nb}", "delta": round(kb / nb - ka / na, 3),
                      "fisher_p": round(fisher_exact_two_sided(ka, na - ka, kb, nb - kb), 4)})
+    # Paired single-trial runs (k=1 per side): exact McNemar on the discordant tasks.
+    mcn = None
+    if all(ta[t]["n"] == 1 and tb[t]["n"] == 1 for t in common):
+        a_only = sum(1 for t in common if ta[t]["pass"] and not tb[t]["pass"])
+        b_only = sum(1 for t in common if tb[t]["pass"] and not ta[t]["pass"])
+        k, m = min(a_only, b_only), a_only + b_only
+        mcn = (a_only, b_only, min(1.0, 2 * sum(math.comb(m, i) for i in range(k + 1)) / 2 ** m) if m else 1.0)
     delta, se = sb - sa, math.sqrt(va + vb)
     p = math.erfc(abs(delta / se) / math.sqrt(2)) if se else 1.0
     # Trials per task per side for 80% power at this effect size.
@@ -116,7 +142,8 @@ def ab(ta, tb, as_json):
     if as_json:
         return print(json.dumps({"tasks": rows, "score_a": round(sa, 3), "score_b": round(sb, 3), "delta": round(delta, 3),
                                  "se": round(se, 3), "p_value": round(p, 6), "k_needed": k_needed,
-                                 "verdict": verdict, "not_compared": only}, indent=2))
+                                 "verdict": verdict, "not_compared": only,
+                                 "mcnemar": {"a_only": mcn[0], "b_only": mcn[1], "p": round(mcn[2], 6)} if mcn else None}, indent=2))
     w = max(len(r["task"]) for r in rows)
     print(f"{'task':<{w}}  A       B       delta  fisher_p")
     for r in rows:
@@ -125,6 +152,8 @@ def ab(ta, tb, as_json):
     print(f"\n{len(common)} common tasks" + (f" ({len(only)} not in both: {', '.join(only)})" if only else ""))
     print(f"score A {sa:.2f}  score B {sb:.2f}  delta {delta:+.2f} ± {se:.2f} (SE)")
     print(f"verdict: {verdict}")
+    if mcn:
+        print(f"paired (k=1): A-only {mcn[0]}, B-only {mcn[1]}, McNemar exact p={mcn[2]:.4g}")
 
 
 def main():

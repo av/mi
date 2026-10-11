@@ -1,0 +1,52 @@
+# Hosts the task container may reach during the agent phase (default deny: everything else is refused).
+# One name per line; a leading dot allows the name's subdomains too. Source: the hosts the proxy logs of the
+# frozen run tb21-mi-frozen2-6d8b3a1-20261007 show as used (38), minus the ones that are not task material
+# (listed at the end), plus the sibling hosts of the same package mirrors.
+
+# model API
+openrouter.ai
+
+# OS package mirrors
+archive.ubuntu.com
+security.ubuntu.com
+ports.ubuntu.com
+deb.debian.org
+security.debian.org
+mirror.stream.centos.org
+
+# language package indexes
+pypi.org
+files.pythonhosted.org
+registry.npmjs.org
+cloud.r-project.org
+cran.r-project.org
+packagemanager.posit.co
+rspm-sync.rstudio.com
+
+# task data and documentation used by the 20 tasks
+huggingface.co
+datasets-server.huggingface.co
+.hf.co
+.rcsb.org
+fpbase.org
+www.fpbase.org
+rest.uniprot.org
+www.ebi.ac.uk
+arxiv.org
+ar5iv.labs.arxiv.org
+www.open-thoughts.ai
+compcert.inria.fr
+www.absint.com
+
+# GitHub: named repositories only, and never the benchmark's organisations (path rules in filter.py)
+github.com
+api.github.com
+codeload.github.com
+raw.githubusercontent.com
+# release downloads that a named repository URL redirects to (signed, opaque paths)
+objects.githubusercontent.com
+release-assets.githubusercontent.com
+
+# Seen in that run and NOT allowed: cdn.jsdelivr.net (serves any GitHub repository under /gh/), example.com and
+# 172.21.0.3 (connectivity checks), clients2.google.com, update.googleapis.com, edgedl.me.gvt1.com (browser
+# component updates).

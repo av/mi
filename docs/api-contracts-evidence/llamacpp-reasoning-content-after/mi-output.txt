@@ -1,0 +1,4 @@
+⟡ bash({"command":"echo alpha"})
+alpha
+
+finished

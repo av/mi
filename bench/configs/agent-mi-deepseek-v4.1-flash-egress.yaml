@@ -1,0 +1,10 @@
+# agent-mi-deepseek-v4.1-flash.yaml plus egress: true — the trial fails at setup unless bench/configs/egress.yaml is stacked on the job
+agents:
+  - import_path: bench.mi_agent:MiAgent
+    model_name: openrouter/deepseek/deepseek-v4.1-flash
+    kwargs:
+      temperature: 0.6
+      seed: null
+      provider: deepinfra/fp8
+      egress: true
+      api_params: '{"reasoning":{"effort":"max"}}'

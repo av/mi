@@ -1,0 +1,38 @@
+# Evaluation egress control, added to every trial with `environment.extra_docker_compose` (see
+# bench/configs/egress.yaml). The task container (`main`) shares the network namespace of `mi-egress`, which
+# redirects all of its outbound TCP into shim.py; `main` has neither NET_ADMIN nor NET_RAW, so a process in it
+# cannot change the redirect. During the agent phase HTTP and TLS go to the filtering proxy, which allows only
+# the hosts in allowlist.txt (rules: filter.py); everything else is refused.
+# Build the image first: bench/egress/build.sh
+services:
+  mi-egress-proxy:
+    image: mi-egress:1
+    command: ["proxy"]
+    environment:
+      MI_EGRESS_DENY: 'terminal[-_. ]?bench|laude-institute|harbor-framework|(?<![a-z])tbench(?![a-z])'
+      # the model API: its request bodies are read only to refuse web-browsing options
+      MI_EGRESS_MODEL_HOSTS: '(^|\.)openrouter\.ai$$'
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import socket; socket.create_connection(('127.0.0.1', 8080), 2)"]
+      interval: 1s
+      timeout: 5s
+      retries: 60
+  mi-egress:
+    image: mi-egress:1
+    command: ["shim"]
+    init: true
+    cap_add: [NET_ADMIN]
+    environment:
+      MI_EGRESS_PROXY: mi-egress-proxy:8080
+    depends_on:
+      mi-egress-proxy: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "test", "-f", "/run/mi-egress/ready"]
+      interval: 1s
+      timeout: 5s
+      retries: 60
+  main:
+    network_mode: "service:mi-egress"
+    cap_drop: [NET_RAW]
+    depends_on:
+      mi-egress: {condition: service_healthy}

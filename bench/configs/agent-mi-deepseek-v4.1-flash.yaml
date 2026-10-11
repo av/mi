@@ -1,0 +1,11 @@
+# mi on DeepSeek V4.1 Flash with the same request settings as
+# agent-terminus2-deepseek-v4.1-flash.yaml: temperature 0.6, reasoning effort max,
+# DeepInfra FP8 without fallbacks, no seed.
+agents:
+  - import_path: bench.mi_agent:MiAgent
+    model_name: openrouter/deepseek/deepseek-v4.1-flash
+    kwargs:
+      temperature: 0.6
+      seed: null
+      provider: deepinfra/fp8
+      api_params: '{"reasoning":{"effort":"max"}}'

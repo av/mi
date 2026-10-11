@@ -1,0 +1,10 @@
+# mi on DeepSeek V4.1 Flash with the same request settings as agent-terminus2-deepseek-v4.1-flash-fast.yaml:
+# CoreWeave FP8 (fast and reliable under load), temperature 1.0, top_p 0.95, maximum reasoning effort, no seed.
+agents:
+  - import_path: bench.mi_agent:MiAgent
+    model_name: openrouter/deepseek/deepseek-v4.1-flash
+    kwargs:
+      temperature: 1.0
+      seed: null
+      provider: coreweave/fp8
+      api_params: '{"reasoning":{"effort":"max"},"top_p":0.95}'

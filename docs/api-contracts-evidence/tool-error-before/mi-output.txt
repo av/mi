@@ -1,0 +1,4 @@
+⟡ retry 1 (network)
+⟡ boom({})
+⟡ empty reply 1 (finish=stop, reasoning 0 chars)
+It ran diagnostics successfully and returned basic system telemetry showing no immediate failures detected.

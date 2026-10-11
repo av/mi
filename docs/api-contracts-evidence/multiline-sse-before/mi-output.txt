@@ -1,0 +1,7 @@
+[90m⟡ empty reply 1 (finish=?, reasoning 0 chars)[0m
+[90m⟡ empty reply 2 (finish=?, reasoning 0 chars)[0m
+[90m⟡ empty reply 3 (finish=?, reasoning 0 chars)[0m
+[90m⟡ empty reply 4 (finish=?, reasoning 0 chars)[0m
+[90m⟡ empty reply 5 (finish=?, reasoning 0 chars)[0m
+[no action: the model kept replying without a tool call or an answer; stopped, work so far is on disk]
+exit 0
