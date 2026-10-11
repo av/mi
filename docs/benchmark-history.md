@@ -1665,3 +1665,35 @@ and run. After: 0 of 59 replies without an action on the same two synthetic task
 
 Not done: the held-out comparison against mini-SWE-agent. The key's balance was $0.95 when it was due to start
 (the replays and capture runs cost more than planned, and the key is shared). The set is `bench/configs/tb21-heldout.yaml`.
+
+## 2026-10-11: correction — the model API rule of the egress filter (follow-up note after review #5)
+
+History is not rewritten; this corrects a statement in the entries of 2026-10-07 and in `docs/benchmarking.md`,
+`.facts` and `bench/egress/filter.py` as they stood until this note. No benchmark was run for it and no score changes.
+
+- "The model API may not be asked to browse the web": stronger than what the filter did. In both egress-filtered
+  frozen runs made under that statement (`tb21-mi-frozen2-6d8b3a1-20261007`, `tb21-mi-frozen3-5d018fc-20261007`;
+  the first frozen run at `0f3dad9` had no model API rule at all, and the later `mi-r1-lost4`/`mi-r1b-lost4` sample
+  ran without the egress sidecar) the rule was a text pattern over the first 262,144 body bytes. Review #5 showed four request shapes it allowed: `web_search_options`, a `web` plugin that is
+  not the first plugin, the same id written with a JSON escape, and a `web` plugin after 300 KB of prompt. While
+  fixing it a fifth was found: the proxy ran with `stream_large_bodies=1m`, so a request body over 1 MiB was
+  forwarded before the filter saw any of it.
+- What the recorded runs show (observed): the proxy logs hold host, method and path, not bodies, so they cannot show
+  whether such a request was sent. The transcripts record every tool call's arguments in full. In the 1,808 recorded
+  files of the two runs no file contains `web_search_options`, `web_search_preview`, `openrouter:web`, a `plugins`
+  key, `:online` or `x_search`. Outside logs and configs, 11 lines name the model host, its key or base-URL variable,
+  `MI_API_PARAMS` or `chat/completions`: 10 are secret-scanning `grep` patterns of the sanitize-git-repo task, one is
+  the output of an `env | grep` in a frozen3 trial; none is a request to the model API. mi does not send these
+  fields at `6d8b3a1` or `5d018fc`, and no config of those runs sets them. The same field search over the first
+  frozen run and the three egress smoke jobs (1,006 files) also finds no file.
+- What that does not show (inferred limit): a command that put the field name together at run time, or a program
+  the worker wrote and ran, would not appear in the transcripts. Use of the gap is not excluded; nothing recorded
+  points to it.
+- The scores of those runs stand as measured with that filter. They were not measured with the rule below, and the
+  image has to be rebuilt (`bench/egress/build.sh`) before the next filtered run.
+
+What replaces it: the rule in `docs/benchmarking.md` ("Egress control for evaluation runs") — the whole body parsed
+as JSON, the listed fields refused, request bodies never streamed past the filter — with its limits listed there.
+Checked against the actual proxy with a local stand-in for the model host: 48 of 48 cases as expected with this
+filter; 22 of 48 wrong with the image used for frozen3. Whether the provider acts on each refused shape was
+not tested (paid API).

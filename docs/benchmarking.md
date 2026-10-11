@@ -242,7 +242,7 @@ files remain in git history on `master` and are copied to the archive under
 add a network boundary that the task container cannot change:
 
 ```sh
-bench/egress/build.sh        # once: builds mi-egress:1 and the run-local CA in bench/egress/ca/ (not committed)
+bench/egress/build.sh        # builds mi-egress:1 (it holds filter.py, entrypoint.sh and allowlist.txt: rebuild after changing them) and, once, the run-local CA in bench/egress/ca/ (not committed)
 bench/harbor.sh run -y -c bench/configs/tb21-mi-v4.1-review-clean.yaml \
   -c bench/configs/agent-mi-deepseek-v4.1-flash-egress.yaml -c bench/configs/egress.yaml -n 4 --job-name <J>
 python3 bench/audit.py jobs/<J>
@@ -263,15 +263,27 @@ What is enforced during the agent phase:
   (`github.com/<owner>/<repo>/...`, the same on `raw.githubusercontent.com` and `codeload.github.com`,
   `api.github.com/repos/<owner>/<repo>/...`); routes by numeric id, `/graphql`, search, organisation and user
   listings and gists are refused, and the benchmark's own organisations are refused by name.
-- The model API may not be asked to browse the web; tunnels (inner CONNECT, raw TCP after TLS, WebSockets) are refused.
+- A request to the model API may not ask the provider to search or fetch for the model. The proxy reads the whole
+  request body, whatever its size (request bodies are never streamed past the filter), and parses it as JSON; a body
+  that is not one JSON object, or that the filter cannot judge, is refused. In that object these are refused, in every value of a repeated key: a
+  `model` or `models` entry with the `:online` suffix; `web_search_options` or `web_search`; a `plugins` entry with
+  id `web`, or whose id cannot be read; a `tools` entry whose type is not `function` (server tools such as
+  `openrouter:web_search`); a non-text content part of `messages` or `input` that carries an http(s) URL (an image
+  or file the provider would download). The field names are OpenRouter's and OpenAI's as documented on 2026-10-11.
+- Tunnels (inner CONNECT, raw TCP after TLS, WebSockets) are refused.
 - The adapter installs the proxy's CA in the container, keeps `agent/egress-shim.log` and `agent/egress-proxy.log`
   with each trial (host, method, first 300 characters of the path, decision — not headers or bodies), and switches
   the shim to plain relaying when the agent phase ends.
 
 What is not enforced:
 
-- Request headers and bodies are not inspected. The policy rests on the list holding no host that fetches arbitrary
-  URLs for its caller; a host added to the list must be checked for that.
+- Request headers and bodies are not inspected, except the model API body as described above. The policy rests on
+  the list holding no host that fetches arbitrary URLs for its caller; a host added to the list must be checked for
+  that.
+- The model API rule knows the request fields listed above and no others. Search switched on outside the request
+  (an account default or a preset at the provider), a model that searches by itself, a field added by a provider
+  later, or the fields of another provider's API are not recognised. Whether OpenRouter acts on each refused shape
+  was not tested (paid API); the rule was tested against a local stand-in for the model host.
 - A copy of benchmark material under an unrelated name on a listed host (a renamed fork, a dataset upload) is not
   recognised. The two release-download hosts serve signed, opaque URLs and are not path-checked.
 - DNS is not inspected.

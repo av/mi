@@ -14,12 +14,20 @@ What is enforced, in this order:
    codeload.github.com/<owner>/<repo>/..., api.github.com/repos/<owner>/<repo>/... . Every other GitHub route is
    refused: routes by numeric id, /graphql, search, organisation and user listings, gists. The benchmark's own
    organisations are refused by rule 2. Replies of api.github.com that name a benchmark source are withheld.
-4. the model API (MI_EGRESS_MODEL_HOSTS) may not be asked to browse or search the web for the model.
+4. a request to the model API (MI_EGRESS_MODEL_HOSTS) may not ask the provider to search or fetch for the model.
+   Its whole body is read (never streamed past this filter) and parsed as JSON; a body that is not one JSON object
+   or cannot be judged is refused. Refused in the object, in every value of a repeated key: a `model` or `models` entry with the
+   `:online` suffix, `web_search_options` or `web_search`, a `plugins` entry with id `web` (or one whose id cannot
+   be read), a `tools` entry whose type is not `function` (those run at the provider: web search, web fetch), and
+   a non-text content part of `messages` or `input` that carries an http(s) URL (a file or image the provider
+   would download).
 5. tunnels are refused: CONNECT inside a connection, raw TCP after TLS, WebSockets.
 
 What is NOT enforced: request headers and bodies are not inspected (apart from rule 4), so the policy rests on
 the allowlist containing no host that fetches arbitrary URLs for its caller. A copy of benchmark material under
-an unrelated name on an allowed host (a renamed fork, a dataset upload) is not recognised.
+an unrelated name on an allowed host (a renamed fork, a dataset upload) is not recognised. Rule 4 knows the
+request fields listed there and no others: search switched on outside the request (an account default or preset
+at the provider), a model that searches by itself, or a field of another provider's API is not recognised.
 """
 import ipaddress
 import json
@@ -47,7 +55,6 @@ GITHUB_ROUTES = {
     "codeload.github.com": re.compile(rf"^/{NAME}/{NAME}/.+$"),
     "api.github.com": re.compile(rf"^/repos/{NAME}/{NAME}(?:/.*)?$"),
 }
-WEB_TOOLS = re.compile(r'"(plugins|web_search_options|web_search|tools)"\s*:\s*\[?\s*\{[^{}]*"(id|type)"\s*:\s*"(web|web_search[^"]*|browser[^"]*)"|"model"\s*:\s*"[^"]*:online"', re.I)
 
 
 def load_allowlist(path: str) -> tuple[set[str], tuple[str, ...]]:
@@ -76,7 +83,76 @@ def decoded(s: str) -> str:
     return s
 
 
-def request_verdict(connect_host: str, host_header: str, sni: str, path: str, body: str = "") -> str | None:
+class Obj(list):
+    """A JSON object as its (key, value) pairs: a repeated key keeps every value, servers differ in which they read."""
+
+
+def values(obj, key: str) -> list:
+    return [v for k, v in obj if k.lower() == key] if isinstance(obj, Obj) else []
+
+
+def strings(node, skip: str = ""):
+    """Every string value under a parsed JSON node, except those under the key `skip`."""
+    if isinstance(node, str):
+        yield node
+    elif isinstance(node, Obj):
+        for k, v in node:
+            if k.lower() != skip:
+                yield from strings(v, skip)
+    elif isinstance(node, list):
+        for v in node:
+            yield from strings(v, skip)
+
+
+def entries(value) -> list:
+    """The items of a JSON array; anything else that is not null counts as one entry."""
+    return value if type(value) is list else [] if value is None else [value]
+
+
+def web_request(body: str | bytes) -> str | None:
+    """Reason to refuse a model API request body (rule 4), or None. The body is judged as the JSON a server parses,
+    not as text: escapes, key order, entry order and repeated keys make no difference."""
+    if not body or not body.strip():
+        return None
+    try:
+        doc = json.loads(body, object_pairs_hook=Obj)
+    except Exception:  # not UTF-8/16/32, not JSON, nested too deep
+        return "model API request body is not JSON"
+    if not isinstance(doc, Obj):
+        return "model API request body is not a JSON object"
+    try:
+        return web_fields(doc)
+    except Exception:  # e.g. nested too deep to walk
+        return "model API request body could not be judged"
+
+
+def web_fields(doc: Obj) -> str | None:
+    why = "asks the model provider to browse the web"
+    models = values(doc, "model") + [m for ms in values(doc, "models") for m in entries(ms)]
+    if any(isinstance(m, str) and ":online" in m.lower() for m in models):
+        return why
+    if any(v is not None for key in ("web_search_options", "web_search") for v in values(doc, key)):
+        return why
+    for plugins in values(doc, "plugins"):
+        for plugin in entries(plugins):
+            ids = values(plugin, "id")
+            if not ids or any(not isinstance(i, str) or i.strip().lower() == "web" for i in ids):
+                return why
+    for tools in values(doc, "tools"):
+        for tool in entries(tools):
+            if not (types := values(tool, "type")) or any(t != "function" for t in types):
+                return "names a tool that runs at the model provider"
+    for key in ("messages", "input"):
+        for messages in values(doc, key):
+            for message in entries(messages):
+                for content in values(message, "content"):
+                    for part in content if type(content) is list else []:
+                        if any(re.match(r"\s*https?://", s, re.I) for s in strings(part, "text")):
+                            return "asks the model provider to fetch a URL"
+    return None
+
+
+def request_verdict(connect_host: str, host_header: str, sni: str, path: str, body: str | bytes = "") -> str | None:
     """Reason to refuse a request, or None. connect_host: the name the connection was opened for."""
     host = canon(connect_host)
     try:
@@ -96,8 +172,8 @@ def request_verdict(connect_host: str, host_header: str, sni: str, path: str, bo
         return "names a benchmark source"
     if (route := GITHUB_ROUTES.get(host)) and not (route.match(norm) and (bare.rstrip("/") or "/") == norm):
         return "GitHub route that is not a named repository"
-    if MODEL_HOSTS.search(host) and WEB_TOOLS.search(body):
-        return "asks the model provider to browse the web"
+    if MODEL_HOSTS.search(host):
+        return web_request(body)
     return None
 
 
@@ -115,16 +191,25 @@ def request(flow) -> None:
     r = flow.request
     if r.method.upper() == "CONNECT":
         return refuse(flow, "tunnel inside a connection")
-    body = (r.get_content(strict=False) or b"")[:262144].decode("latin1") if MODEL_HOSTS.search(canon(r.host)) else ""
-    if why := request_verdict(r.host, r.host_header or "", flow.client_conn.sni or "", r.path, body):
+    try:
+        body = (r.get_content(strict=False) or b"") if MODEL_HOSTS.search(canon(r.host)) else b""
+        why = request_verdict(r.host, r.host_header or "", flow.client_conn.sni or "", r.path, body)
+    except Exception as e:  # mitmproxy forwards a request whose hook raised: a request that cannot be judged is refused
+        why = f"the policy could not judge the request ({type(e).__name__})"
+    if why:
         return refuse(flow, why)
     log(host=canon(r.host), method=r.method, path=r.path[:300], action="allowed")
 
 
+def running() -> None:
+    from mitmproxy import ctx
+    # with this option set, mitmproxy forwards a request body over the limit before request() has seen it
+    ctx.options.stream_large_bodies = None
+
+
 def responseheaders(flow) -> None:
-    r = flow.response
-    if "event-stream" in r.headers.get("content-type", "") or MODEL_HOSTS.search(canon(flow.request.host)):
-        r.stream = True  # model replies are streamed through as they come
+    if canon(flow.request.host) != "api.github.com":
+        flow.response.stream = True  # replies are passed through as they come; only api.github.com's are read (response())
 
 
 def response(flow) -> None:

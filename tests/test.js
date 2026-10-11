@@ -4115,6 +4115,31 @@ print(json.dumps({
   "rcsb_suffix": v("data.rcsb.org", "/rest/v1/core/entry/1ABC"), "model_api": v("openrouter.ai", "/api/v1/chat/completions", body='{"messages":[{"content":"git clone terminal-bench was blocked"}]}'),
   "model_web_plugin": v("openrouter.ai", "/api/v1/chat/completions", body='{"model":"x","plugins":[{"id":"web"}]}'),
   "model_online": v("openrouter.ai", "/api/v1/chat/completions", body='{"model":"deepseek/x:online"}'),
+  # review 5: the model API request is judged as parsed JSON, whole, whatever its size, order, escapes or repeated keys
+  **{"model_" + k: v("openrouter.ai", "/api/v1/chat/completions", body=b) for k, b in {
+    "web_search_options": '{"model":"x","web_search_options":{"search_context_size":"high"}}', "web_search_options_empty": '{"model":"x","web_search_options":{}}',
+    "web_plugin_second": '{"model":"x","plugins":[{"id":"response-healing"},{"id":"web"}]}', "web_plugin_escaped": '{"model":"x","plugins":[{"id":"w\\\\u0065b"}]}',
+    "web_plugin_escaped_key": '{"model":"x","plu\\\\u0067ins":[{"id":"web"}]}', "web_plugin_options_first": '{"plugins":[{"engine":{"a":{}},"id":"web"}]}',
+    "web_plugin_after_300kb": json.dumps({"messages": [{"role": "user", "content": "x" * 300000}], "plugins": [{"id": "web"}]}),
+    "web_plugin_after_8mb_bytes": json.dumps({"messages": [{"role": "user", "content": "x" * 8000000}], "plugins": [{"id": "web"}]}).encode(),
+    "web_plugin_key_twice_first": '{"plugins":[{"id":"web"}],"plugins":[]}', "web_plugin_key_twice_last": '{"plugins":[],"plugins":[{"id":"web"}]}',
+    "web_plugin_id_twice": '{"plugins":[{"id":"response-healing","id":"web"}]}', "web_plugin_case": '{"plugins":[{"id":" Web "}]}',
+    "plugins_not_a_list": '{"plugins":{"id":"web"}}', "plugins_string": '{"plugins":"web"}', "plugins_number": '{"plugins":7}', "plugin_without_id": '{"plugins":[{"engine":"exa"}]}',
+    "online_in_models": '{"models":["a/b","c/d:online"]}', "online_upper": '{"model":"a/b:ONLINE"}', "online_model_key_twice": '{"model":"a/b:online","model":"a/b"}',
+    "server_tool": '{"tools":[{"type":"function","function":{"name":"bash"}},{"type":"openrouter:web_search"}]}', "server_tool_preview": '{"tools":[{"type":"web_search_preview"}]}',
+    "tool_without_type": '{"tools":[{"name":"web_search"}]}', "tool_type_twice": '{"tools":[{"type":"function","type":"openrouter:web_search"}]}',
+    "remote_image": '{"messages":[{"role":"user","content":[{"type":"image_url","image_url":{"url":"https://example.com/a.png"}}]}]}',
+    "remote_file": '{"messages":[{"role":"user","content":[{"type":"file","file":{"file_data":" HTTP://example.com/a.pdf"}}]}]}',
+    "utf16": '{"plugins":[{"id":"web"}]}'.encode("utf-16"), "utf8_bom": b"\\xef\\xbb\\xbf" + b'{"plugins":[{"id":"web"}]}', "not_utf8": b'{"model":"\\xff"}',
+    "trailing_comma": '{"plugins":[{"id":"web"},],}', "comment": '{"plugins":[{"id":/**/"web"}]}', "not_json": "plugins=web", "json_array": '[{"plugins":[{"id":"web"}]}]',
+    "nested_too_deep": '{"a":' + "[" * 100000 + "]" * 100000 + ',"plugins":[{"id":"web"}]}',
+    "nested_deep_content_part": '{"messages":[{"role":"user","content":[{"type":"x","a":' + "[" * 2000 + '"https://example.com/a"' + "]" * 2000 + '}]}]}',
+    # allowed: what mi sends, and text that only mentions the words
+    "ok_mi_request": json.dumps({"model": "deepseek/x", "stream": True, "messages": [{"role": "system", "content": 'see https://example.com "plugins":[{"id":"web"}] x:online'}, {"role": "user", "content": [{"type": "text", "text": "https://example.com"}, {"type": "image_url", "image_url": {"url": "data:image/png;base64,AAAA"}}]}, {"role": "assistant", "content": "", "tool_calls": [{"id": "c1", "type": "function", "function": {"name": "bash", "arguments": '{"command":"curl https://example.com"}'}}]}, {"role": "tool", "tool_call_id": "c1", "content": "https://example.com"}], "tools": [{"type": "function", "function": {"name": "bash", "parameters": {"type": "object", "properties": {"web_search": {"type": "string"}, "plugins": {"type": "array"}}}}}]}),
+    "ok_8mb_bytes": json.dumps({"model": "x", "messages": [{"role": "user", "content": "x" * 8000000}]}).encode(), "ok_plugins_null_tools_empty": '{"model":"x","plugins":null,"tools":[],"web_search_options":null}',
+    "ok_other_plugin": '{"model":"x","plugins":[{"id":"response-healing"}]}', "ok_empty_body": "", "ok_blank_body": b" \\n",
+  }.items()},
+  "body_on_other_host_not_read": v("pypi.org", "/simple/six/", body='{"plugins":[{"id":"web"}]}'),
   # a benchmark name on a listed host
   "pypi_benchmark_package": v("pypi.org", "/simple/terminal-bench/"), "hf_benchmark_dataset": v("huggingface.co", "/datasets/x/Terminal_Bench-2"), "hf_encoded": v("huggingface.co", "/datasets/x/%74erminal-bench"),
   # GitHub: named repositories only
@@ -4132,7 +4157,32 @@ print(json.dumps({
 }))`;
   const r = JSON.parse(execFileSync('python3', ['-c', py], { cwd: join(__dirname, '..'), encoding: 'utf8' }));
   const allowed = Object.keys(r).filter(k => r[k]).sort();
-  assert.deepStrictEqual(allowed, ['apt', 'gh_api_repo', 'gh_codeload', 'gh_git_protocol', 'gh_raw', 'gh_release_asset', 'gh_repo', 'hf', 'hf_cdn_suffix', 'host_header_with_port', 'model_api', 'pypi', 'pypi_upper_dot', 'rcsb_suffix'].sort());
+  assert.deepStrictEqual(allowed, ['apt', 'gh_api_repo', 'gh_codeload', 'gh_git_protocol', 'gh_raw', 'gh_release_asset', 'gh_repo', 'hf', 'hf_cdn_suffix', 'host_header_with_port', 'model_api', 'pypi', 'pypi_upper_dot', 'rcsb_suffix',
+    'model_ok_mi_request', 'model_ok_8mb_bytes', 'model_ok_plugins_null_tools_empty', 'model_ok_other_plugin', 'model_ok_empty_body', 'model_ok_blank_body', 'body_on_other_host_not_read'].sort());
+  assert.strictEqual(Object.keys(r).filter(k => k.startsWith('model_')).length, 43, 'every model API case was judged');
+  // a request body over mitmproxy's stream_large_bodies limit is forwarded before request() sees it: the option must stay off
+  assert.doesNotMatch(readFileSync(join(__dirname, '..', 'bench/egress/entrypoint.sh'), 'utf8'), /stream_large_bodies/);
+  assert.match(readFileSync(join(__dirname, '..', 'bench/egress/filter.py'), 'utf8'), /def running\(\)[\s\S]{0,300}ctx\.options\.stream_large_bodies = None/);
+  // mitmproxy forwards a request whose hook raised: request() refuses what the policy cannot judge
+  const hook = `
+import os, sys, json
+from types import SimpleNamespace as NS
+os.environ["MI_EGRESS_DENY"] = "tbench"; os.environ["MI_EGRESS_MODEL_HOSTS"] = "openrouter"
+sys.path.insert(0, "bench/egress")
+import filter as f
+f.http = NS(Response=NS(make=lambda status, body, headers: NS(status_code=status, body=body.decode())))
+f.log = lambda **kw: None
+def boom(*a, **k): raise RuntimeError("synthetic")
+def run(get_content):
+    flow = NS(request=NS(host="openrouter.ai", host_header="openrouter.ai", path="/api/v1/chat/completions", method="POST", get_content=get_content), client_conn=NS(sni="openrouter.ai"), response=None)
+    f.request(flow); return flow.response and [flow.response.status_code, flow.response.body.strip()]
+out = {"ordinary": run(lambda strict=False: b'{"model":"x","messages":[]}'), "body_unreadable": run(boom)}
+f.request_verdict = boom
+out["verdict_raises"] = run(lambda strict=False: b"{}")
+print(json.dumps(out))`;
+  const h = JSON.parse(execFileSync('python3', ['-c', hook], { cwd: join(__dirname, '..'), encoding: 'utf8' }));
+  assert.strictEqual(h.ordinary, null);
+  for (const k of ['body_unreadable', 'verdict_raises']) { assert.strictEqual(h[k][0], 403, k); assert.match(h[k][1], /could not judge the request \(RuntimeError\)/); }
 });
 
 test('review3 2: failed criteria in a NACK review still reach the worker as feedback — itemising them is best effort and never decides the verdict', async () => {
