@@ -1,0 +1,5 @@
+[90m⟡ bash({"command":"echo multi-line-sse-ok"})[0m
+[90mmulti-line-sse-ok
+[0m
+multi-line-sse-ok
+exit 0

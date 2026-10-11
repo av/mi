@@ -4208,9 +4208,8 @@ test('a reply with reasoning but no tool call and no answer keeps the run alive:
   assert.strictEqual(r.status, 0, r.stderr);
   assert.strictEqual(bodies.length, 4);
   const fed = bodies[2].messages.filter(m => m.role === 'user').map(m => m.content);
-  assert.strictEqual(fed.length, 3, 'the task and one harness message per empty reply');
-  assert.match(fed[1], /ended without a tool call and without an answer[\s\S]*design 1: primers chosen, next write the fasta file[\s\S]*act now/);
-  assert.match(fed[2], /design 2: primers chosen/);
+  assert.deepStrictEqual(bodies[2].messages.map(m => m.role), ['system', 'user'], 'the harness notes join the task message: no user message follows a user message');
+  assert.match(fed[0], /^go\n\n\[harness\] your last reply ended without a tool call and without an answer[\s\S]*design 1: primers chosen, next write the fasta file[\s\S]*act now[\s\S]*\n\n\[harness\][\s\S]*design 2: primers chosen/);
   assert.match(r.stderr, /empty reply 1 \(finish=stop, reasoning \d+ chars\)/);
   assert.match(r.stdout, /done/);
 });
@@ -4303,6 +4302,27 @@ test('contract (OpenRouter): reasoning_details are merged by index and sent back
   assert.ok(!('reasoning' in a) && !('reasoning_content' in a), 'the details are the one copy sent back');
 });
 
+test('contract (OpenRouter): reasoning_details without an index — blocks with their own id or signature stay separate, pieces of one block are joined', async () => {
+  const bodies = [], a = { type: 'reasoning.text', id: 'thought-a', text: 'first block', signature: 'sig-a', format: 'anthropic-claude-v1' }, b = { type: 'reasoning.text', id: 'thought-b', text: 'second block', signature: 'sig-b', format: 'anthropic-claude-v1' };
+  const sent = async first => { bodies.length = 0; requestHandler = (req, res, body) => { bodies.push(body); if (bodies.length === 1) chunks(res, [...first, ch(callDelta('echo hi')), ch({}, 'tool_calls')]); else chunks(res, [ch({ content: 'done' }), ch({}, 'stop')]); }; const r = await runMi(['-p', 'go']); assert.strictEqual(r.status, 0, r.stderr); return bodies[1].messages.find(m => m.role === 'assistant').reasoning_details; };
+  assert.deepStrictEqual(await sent([ch({ reasoning_details: [a, b] })]), [a, b], 'two complete blocks in one chunk');
+  assert.deepStrictEqual(await sent([ch({ reasoning_details: [a] }), ch({ reasoning_details: [b] })]), [a, b], 'two complete blocks in two chunks');
+  const noId = ({ id, ...x }) => x;
+  assert.deepStrictEqual(await sent([ch({ reasoning_details: [noId(a), noId(b)] })]), [noId(a), noId(b)], 'no ids: the signatures tell the blocks apart');
+  assert.deepStrictEqual(await sent([ch({ reasoning_details: [{ type: 'reasoning.text', id: 'thought-a', text: 'first ', format: 'anthropic-claude-v1' }] }), ch({ reasoning_details: [{ type: 'reasoning.text', text: 'block' }] }), ch({ reasoning_details: [{ type: 'reasoning.text', id: 'thought-a', signature: 'sig-a' }] }), ch({ reasoning_details: [{ type: 'reasoning.text', text: 'second ' }] }), ch({ reasoning_details: [{ type: 'reasoning.text', text: 'block', signature: 'sig-b' }] }), ch({ reasoning_details: [{ type: 'reasoning.encrypted', data: 'ENC', id: 'rs_1' }] }), ch({ reasoning_details: [{ type: 'reasoning.encrypted', data: 'RYPTED' }] }), ch({ reasoning_details: [{ type: 'reasoning.encrypted', data: 'OTHER', id: 'rs_2' }] })]),
+    [{ type: 'reasoning.text', id: 'thought-a', text: 'first block', format: 'anthropic-claude-v1', signature: 'sig-a' }, { type: 'reasoning.text', text: 'second block', signature: 'sig-b' }, { type: 'reasoning.encrypted', data: 'ENCRYPTED', id: 'rs_1' }, { type: 'reasoning.encrypted', data: 'OTHER', id: 'rs_2' }], 'streamed pieces: text after a signature and a new id start a block');
+});
+
+test('contract (SSE): an event with several data lines is one payload; events packed in one block without the blank line are still read', async () => {
+  let n = 0;
+  requestHandler = (req, res) => { n++; res.writeHead(200, { 'Content-Type': 'text/event-stream' }); if (n === 1) res.end('event: message\ndata: {"choices": [\ndata: {"index":0,"delta":' + JSON.stringify(callDelta('echo multi')) + ',\r\ndata:"finish_reason":"tool_calls"}]}\n\ndata: [DONE]\n\n'); else res.end('data: ' + JSON.stringify(ch({ content: 'packed ' })) + '\ndata: ' + JSON.stringify(ch({ content: 'events' }, 'stop')) + '\ndata: [DONE]\n\n'); };
+  const r = await runMi(['-p', 'go']);
+  assert.strictEqual(r.status, 0, r.stderr);
+  assert.match(r.stdout, /echo multi/);
+  assert.match(r.stdout, /packed events/);
+  assert.strictEqual(n, 2);
+});
+
 test('contract (SSE): CRLF line endings, "data:" without a space, comment lines and a last event without a blank line are all read', async () => {
   let n = 0;
   requestHandler = (req, res) => { n++; res.writeHead(200, { 'Content-Type': 'text/event-stream' }); if (n === 1) res.end(': keep-alive\r\n\r\ndata:' + JSON.stringify(ch(callDelta('echo crlf'))) + '\r\n\r\ndata:' + JSON.stringify(ch({}, 'tool_calls')) + '\r\n\r\ndata:[DONE]\r\n\r\n'); else res.end('data: ' + JSON.stringify(ch({ content: 'no trailing blank line' }, 'stop'))); };
@@ -4361,6 +4381,18 @@ test('contract (finish_reason): length continues a cut-off answer and explains c
   r = await runMi(['-p', 'go']);
   assert.notStrictEqual(r.status, 0);
   assert.match(r.stderr, /finish_reason=content_filter/);
+  let n = 0;
+  requestHandler = (req, res) => { n++; chunks(res, [ch({ content: 'partial answer' }), ch({}, 'content_filter')]); };
+  r = await runMi(['-p', 'go']);
+  assert.notStrictEqual(r.status, 0, 'a reply cut by the filter is not a completed answer');
+  assert.match(r.stderr, /withheld part of the reply \(finish_reason=content_filter\)/);
+  assert.strictEqual(n, 1);
+  const flag = join(tmpdir(), `mi-filter-${process.pid}`);
+  requestHandler = (req, res) => chunks(res, [ch(callDelta(`touch ${flag}`)), ch({}, 'content_filter')]);
+  r = await runMi(['-p', 'go']);
+  assert.notStrictEqual(r.status, 0);
+  assert.match(r.stderr, /finish_reason=content_filter/);
+  assert.ok(!existsSync(flag), 'a tool call from a filtered reply is not run');
   requestHandler = (req, res) => chunks(res, [ch({ refusal: 'I cannot help with that.' }), ch({}, 'stop')]);
   r = await runMi(['-p', 'go']);
   assert.strictEqual(r.status, 0, r.stderr);
@@ -4374,6 +4406,16 @@ test('contract (errors): the HTTP status decides retries when the body carries a
   assert.strictEqual(r.status, 0, r.stderr);
   assert.strictEqual(seen.length, 3);
   assert.ok(seen[1] - seen[0] >= 950, `waited ${seen[1] - seen[0]}ms for Retry-After: 1`);
+});
+
+test('contract (errors): Retry-After as an HTTP date is waited for; one in the past or unreadable falls back to the short backoff', async () => {
+  const seen = [];
+  requestHandler = (req, res) => { seen.push(Date.now()); const ra = [new Date(Date.now() + 3000).toUTCString(), new Date(Date.now() - 60000).toUTCString(), 'soon'][seen.length - 1]; if (ra) { res.writeHead(seen.length === 2 ? 503 : 429, { 'Content-Type': 'application/json', 'Retry-After': ra }); res.end(JSON.stringify({ error: { message: 'slow down', code: 'rate_limit_exceeded' } })); } else chunks(res, [ch({ content: 'ok' }), ch({}, 'stop')]); };
+  const r = await runMi(['-p', 'go']);
+  assert.strictEqual(r.status, 0, r.stderr);
+  assert.strictEqual(seen.length, 4);
+  assert.ok(seen[1] - seen[0] >= 1950 && seen[1] - seen[0] < 4500, `waited ${seen[1] - seen[0]}ms for a date 3 s ahead (HTTP dates have whole seconds)`);
+  assert.ok(seen[2] - seen[1] < 1900 && seen[3] - seen[2] < 2900, `past date ${seen[2] - seen[1]}ms, unreadable ${seen[3] - seen[2]}ms`);
 });
 
 test('contract (compaction): the summary request carries MI_API_PARAMS, and a server that rejects chat_template_kwargs gets the plain request', async () => {
@@ -4394,12 +4436,39 @@ test('contract (compaction): the summary request carries MI_API_PARAMS, and a se
   assert.match(r.stdout, /done/);
 });
 
-test('contract (roles): a timed-out request adds one harness message, not two user messages in a row', async () => {
-  const bodies = [];
-  requestHandler = (req, res, body) => { bodies.push(body); res.writeHead(200, { 'Content-Type': 'text/event-stream' }); if (bodies.length === 1) return void res.write(`data: ${JSON.stringify(ch({ reasoning: 'half a thought' }))}\n\n`); res.end(`data: ${JSON.stringify(ch({ content: 'done' }, 'stop'))}\n\ndata: [DONE]\n\n`); };
-  const r = await runMi(['-p', 'go'], { MI_REQUEST_TIMEOUT: '1' });
+const alternates = body => !body.messages.some((m, i) => m.role === 'user' && body.messages[i - 1]?.role === 'user');
+const strict = (res, body, reply) => { if (alternates(body)) return reply(); res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: { message: 'Conversation roles must alternate user/assistant', code: 'invalid_request' } })); }; // a chat template that requires alternating roles
+
+test('contract (roles): a timed-out request never leaves two user messages in a row — the harness note joins the user message already there', async () => {
+  const bodies = [], hang = res => { res.writeHead(200, { 'Content-Type': 'text/event-stream' }); res.write(`data: ${JSON.stringify(ch({ reasoning: 'half a thought' }))}\n\n`); };
+  requestHandler = (req, res, body) => { bodies.push(body); if (bodies.length === 1) return hang(res); strict(res, body, () => chunks(res, [ch({ content: 'done' }, 'stop')])); };
+  let r = await runMi(['-p', 'go'], { MI_REQUEST_TIMEOUT: '1' });
   assert.strictEqual(r.status, 0, r.stderr);
-  const roles = bodies[1].messages.map(m => m.role);
-  assert.deepStrictEqual(roles, ['system', 'user', 'user']);
-  assert.match(bodies[1].messages[2].content, /cut off by the request time limit[\s\S]*half a thought[\s\S]*reply in smaller steps/);
+  assert.deepStrictEqual(bodies[1].messages.map(m => m.role), ['system', 'user']);
+  assert.match(bodies[1].messages[1].content, /^go\n\n\[harness\] your last reply was cut off by the request time limit[\s\S]*half a thought[\s\S]*reply in smaller steps/);
+  // after a tool result the note is a message of its own, and a second timeout joins it
+  bodies.length = 0;
+  requestHandler = (req, res, body) => { bodies.push(body); if (bodies.length === 1) return chunks(res, [ch(callDelta('echo one')), ch({}, 'tool_calls')]); if (bodies.length < 4) return hang(res); strict(res, body, () => chunks(res, [ch({ content: 'done' }, 'stop')])); };
+  r = await runMi(['-p', 'go'], { MI_REQUEST_TIMEOUT: '1' });
+  assert.strictEqual(r.status, 0, r.stderr);
+  assert.deepStrictEqual(bodies[3].messages.map(m => m.role), ['system', 'user', 'assistant', 'tool', 'user']);
+  assert.strictEqual(bodies[3].messages[4].content.match(/reply in smaller steps/g).length, 2);
+});
+
+test('contract (roles): the next prompt of a continued session, a prompt after -f images and a cut-off continuation keep the roles alternating', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'mi-roles-')), sess = join(dir, 's.json'), img = join(dir, 'a.png'), bodies = [];
+  writeFileSync(sess, JSON.stringify([{ role: 'system', content: 'old' }, { role: 'user', content: 'first task' }, { role: 'assistant', content: '', tool_calls: [{ id: 'c1', type: 'function', function: { name: 'bash', arguments: '{"command":"true"}' } }] }, { role: 'tool', tool_call_id: 'c1', content: '' }, { role: 'user', content: '[harness] your last reply was cut off by the request time limit.' }])); writeFileSync(img, 'png');
+  requestHandler = (req, res, body) => { bodies.push(body); strict(res, body, () => chunks(res, bodies.length === 2 ? [ch({ content: 'half, ' }), ch({}, 'length')] : [ch({ content: 'done' }, 'stop')])); };
+  try {
+    let r = await runMi(['-p', 'judge findings'], { MI_SESSION: sess });
+    assert.strictEqual(r.status, 0, r.stderr);
+    assert.deepStrictEqual(bodies[0].messages.map(m => m.role), ['system', 'user', 'assistant', 'tool', 'user']);
+    assert.match(bodies[0].messages[4].content, /^\[harness\] your last reply was cut off by the request time limit\.\n\njudge findings$/);
+    r = await runMi(['-f', img, '-p', 'what is in the picture']);
+    assert.strictEqual(r.status, 0, r.stderr);
+    assert.deepStrictEqual(bodies[1].messages.map(m => m.role), ['system', 'user']);
+    assert.deepStrictEqual(bodies[1].messages[1].content.map(p => p.type), ['text', 'image_url', 'text']);
+    assert.strictEqual(bodies[1].messages[1].content[2].text, 'what is in the picture');
+    assert.deepStrictEqual(bodies[2].messages.map(m => m.role), ['system', 'user', 'assistant', 'user'], 'a continuation request follows the assistant message');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });

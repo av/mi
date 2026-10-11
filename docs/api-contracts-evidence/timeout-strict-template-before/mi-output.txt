@@ -1,0 +1,20 @@
+[90m⟡ retry 1 (23)[0m
+file:///tmp/mi-fix6-before/index.mjs:29
+  if (!response.ok) { const body = await response.json().catch(() => ({})); const err = new Error(body.error?.message || `HTTP ${response.status}`); err.code = body.error?.code; err.status = response.status; throw err; }
+                                                                                        ^
+
+Error: Unable to generate parser for this template. Automatic parser generation failed: 
+------------
+While executing CallExpression at line 19, column 27 in source:
+...% 2 == 0) -%}↵        {{ raise_exception("Conversation roles must alternate user...
+                                           ^
+Error: Jinja Exception: Conversation roles must alternate user/assistant/user/assistant/...
+    at run (file:///tmp/mi-fix6-before/index.mjs:29:89)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async file:///tmp/mi-fix6-before/index.mjs:71:478 {
+  code: 400,
+  status: 400
+}
+
+Node.js v22.22.2
+exit 1
