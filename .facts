@@ -180,7 +180,12 @@
   command: grep -q 'reasoning_effort.*REASONING_EFFORT' index.mjs
 - label: MI_API_PARAMS is optional JSON merged into chat completion payload
   command: grep -q 'MI_API_PARAMS.*JSON.parse' index.mjs
-- MI_DIR and MI_PATH set in process.env for tools/skills to locate package assets
+- label: MI_DIR and MI_PATH set in process.env for tools/skills to locate package assets — file paths (fileURLToPath), so an install path with spaces, # or non-ASCII letters works; tool modules are imported by file URL
+  command: grep -q "MI_PATH: fileURLToPath(import.meta.url)" index.mjs && grep -q 'pathToFileURL(`${dir}/${f}`)' index.mjs
+- label: ~/.mi/config.json values that are not strings (an MI_API_PARAMS object, a number) become env defaults as their JSON text
+  command: grep -q "typeof v === 'string' ? v : JSON.stringify(v)" index.mjs
+- label: --sandbox (or MI_SANDBOX) runs ghcr.io/av/mi:<running version> unless MI_IMAGE is set, mounts the cwd at /work and config.json read-only, and passes OPENAI_*, MODEL, REASONING_EFFORT, SYSTEM_PROMPT and MI_* (except the host paths MI_DIR, MI_PATH, MI_HOME, MI_SESSION) to docker by name, so no value is on docker's command line
+  command: grep -q 'ghcr.io/av/mi:${ver}' index.mjs && grep -q "flatMap(k => \['-e', k\])" index.mjs && ! grep -q 'OPENAI_API_KEY=${' index.mjs
 - label: OPENAI_BASE_URL accepts provider roots with or without trailing /v1
   command: grep -q 'api = p =>' index.mjs
 - label: CLI supports -d flag and MI_DEADLINE env var for goal deadline
