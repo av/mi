@@ -12,8 +12,8 @@ agentic coding in 30 loc. a loop, two tools, and an llm.
 - self-extending: agent can write its own tools via the `self` skill
 - `skill` tool loads markdown playbooks from `skills/` and `~/.agents/skills/` (auto-advertised in system prompt)
 - bundled skills: `plan`, `tasks`, `delegate`, `explore`, `refactor`, `review`, `verify`, `debug`, `tdd`, `new-skill`, `self`
-- modular tools: add new tools by dropping `.mjs` files in `tools/` (hot-loaded before each model call)
-- `--sandbox` mode: run inside a Docker container with PWD mounted — safe for destructive experiments. image ships with node, python, uv, git, GNU coreutils/grep/sed/awk/find, curl, jq, ssh, rsync, vim, less, procps, util-linux, bind-tools (dig), iputils (ping), tree
+- modular tools: add new tools by dropping `.mjs` files in `tools/`, or keep your own in `~/.mi/tools/` so they survive upgrades (hot-loaded before each model call; a user tool with a bundled tool's name replaces it)
+- `--sandbox` mode: run inside a Docker container with PWD mounted — safe for destructive experiments. the container runs the same mi version as your install and gets your settings (`OPENAI_*`, `MODEL`, `REASONING_EFFORT`, `SYSTEM_PROMPT`, `MI_*`) from the shell and `config.json`. image ships with node, python, uv, git, GNU coreutils/grep/sed/awk/find, curl, jq, ssh, rsync, vim, less, procps, util-linux, bind-tools (dig), iputils (ping), tree
 - automatic `AGENTS.md` ingestion from current directory for repo-specific context
 - chat REPL with `/reset` (aliases: `/new`, `/clear`) and error recovery
 - non-interactive mode with `-p 'prompt'` for scripting and CI
@@ -75,7 +75,7 @@ mi
 }
 ```
 
-any env var that mi reads can be set here: `OPENAI_API_KEY`, `MODEL`, `OPENAI_BASE_URL`, `REASONING_EFFORT`, `SYSTEM_PROMPT`. the config directory can be overridden with `MI_HOME`.
+any env var that mi reads can be set here: `OPENAI_API_KEY`, `MODEL`, `OPENAI_BASE_URL`, `REASONING_EFFORT`, `SYSTEM_PROMPT`, `MI_API_PARAMS` (as a JSON object or a JSON string). the config directory can be overridden with `MI_HOME`; your own tools go in its `tools/` subdirectory.
 
 ## env
 
@@ -86,10 +86,10 @@ any env var that mi reads can be set here: `OPENAI_API_KEY`, `MODEL`, `OPENAI_BA
 | `MODEL` | `gpt-5.4` | model name |
 | `REASONING_EFFORT` | (unset) | optional reasoning effort for compatible models (`minimal`, `low`, `medium`, `high`) |
 | `SYSTEM_PROMPT` | built-in agent prompt | override the system prompt entirely |
-| `MI_HOME` | `~/.mi` | config directory (reads `config.json`) |
+| `MI_HOME` | `~/.mi` | config directory (reads `config.json`, loads user tools from `tools/*.mjs`) |
 | `MI_SANDBOX` | (unset) | truthy = always run in Docker container |
 | `MI_API_PARAMS` | (unset) | JSON object merged into chat completion payload (e.g. `{"temperature":0}`) |
-| `MI_IMAGE` | `ghcr.io/av/mi:latest` | docker image for sandbox mode |
+| `MI_IMAGE` | `ghcr.io/av/mi:<mi version>` | docker image for sandbox mode |
 
 ## deep dive
 
@@ -106,7 +106,7 @@ export default { name: 'bash', description: '...', parameters: {...}, handler: (
 }};
 ```
 
-the harness hot-loads tools before each model call by scanning `tools/*.mjs`. two tools ship by default:
+the harness hot-loads tools before each model call by scanning `tools/*.mjs` and then your own `~/.mi/tools/*.mjs` (same export contract). two tools ship by default:
 
 - `bash` gives the agent access to the entire system: git, curl, compilers, package managers, and file I/O (via `cat`, `sed -n`, `sed -i`, heredocs; the system prompt teaches the patterns). optional `timeout=<ms>` kills the process after the given delay and resolves with `[timeout]`. optional `bg=truthy` runs the command detached and returns `pid:X log:/tmp/mi-*.log` immediately.
 - `skill` gives the agent specialized workflows loaded on demand from markdown playbooks in bundled `skills/` or `~/.agents/skills/`.

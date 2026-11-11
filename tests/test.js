@@ -2507,6 +2507,66 @@ test('env vars override ~/.mi/config.json', async () => {
   }
 });
 
+test('~/.mi/config.json values that are not strings are read as their JSON text (MI_API_PARAMS object)', async () => {
+  const mockHome = join(__dirname, 'mock_mi_home_json_values');
+  mkdirSync(mockHome, { recursive: true });
+  writeFileSync(join(mockHome, 'config.json'), JSON.stringify({ MI_API_PARAMS: { temperature: 0.25, top_p: 0.5 } }));
+  requestHandler = (req, res, body) => {
+    assert.strictEqual(body.temperature, 0.25);
+    assert.strictEqual(body.top_p, 0.5);
+    sse(res, { role: 'assistant', content: 'json config ok' });
+  };
+  try {
+    const result = await runMi(['-p', 'check json config'], { MI_HOME: mockHome });
+    assert.strictEqual(result.status, 0, result.stderr);
+    assert.match(result.stdout, /json config ok/);
+  } finally {
+    rmSync(mockHome, { recursive: true, force: true });
+  }
+});
+
+test('mi installed under a path with spaces, # and non-ASCII letters starts and loads its tools and skills', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'mi install #1 Пример '));
+  for (const p of ['index.mjs', 'package.json', 'tools', 'skills']) cpSync(join(__dirname, '..', p), join(root, p), { recursive: true });
+  let n = 0;
+  requestHandler = (req, res, body) => {
+    n++;
+    if (n === 1) {
+      assert.ok(body.tools.some(t => t.function.name === 'bash'));
+      assert.match(body.messages[0].content, /Skill descriptions:/);
+      sse(res, { role: 'assistant', tool_calls: [{ id: 'call_path', type: 'function', function: { name: 'bash', arguments: JSON.stringify({ command: 'echo "$MI_DIR"' }) } }] });
+    } else {
+      assert.strictEqual(body.messages.at(-1).content.trim(), `${root}/`);
+      sse(res, { role: 'assistant', content: 'odd path ok' });
+    }
+  };
+  try {
+    const child = spawn('node', [join(root, 'index.mjs'), '-p', 'check path'], { env: { ...process.env, OPENAI_BASE_URL: serverUrl, OPENAI_API_KEY: 'test-key', MI_HOME: '/tmp/.mi-test-no-home', http_proxy: '', HTTP_PROXY: '' } });
+    child.stdin.end();
+    let out = '', err = '';
+    child.stdout.on('data', d => out += d); child.stderr.on('data', d => err += d);
+    const status = await new Promise(r => child.on('close', r));
+    assert.strictEqual(status, 0, err);
+    assert.match(out, /odd path ok/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('--sandbox runs the image of the same mi version and passes mi settings to docker by name, not by value', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'mi-fake-docker-'));
+  writeFileSync(join(dir, 'docker'), '#!/bin/sh\nprintf "%s\\n" "$@" > "$FAKE_DOCKER_DIR/args"\nenv > "$FAKE_DOCKER_DIR/env"\n', { mode: 0o755 });
+  try {
+    const result = await runMi(['--sandbox', '-p', 'hi'], { PATH: `${dir}:${process.env.PATH}`, FAKE_DOCKER_DIR: dir, MODEL: 'sandbox-model', REASONING_EFFORT: 'low', MI_API_PARAMS: '{"temperature":0}' });
+    assert.strictEqual(result.status, 0, result.stderr);
+    const args = readFileSync(join(dir, 'args'), 'utf8').trim().split('\n'), ver = JSON.parse(readFileSync(join(__dirname, '../package.json'), 'utf8')).version;
+    const passed = args.flatMap((a, i) => a === '-e' ? [args[i + 1]] : []);
+    for (const k of ['OPENAI_API_KEY', 'OPENAI_BASE_URL', 'MODEL', 'REASONING_EFFORT', 'MI_API_PARAMS', 'MI_SANDBOXED=1']) assert.ok(passed.includes(k), `-e ${k} missing: ${passed}`);
+    for (const k of ['MI_DIR', 'MI_PATH', 'MI_HOME']) assert.ok(!passed.some(p => p.split('=')[0] === k), `${k} is a host path and must not reach the container`);
+    assert.ok(!args.some(a => a.includes('test-key')), 'the API key is not on the docker command line');
+    assert.match(readFileSync(join(dir, 'env'), 'utf8'), /^OPENAI_API_KEY=test-key$/m);
+    assert.deepStrictEqual(args.slice(args.indexOf(`ghcr.io/av/mi:${ver}`)), [`ghcr.io/av/mi:${ver}`, '-p', 'hi']);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
 test('user tools loaded from MI_HOME/tools/ directory', async () => {
   const mockHome = join(__dirname, 'mock_mi_home_tools');
   const toolsDir = join(mockHome, 'tools');
@@ -2936,7 +2996,7 @@ test('MI_API_PARAMS with invalid JSON gives clean error', async () => {
 });
 
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, cpSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 
 test('Harbor adapter routes tasks through goal mode with the eval prompts', async () => {
